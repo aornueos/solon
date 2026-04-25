@@ -1,0 +1,16 @@
+# Redireciona artefatos de build pra fora do OneDrive.
+#
+# O projeto vive em C:\Users\raull\OneDrive\WaitNewIdea\solon. O OneDrive
+# sincroniza o `target/` em tempo real — durante o build, ele desidrata
+# arquivos (cloud-only) e mantém handles abertos em arquivos que o Cargo
+# tenta sobrescrever. Resultado: erros intermitentes de
+# "output path is not a writable directory" (autocfg), "os error 5"
+# (access denied), e linkagem travando.
+#
+# Mandar target-dir pra %LOCALAPPDATA% resolve tudo: é local-only, sem
+# sincronização, e é o local convencional no Windows pra cache de build.
+#
+# Se mudar de máquina / usuário, só trocar o caminho abaixo.
+
+[build]
+target-dir = "C:/Users/raull/AppData/Local/cargo-target/solon"

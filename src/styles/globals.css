@@ -1,0 +1,360 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────
+   Tema — Light (papel/sépia sutil) e Dark (cinza neutro quente)
+   ─────────────────────────────────────────
+   O dark é neutro — grafite com leve warmth pra não ficar clínico.
+   Evitamos marrom: a sensação é "caderno de couro preto" e não
+   "papel envelhecido". O accent continua âmbar pra manter
+   personalidade editorial em ambos os temas.
+─────────────────────────────────────────── */
+:root,
+[data-theme="light"] {
+  --bg-app: #f4f2ed;
+  --bg-panel: #fdfcf9;
+  --bg-panel-2: #f7f5f0;
+  --bg-hover: #ebe8e1;
+  --bg-active: #dedad1;
+  --bg-selected: #f0e7d0;
+  --bg-inverse: #1f1e1c;
+  --bg-code: #ebe8e1;
+
+  --text-primary: #1f1e1c;
+  --text-secondary: #4a4845;
+  --text-muted: #807c76;
+  --text-placeholder: #a8a39b;
+  --text-inverse: #fdfcf9;
+
+  --border: #d1cec7;
+  --border-subtle: #e4e1db;
+  --border-strong: #a8a39b;
+
+  --accent: #a07850;
+  --accent-2: #c9a05a;
+  --accent-soft: rgba(160, 120, 80, 0.18);
+  --danger: #a04040;
+  --success: #6b8e4e;
+
+  --dot-grid: #d6d2cb;
+  --marquee-fill: rgba(160, 120, 80, 0.08);
+  --marquee-stroke: rgba(160, 120, 80, 0.7);
+  --selection-ring: rgba(160, 120, 80, 0.55);
+
+  --shadow-sm: 0 1px 2px rgba(30, 28, 25, 0.08);
+  --shadow-md: 0 3px 10px rgba(30, 28, 25, 0.12);
+}
+
+[data-theme="dark"] {
+  /* Grafite neutro com 2% de warmth — não é azul-cinza (frio) nem marrom */
+  --bg-app: #1b1c1e;
+  --bg-panel: #232427;
+  --bg-panel-2: #292a2d;
+  --bg-hover: #33353a;
+  --bg-active: #3e4046;
+  --bg-selected: #4a463a;
+  --bg-inverse: #e8e6e1;
+  --bg-code: #2e2f33;
+
+  --text-primary: #e6e4df;
+  --text-secondary: #b9b6af;
+  --text-muted: #8a8680;
+  --text-placeholder: #5e5a54;
+  --text-inverse: #1b1c1e;
+
+  --border: #3a3b40;
+  --border-subtle: #2d2e32;
+  --border-strong: #55565c;
+
+  --accent: #c9a05a;
+  --accent-2: #d8b67a;
+  --accent-soft: rgba(201, 160, 90, 0.2);
+  --danger: #d26a6a;
+  --success: #9abd7b;
+
+  --dot-grid: #2d2e32;
+  --marquee-fill: rgba(201, 160, 90, 0.1);
+  --marquee-stroke: rgba(201, 160, 90, 0.7);
+  --selection-ring: rgba(201, 160, 90, 0.75);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    background-color: var(--bg-panel);
+    color: var(--text-primary);
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+}
+
+/* ─────────────────────────────────────────
+   Editor ProseMirror
+───────────────────────────────────────── */
+
+.ProseMirror {
+  outline: none;
+  user-select: text;
+  cursor: text;
+  font-family: "Lora", Georgia, serif !important;
+  font-size: 1.0625rem !important;
+  line-height: 1.85;
+  color: var(--text-primary);
+  caret-color: var(--accent);
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text-placeholder);
+  pointer-events: none;
+  height: 0;
+  font-style: italic;
+}
+
+.ProseMirror h1 {
+  font-family: "Lora", Georgia, serif !important;
+  font-size: 2rem !important;
+  font-weight: 700 !important;
+  line-height: 1.15;
+  margin-top: 3rem;
+  margin-bottom: 1.25rem;
+  color: var(--text-primary) !important;
+  letter-spacing: -0.03em;
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid var(--accent-2);
+}
+
+.ProseMirror h1:first-child { margin-top: 0; }
+
+.ProseMirror h2 {
+  font-family: "Lora", Georgia, serif !important;
+  font-size: 1.35rem !important;
+  font-weight: 600 !important;
+  line-height: 1.3;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary) !important;
+  letter-spacing: -0.01em;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--accent-2);
+}
+
+.ProseMirror h3 {
+  font-family: "Inter", sans-serif !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  line-height: 1.4;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--accent) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.ProseMirror h4 {
+  font-family: "Inter", sans-serif !important;
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  margin-top: 1.75rem;
+  margin-bottom: 0.4rem;
+  color: var(--text-muted) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.ProseMirror h5,
+.ProseMirror h6 {
+  font-family: "Inter", sans-serif !important;
+  font-size: 0.68rem !important;
+  font-weight: 500 !important;
+  margin-top: 1.25rem;
+  margin-bottom: 0.3rem;
+  color: var(--text-placeholder) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.ProseMirror p {
+  margin-bottom: 0.85em;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 1.25rem;
+  margin: 1.5rem 0;
+  color: var(--text-secondary) !important;
+  font-style: italic;
+}
+
+/* ── Separador de cena — padrão robusto ──
+ * Tailwind preflight e browsers não renderizam `::after` em `<hr>`
+ * de forma confiável. Usamos SVG-in-data-URL como background,
+ * funciona em todo canto e escala certo. */
+.ProseMirror hr {
+  border: none;
+  margin: 2.5rem auto;
+  height: 1.25rem;
+  width: 40%;
+  min-width: 120px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  /* 3 diamond glyphs — ajustam cor via currentColor */
+  background-image: linear-gradient(
+    to right,
+    transparent 0%,
+    currentColor 10%,
+    currentColor 22%,
+    transparent 32%,
+    transparent 40%,
+    currentColor 50%,
+    currentColor 50%,
+    transparent 60%,
+    transparent 68%,
+    currentColor 78%,
+    currentColor 90%,
+    transparent 100%
+  );
+  background-size: 100% 1px;
+  color: var(--border-strong);
+  opacity: 0.7;
+}
+
+.ProseMirror strong { font-weight: 700; color: var(--text-primary); }
+.ProseMirror em { font-style: italic; }
+
+/* ── Listas — Tailwind preflight remove list-style, restauramos ── */
+.ProseMirror ul {
+  list-style: disc outside;
+  padding-left: 1.75rem;
+  margin-bottom: 0.85em;
+}
+.ProseMirror ol {
+  list-style: decimal outside;
+  padding-left: 1.75rem;
+  margin-bottom: 0.85em;
+}
+.ProseMirror ul ul { list-style: circle outside; }
+.ProseMirror ul ul ul { list-style: square outside; }
+.ProseMirror li {
+  margin-bottom: 0.25em;
+  padding-left: 0.25rem;
+}
+.ProseMirror li::marker {
+  color: var(--text-muted);
+}
+
+.ProseMirror code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.85em;
+  background: var(--bg-code);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  color: var(--text-primary);
+}
+.ProseMirror pre {
+  background: var(--bg-inverse);
+  color: var(--text-inverse);
+  padding: 1rem 1.25rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 1rem 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.ProseMirror ::selection {
+  background: var(--accent-soft);
+}
+
+/* ─────────────────────────────────────────
+   Tabelas (@tiptap/extension-table)
+   Estilo Obsidian — grade sutil, header com fundo suave.
+───────────────────────────────────────── */
+.ProseMirror table {
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  width: 100%;
+  table-layout: fixed;
+  overflow: hidden;
+  font-family: "Inter", sans-serif;
+  font-size: 0.92rem;
+}
+.ProseMirror table td,
+.ProseMirror table th {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  min-width: 80px;
+  position: relative;
+  line-height: 1.5;
+}
+.ProseMirror table th {
+  background: var(--bg-panel-2);
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+}
+.ProseMirror table tr:nth-child(even) td {
+  background: var(--bg-panel-2);
+}
+.ProseMirror table .selectedCell::after {
+  content: "";
+  background: var(--accent-soft);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ProseMirror table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--accent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ProseMirror table td:hover .column-resize-handle,
+.ProseMirror table th:hover .column-resize-handle {
+  opacity: 0.4;
+}
+.ProseMirror .tableWrapper {
+  overflow-x: auto;
+  margin: 1.25rem 0;
+}
+
+/* ─────────────────────────────────────────
+   Canvas — bg/cursor hints no modo dark
+───────────────────────────────────────── */
+.canvas-surface {
+  background-color: var(--bg-app);
+  background-image: radial-gradient(circle, var(--dot-grid) 1px, transparent 1px);
+}

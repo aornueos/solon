@@ -1,0 +1,398 @@
+import { Editor } from "@tiptap/react";
+import {
+  Bold,
+  Italic,
+  Strikethrough,
+  Heading1,
+  Heading2,
+  Heading3,
+  Quote,
+  Minus,
+  List,
+  ListOrdered,
+  Undo,
+  Redo,
+  Table as TableIcon,
+  Plus,
+  Rows,
+  Columns,
+  Trash2,
+} from "lucide-react";
+import { useState } from "react";
+import clsx from "clsx";
+
+interface Props {
+  editor: Editor;
+}
+
+/**
+ * Specs das ações — elimina a repetição de `onMouseDown → chain().focus()`
+ * espalhada no código antigo (clean code: table-driven).
+ */
+interface ToolSpec {
+  icon: React.ReactNode;
+  title: string;
+  run: (e: Editor) => void;
+  isActive?: (e: Editor) => boolean;
+}
+
+export function EditorToolbar({ editor }: Props) {
+  const [tableMenu, setTableMenu] = useState(false);
+
+  const inTable = editor.isActive("table");
+
+  const historyTools: ToolSpec[] = [
+    {
+      icon: <Undo size={15} />,
+      title: "Desfazer (Ctrl+Z)",
+      run: (e) => e.chain().focus().undo().run(),
+    },
+    {
+      icon: <Redo size={15} />,
+      title: "Refazer (Ctrl+Y)",
+      run: (e) => e.chain().focus().redo().run(),
+    },
+  ];
+
+  const headingTools: ToolSpec[] = [1, 2, 3].map((level) => ({
+    icon:
+      level === 1 ? <Heading1 size={15} /> :
+      level === 2 ? <Heading2 size={15} /> :
+      <Heading3 size={15} />,
+    title:
+      level === 1 ? "Capítulo (H1)" :
+      level === 2 ? "Seção (H2)" :
+      "Cena (H3)",
+    run: (e) => e.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 }).run(),
+    isActive: (e) => e.isActive("heading", { level }),
+  }));
+
+  const inlineTools: ToolSpec[] = [
+    {
+      icon: <Bold size={15} />,
+      title: "Negrito (Ctrl+B)",
+      run: (e) => e.chain().focus().toggleBold().run(),
+      isActive: (e) => e.isActive("bold"),
+    },
+    {
+      icon: <Italic size={15} />,
+      title: "Itálico (Ctrl+I)",
+      run: (e) => e.chain().focus().toggleItalic().run(),
+      isActive: (e) => e.isActive("italic"),
+    },
+    {
+      icon: <Strikethrough size={15} />,
+      title: "Tachado",
+      run: (e) => e.chain().focus().toggleStrike().run(),
+      isActive: (e) => e.isActive("strike"),
+    },
+  ];
+
+  const blockTools: ToolSpec[] = [
+    {
+      icon: <Quote size={15} />,
+      title: "Diálogo / Citação",
+      run: (e) => e.chain().focus().toggleBlockquote().run(),
+      isActive: (e) => e.isActive("blockquote"),
+    },
+    {
+      icon: <Minus size={15} />,
+      title: "Quebra de cena",
+      run: (e) => e.chain().focus().setHorizontalRule().run(),
+    },
+  ];
+
+  const listTools: ToolSpec[] = [
+    {
+      icon: <List size={15} />,
+      title: "Lista",
+      run: (e) => e.chain().focus().toggleBulletList().run(),
+      isActive: (e) => e.isActive("bulletList"),
+    },
+    {
+      icon: <ListOrdered size={15} />,
+      title: "Lista numerada",
+      run: (e) => e.chain().focus().toggleOrderedList().run(),
+      isActive: (e) => e.isActive("orderedList"),
+    },
+  ];
+
+  return (
+    <div
+      className="flex items-center gap-0.5 px-4 py-1.5"
+      style={{
+        borderBottom: "1px solid var(--border-subtle)",
+        background: "var(--bg-panel-2)",
+      }}
+    >
+      <ToolGroup editor={editor} tools={historyTools} />
+      <Divider />
+      <ToolGroup editor={editor} tools={headingTools} />
+      <Divider />
+      <ToolGroup editor={editor} tools={inlineTools} />
+      <Divider />
+      <ToolGroup editor={editor} tools={blockTools} />
+      <Divider />
+      <ToolGroup editor={editor} tools={listTools} />
+      <Divider />
+
+      <div className="relative">
+        <ToolBtn
+          title="Tabela"
+          active={inTable}
+          onClick={() => setTableMenu((v) => !v)}
+        >
+          <TableIcon size={15} />
+        </ToolBtn>
+        {tableMenu && (
+          <TableMenu
+            editor={editor}
+            inTable={inTable}
+            onClose={() => setTableMenu(false)}
+          />
+        )}
+      </div>
+
+      <div className="ml-auto flex items-center gap-1">
+        <NovelPresets editor={editor} />
+      </div>
+    </div>
+  );
+}
+
+function ToolGroup({ editor, tools }: { editor: Editor; tools: ToolSpec[] }) {
+  return (
+    <>
+      {tools.map((t, i) => (
+        <ToolBtn
+          key={i}
+          title={t.title}
+          onClick={() => t.run(editor)}
+          active={t.isActive?.(editor)}
+        >
+          {t.icon}
+        </ToolBtn>
+      ))}
+    </>
+  );
+}
+
+function ToolBtn({
+  children,
+  title,
+  onClick,
+  active,
+}: {
+  children: React.ReactNode;
+  title: string;
+  onClick: () => void;
+  active?: boolean;
+}) {
+  return (
+    <button
+      onMouseDown={(e) => {
+        e.preventDefault();
+        onClick();
+      }}
+      title={title}
+      className={clsx("p-1.5 rounded transition-colors")}
+      style={{
+        background: active ? "var(--bg-active)" : "transparent",
+        color: active ? "var(--text-primary)" : "var(--text-muted)",
+      }}
+      onMouseEnter={(e) => {
+        if (active) return;
+        (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+        (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+      }}
+      onMouseLeave={(e) => {
+        if (active) return;
+        (e.currentTarget as HTMLElement).style.background = "transparent";
+        (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TableMenu({
+  editor,
+  inTable,
+  onClose,
+}: {
+  editor: Editor;
+  inTable: boolean;
+  onClose: () => void;
+}) {
+  const run = (fn: () => void) => {
+    fn();
+    onClose();
+  };
+
+  return (
+    <div
+      className="absolute left-0 top-full mt-1 z-20 rounded shadow-md py-1 min-w-[200px]"
+      style={{
+        background: "var(--bg-panel)",
+        border: "1px solid var(--border)",
+      }}
+      onMouseLeave={onClose}
+    >
+      <MenuItem
+        onClick={() =>
+          run(() =>
+            editor
+              .chain()
+              .focus()
+              .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+              .run(),
+          )
+        }
+        icon={<Plus size={12} />}
+        label="Inserir tabela 3×3"
+      />
+      <div
+        className="h-px my-1"
+        style={{ background: "var(--border-subtle)" }}
+      />
+      <MenuItem
+        disabled={!inTable}
+        onClick={() => run(() => editor.chain().focus().addRowAfter().run())}
+        icon={<Rows size={12} />}
+        label="Adicionar linha abaixo"
+      />
+      <MenuItem
+        disabled={!inTable}
+        onClick={() => run(() => editor.chain().focus().addColumnAfter().run())}
+        icon={<Columns size={12} />}
+        label="Adicionar coluna à direita"
+      />
+      <MenuItem
+        disabled={!inTable}
+        onClick={() => run(() => editor.chain().focus().deleteRow().run())}
+        icon={<Trash2 size={12} />}
+        label="Excluir linha"
+      />
+      <MenuItem
+        disabled={!inTable}
+        onClick={() => run(() => editor.chain().focus().deleteColumn().run())}
+        icon={<Trash2 size={12} />}
+        label="Excluir coluna"
+      />
+      <div
+        className="h-px my-1"
+        style={{ background: "var(--border-subtle)" }}
+      />
+      <MenuItem
+        disabled={!inTable}
+        onClick={() => run(() => editor.chain().focus().deleteTable().run())}
+        icon={<Trash2 size={12} />}
+        label="Excluir tabela"
+        danger
+      />
+    </div>
+  );
+}
+
+function MenuItem({
+  onClick,
+  icon,
+  label,
+  disabled,
+  danger,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      disabled={disabled}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        if (!disabled) onClick();
+      }}
+      className="w-full flex items-center gap-2 px-3 py-1.5 text-[0.78rem] text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      style={{
+        color: danger ? "var(--danger)" : "var(--text-secondary)",
+      }}
+      onMouseEnter={(e) => {
+        if (disabled) return;
+        (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.background = "transparent";
+      }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function Divider() {
+  return (
+    <div
+      className="w-px h-4 mx-1"
+      style={{ background: "var(--border-subtle)" }}
+    />
+  );
+}
+
+function NovelPresets({ editor }: { editor: Editor }) {
+  const presets = [
+    {
+      label: "Capítulo",
+      action: () =>
+        editor
+          .chain()
+          .focus()
+          .setHorizontalRule()
+          .insertContent("<h1>Capítulo</h1>")
+          .run(),
+    },
+    {
+      label: "Cena",
+      action: () =>
+        editor.chain().focus().insertContent("<hr /><h3>Nova Cena</h3>").run(),
+    },
+  ];
+
+  return (
+    <>
+      <span
+        className="text-[0.65rem] uppercase tracking-wider mr-1"
+        style={{ color: "var(--text-placeholder)" }}
+      >
+        Inserir
+      </span>
+      {presets.map((p) => (
+        <button
+          key={p.label}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            p.action();
+          }}
+          className="text-[0.72rem] px-2 py-1 rounded transition-colors"
+          style={{
+            border: "1px solid var(--border)",
+            color: "var(--text-secondary)",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+            (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
+          }}
+        >
+          {p.label}
+        </button>
+      ))}
+    </>
+  );
+}
