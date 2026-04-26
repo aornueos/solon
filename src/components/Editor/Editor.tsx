@@ -22,9 +22,12 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import { IndentExtension } from "./IndentExtension";
+import { ListExitExtension } from "./ListExitExtension";
 import { useAppStore } from "../../store/useAppStore";
 import { EditorToolbar } from "./EditorToolbar";
 import { markdownToHtml, htmlToMarkdown } from "./markdownBridge";
+import { setCurrentEditor } from "../../lib/editorRef";
+import { ensureSpellchecker } from "../../lib/spellcheck";
 
 export function Editor() {
   // Seletores granulares: evita re-render do editor ao mudar sidebarWidth,
@@ -37,6 +40,7 @@ export function Editor() {
   const setWordCount = useAppStore((s) => s.setWordCount);
   const setFileBody = useAppStore((s) => s.setFileBody);
   const editorZoom = useAppStore((s) => s.editorZoom);
+  const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
 
   const isLoadingRef = useRef(false);
   const lastLoadedPathRef = useRef<string | null>(null);
@@ -60,6 +64,7 @@ export function Editor() {
       Typography,
       CharacterCount,
       IndentExtension,
+      ListExitExtension,
       Table.configure({ resizable: true, HTMLAttributes: { class: "solon-table" } }),
       TableRow,
       TableHeader,
@@ -69,6 +74,17 @@ export function Editor() {
       }),
     ],
     content: "",
+    // `spellcheck=true/false` ativa o spellchecker nativo do WebView2/
+    // WebKit/WebKitGTK — risca em vermelho palavras nao-reconhecidas.
+    // O valor inicial vem da pref persistida; mudancas em runtime sao
+    // aplicadas imperativamente no DOM (vide useEffect abaixo).
+    editorProps: {
+      attributes: {
+        spellcheck: useAppStore.getState().spellcheckEnabled
+          ? "true"
+          : "false",
+      },
+    },
     onUpdate: ({ editor }) => {
       if (isLoadingRef.current) return;
 
@@ -115,6 +131,39 @@ export function Editor() {
     });
     return () => cancelAnimationFrame(raf);
   }, [activeFilePath, editor, setHeadings, setWordCount]);
+
+  // Spellcheck toggle reativo: editorProps.attributes so e' lido na init,
+  // entao se o user mudar a pref via context menu / settings em runtime,
+  // a gente seta o atributo no DOM imperativamente.
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view.dom as HTMLElement;
+    dom.setAttribute("spellcheck", spellcheckEnabled ? "true" : "false");
+  }, [editor, spellcheckEnabled]);
+
+  // Registra/desregistra ref global pro editor. Usado pelo
+  // ContextMenuProvider pra detectar palavra em right-click sem precisar
+  // passar refs por arvore de props.
+  useEffect(() => {
+    if (!editor) return;
+    setCurrentEditor(editor);
+    return () => setCurrentEditor(null);
+  }, [editor]);
+
+  // Pre-warming do spellcheck: dispara o load 2s apos o editor montar,
+  // em background, sem await. Quando o user fizer o primeiro right-click
+  // em uma palavra errada (~10s+ depois normalmente), o engine ja' esta
+  // pronto e as sugestoes aparecem instantaneas. Sem pre-warm, o
+  // primeiro right-click teria menu sem sugestoes (engine ainda
+  // carregando).
+  useEffect(() => {
+    if (!spellcheckEnabled) return;
+    const t = window.setTimeout(() => {
+      // fire-and-forget — failures sao logadas dentro do facade
+      ensureSpellchecker();
+    }, 2000);
+    return () => window.clearTimeout(t);
+  }, [spellcheckEnabled]);
 
   // Scroll para heading via evento do Outline. Chain pra scrollar DE FATO
   // até a posição — `setTextSelection` sozinho só move o caret, não o

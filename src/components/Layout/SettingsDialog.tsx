@@ -1,6 +1,7 @@
-import { useEffect } from "react";
-import { X, Sun, Moon, RotateCcw, Save, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Sun, Moon, RotateCcw, Save, Sparkles, SpellCheck } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
+import { getPersonalDictSize } from "../../lib/spellcheck";
 
 /**
  * Dialog de Preferencias.
@@ -25,7 +26,17 @@ export function SettingsDialog() {
   const setAutoSaveEnabled = useAppStore((s) => s.setAutoSaveEnabled);
   const autoCheckUpdates = useAppStore((s) => s.autoCheckUpdates);
   const setAutoCheckUpdates = useAppStore((s) => s.setAutoCheckUpdates);
+  const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
+  const setSpellcheckEnabled = useAppStore((s) => s.setSpellcheckEnabled);
   const resetSettings = useAppStore((s) => s.resetSettings);
+
+  // Re-le o tamanho do dicionario pessoal toda vez que o dialog abre.
+  // Sem reactividade real — a store nao tracka isso (ficaria barulhento
+  // pra um numero que muda raro). Snapshot na abertura e' suficiente.
+  const [personalDictSize, setPersonalDictSize] = useState(0);
+  useEffect(() => {
+    if (show) setPersonalDictSize(getPersonalDictSize());
+  }, [show]);
 
   // Esc fecha o dialog. Listener no nivel da janela (e' dialog modal,
   // entao um Esc deveria fecha-lo independente de foco).
@@ -182,6 +193,22 @@ export function SettingsDialog() {
                 checked={autoSaveEnabled}
                 onChange={setAutoSaveEnabled}
                 label={autoSaveEnabled ? "Ativado" : "Desativado"}
+              />
+            </Row>
+
+            <Row
+              label="Verificação ortográfica (pt-BR)"
+              hint={
+                personalDictSize > 0
+                  ? `Sublinhado vermelho + sugestões no clique direito. ${personalDictSize} ${personalDictSize === 1 ? "palavra" : "palavras"} no dicionário pessoal.`
+                  : "Sublinhado vermelho em palavras erradas + sugestões clicáveis no clique direito. Carregado sob demanda."
+              }
+              icon={<SpellCheck size={13} />}
+            >
+              <Toggle
+                checked={spellcheckEnabled}
+                onChange={setSpellcheckEnabled}
+                label={spellcheckEnabled ? "Ativada" : "Desativada"}
               />
             </Row>
           </Section>

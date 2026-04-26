@@ -64,6 +64,34 @@ export interface ConfirmOptions {
 }
 
 /**
+ * Item de context menu custom. Pode ser uma acao normal, um separador
+ * (linha horizontal), ou um item-toggle (checkbox-like).
+ *
+ * `disabled` desabilita o click e baixa opacity. `danger` deixa em
+ * vermelho (pra Excluir, etc). `shortcut` mostra o atalho a' direita.
+ */
+export type ContextMenuItem =
+  | {
+      kind?: "action";
+      label: string;
+      onClick: () => void;
+      icon?: React.ReactNode;
+      shortcut?: string;
+      disabled?: boolean;
+      danger?: boolean;
+      checked?: boolean; // se presente, mostra check ao lado quando true
+    }
+  | { kind: "separator" };
+
+/** Context menu ativo — coordenadas em viewport (clientX/Y). */
+export interface ActiveContextMenu {
+  id: number;
+  x: number;
+  y: number;
+  items: ContextMenuItem[];
+}
+
+/**
  * Estado do sistema de update.
  *  - `idle`: nada a fazer (boot inicial ou apos check vazio).
  *  - `checking`: requisicao em andamento.
@@ -151,6 +179,10 @@ interface AppState {
   autoCheckUpdates: boolean;
   /** Visibilidade do dialog de preferencias. */
   showSettings: boolean;
+  /** Context menu ativo (custom, substitui o nativo do WebView). */
+  activeContextMenu: ActiveContextMenu | null;
+  /** Liga/desliga spellcheck visual (red underlines) no editor. */
+  spellcheckEnabled: boolean;
 
   // Actions
   setActiveFile: (path: string, name: string, body: string, meta: SceneMeta) => void;
@@ -191,6 +223,9 @@ interface AppState {
   /** Reset de todas as preferencias pro default (zoom 100%, theme light,
    *  auto-save on, etc). Usado pelo botao "Restaurar padroes". */
   resetSettings: () => void;
+  openContextMenu: (x: number, y: number, items: ContextMenuItem[]) => void;
+  closeContextMenu: () => void;
+  setSpellcheckEnabled: (v: boolean) => void;
 }
 
 const THEME_KEY = "solon:theme";
@@ -207,9 +242,11 @@ function loadTheme(): "light" | "dark" {
 const DEFAULT_EDITOR_ZOOM = 100;
 const DEFAULT_AUTO_SAVE = true;
 const DEFAULT_AUTO_CHECK_UPDATES = true;
+const DEFAULT_SPELLCHECK = true;
 const EDITOR_ZOOM_KEY = "solon:editorZoom";
 const AUTO_SAVE_KEY = "solon:autoSave";
 const AUTO_CHECK_UPDATES_KEY = "solon:autoCheckUpdates";
+const SPELLCHECK_KEY = "solon:spellcheck";
 
 function loadEditorZoom(): number {
   try {
@@ -263,6 +300,8 @@ export const useAppStore = create<AppState>((set) => ({
   autoSaveEnabled: loadBoolPref(AUTO_SAVE_KEY, DEFAULT_AUTO_SAVE),
   autoCheckUpdates: loadBoolPref(AUTO_CHECK_UPDATES_KEY, DEFAULT_AUTO_CHECK_UPDATES),
   showSettings: false,
+  activeContextMenu: null,
+  spellcheckEnabled: loadBoolPref(SPELLCHECK_KEY, DEFAULT_SPELLCHECK),
 
   setActiveFile: (path, name, body, meta) => {
     // Persiste o ultimo arquivo aberto pra "Continuar" na HomePage e
@@ -454,6 +493,7 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.removeItem(EDITOR_ZOOM_KEY);
       localStorage.removeItem(AUTO_SAVE_KEY);
       localStorage.removeItem(AUTO_CHECK_UPDATES_KEY);
+      localStorage.removeItem(SPELLCHECK_KEY);
     } catch {
       /* ignora */
     }
@@ -461,7 +501,29 @@ export const useAppStore = create<AppState>((set) => ({
       editorZoom: DEFAULT_EDITOR_ZOOM,
       autoSaveEnabled: DEFAULT_AUTO_SAVE,
       autoCheckUpdates: DEFAULT_AUTO_CHECK_UPDATES,
+      spellcheckEnabled: DEFAULT_SPELLCHECK,
     });
+  },
+
+  openContextMenu: (x, y, items) =>
+    set({
+      activeContextMenu: {
+        id: Date.now(),
+        x,
+        y,
+        items,
+      },
+    }),
+
+  closeContextMenu: () => set({ activeContextMenu: null }),
+
+  setSpellcheckEnabled: (v) => {
+    try {
+      localStorage.setItem(SPELLCHECK_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ spellcheckEnabled: v });
   },
 }));
 

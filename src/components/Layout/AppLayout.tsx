@@ -12,6 +12,8 @@ import { ToastLayer } from "./ToastLayer";
 import { DialogLayer } from "./DialogLayer";
 import { UpdateNotesDialog } from "./UpdateNotesDialog";
 import { SettingsDialog } from "./SettingsDialog";
+import { ContextMenuLayer } from "./ContextMenuLayer";
+import { ContextMenuProvider } from "./ContextMenuProvider";
 import { startDrag } from "../../lib/drag";
 
 export function AppLayout() {
@@ -135,6 +137,8 @@ export function AppLayout() {
       <DialogLayer />
       <UpdateNotesDialog />
       <SettingsDialog />
+      <ContextMenuLayer />
+      <ContextMenuProvider />
     </div>
   );
 }

@@ -7,6 +7,10 @@ dist-ssr/
 build/
 *.local
 
+# spellcheck dictionary — copiado de node_modules/dictionary-pt em
+# postinstall. Nao versionar pra nao inflar o repo (.aff+.dic ~= 5MB).
+public/dict/
+
 # Tauri build artifacts
 src-tauri/target/
 src-tauri/gen/schemas/
