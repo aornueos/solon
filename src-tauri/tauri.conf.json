@@ -39,5 +39,14 @@
       "icons/icon.ico"
     ]
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": false,
+      "endpoints": [
+        "https://github.com/SEU_USUARIO/solon/releases/latest/download/latest.json"
+      ],
+      "pubkey": "SUBSTITUIR_APOS_RODAR_TAURI_SIGNER_GENERATE"
+    }
+  }
 }

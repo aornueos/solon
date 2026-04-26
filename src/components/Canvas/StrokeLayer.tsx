@@ -17,7 +17,8 @@ export function StrokeLayer({
   worldHeight: number;
   liveStroke?: CanvasStroke | null;
 }) {
-  const { strokes, selectedId, selectedIds, select, tool } = useCanvasStore();
+  const { strokes, selectedId, selectedIds, select, tool, eraseById } =
+    useCanvasStore();
 
   return (
     <svg
@@ -49,8 +50,14 @@ export function StrokeLayer({
             ? "var(--text-primary)"
             : s.color;
         return (
-          <g key={s.id} style={{ pointerEvents: tool === "select" ? "auto" : "none" }}>
-            {/* Hit area gorda (transparente) pra facilitar seleção */}
+          <g
+            key={s.id}
+            style={{
+              pointerEvents:
+                tool === "select" || tool === "eraser" ? "auto" : "none",
+            }}
+          >
+            {/* Hit area gorda (transparente) pra facilitar seleção/borracha */}
             <path
               d={d}
               stroke="transparent"
@@ -58,8 +65,13 @@ export function StrokeLayer({
               fill="none"
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={{ cursor: "pointer" }}
+              style={{ cursor: tool === "eraser" ? "cell" : "pointer" }}
               onMouseDown={(e) => {
+                if (tool === "eraser") {
+                  e.stopPropagation();
+                  eraseById(s.id);
+                  return;
+                }
                 if (tool !== "select") return;
                 e.stopPropagation();
                 select(s.id);

@@ -10,6 +10,8 @@ import { Titlebar } from "./Titlebar";
 import { StatusBar } from "./StatusBar";
 import { ToastLayer } from "./ToastLayer";
 import { DialogLayer } from "./DialogLayer";
+import { UpdateNotesDialog } from "./UpdateNotesDialog";
+import { SettingsDialog } from "./SettingsDialog";
 import { startDrag } from "../../lib/drag";
 
 export function AppLayout() {
@@ -131,6 +133,8 @@ export function AppLayout() {
       <StatusBar />
       <ToastLayer />
       <DialogLayer />
+      <UpdateNotesDialog />
+      <SettingsDialog />
     </div>
   );
 }

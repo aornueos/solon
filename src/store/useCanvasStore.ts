@@ -47,6 +47,22 @@ export type SelectionSnapshot = Map<
   | { kind: "stroke"; points: number[] }
 >;
 
+/**
+ * Snapshot mínimo serializavel pra historico de undo/redo. Inclui só os
+ * arrays de geometria — viewport (pan/zoom) e tool nao entram porque o
+ * usuario nao espera que Ctrl+Z desfaca um zoom acidental ou volte de
+ * eraser pra select.
+ */
+interface CanvasSnapshot {
+  cards: CanvasCard[];
+  arrows: CanvasArrow[];
+  texts: CanvasText[];
+  strokes: CanvasStroke[];
+  images: CanvasImage[];
+}
+
+const MAX_HISTORY = 80;
+
 interface CanvasState {
   /** Arquivo `.md` para qual este canvas pertence (ou null). */
   filePath: string | null;
@@ -56,6 +72,11 @@ interface CanvasState {
   strokes: CanvasStroke[];
   images: CanvasImage[];
   viewport: CanvasViewport;
+
+  /** Pilha de snapshots para undo (mais antigo no inicio, mais recente no fim). */
+  past: CanvasSnapshot[];
+  /** Pilha de snapshots para redo. Limpa em qualquer mutacao nova. */
+  future: CanvasSnapshot[];
 
   /** Ferramenta ativa (default: select). */
   tool: CanvasTool;
@@ -145,6 +166,9 @@ interface CanvasState {
   toggleInSelection: (id: string) => void;
   /** Identifica a categoria de `id` na store. */
   findSelectionKind: (id: string) => SelectionKind | null;
+  /** Remove um item por id, descobrindo o tipo dele. Usado pela
+   *  ferramenta borracha (que nao discrimina kind no UI). */
+  eraseById: (id: string) => void;
   /** Remove todas as entidades selecionadas (`selectedIds`). */
   removeSelected: () => void;
   /** Captura as posicoes originais de todos os itens em `selectedIds`
@@ -159,6 +183,15 @@ interface CanvasState {
 
   /** Serializa para gravar no disco. */
   toDoc: () => CanvasDoc;
+
+  /** Captura o estado atual no past — chame ANTES de mutar pra registrar
+   *  o "ponto de undo". Idempotente em snapshot identico (debounce: nao
+   *  empurra se o ultimo past ja e igual ao state atual). */
+  pushHistory: () => void;
+  /** Reverte ao snapshot mais recente do past. No-op se vazio. */
+  undo: () => void;
+  /** Re-aplica do future. No-op se vazio. */
+  redo: () => void;
 }
 
 /**
@@ -208,6 +241,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   selectedIds: new Set<string>(),
   linkingFromId: null,
   linkingFromSide: null,
+  past: [],
+  future: [],
 
   hydrate: (filePath, doc) =>
     set({
@@ -223,6 +258,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       linkingFromId: null,
       linkingFromSide: null,
       tool: "select",
+      // Trocar de arquivo zera o historico — Ctrl+Z apos abrir um canvas
+      // diferente nao deveria voltar pro estado do canvas anterior.
+      past: [],
+      future: [],
     }),
 
   reset: () =>
@@ -239,9 +278,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       linkingFromId: null,
       linkingFromSide: null,
       tool: "select",
+      past: [],
+      future: [],
     }),
 
   addCard: (partial) => {
+    get().pushHistory();
     const id = nanoid();
     const { viewport, cards } = get();
     const w = partial?.w ?? DEFAULT_CARD_W;
@@ -293,6 +335,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       set({ selectedId: existing.id });
       return existing.id;
     }
+    get().pushHistory();
     const id = nanoid();
     const card: CanvasCard = {
       id,
@@ -336,12 +379,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return changed ? { cards } : s;
     }),
 
-  removeCard: (id) =>
+  removeCard: (id) => {
+    get().pushHistory();
     set((s) => ({
       cards: s.cards.filter((c) => c.id !== id),
       arrows: s.arrows.filter((a) => a.from !== id && a.to !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
-    })),
+    }));
+  },
 
   duplicateCard: (id) => {
     const card = get().cards.find((c) => c.id === id);
@@ -349,6 +394,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     // Cenas não duplicam (duas cards apontando pro mesmo arquivo confunde
     // o fluxo de snapshot e abertura). O atalho vira no-op para cenas.
     if (card.kind === "scene") return null;
+    get().pushHistory();
     const newId = nanoid();
     const copy: CanvasCard = {
       ...card,
@@ -369,6 +415,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   addArrow: (from, to, sides) => {
     if (from === to) return;
+    get().pushHistory();
     set((s) => {
       // Duplicate check considera também o par de lados: duas setas entre
       // os mesmos cards mas em lados diferentes são legítimas (ex: ida e
@@ -391,11 +438,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     });
   },
 
-  removeArrow: (id) =>
+  removeArrow: (id) => {
+    get().pushHistory();
     set((s) => ({
       arrows: s.arrows.filter((a) => a.id !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
-    })),
+    }));
+  },
 
   updateArrow: (id, patch) =>
     set((s) => ({
@@ -430,6 +479,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     })),
 
   addText: (partial) => {
+    get().pushHistory();
     const id = nanoid();
     // Default color e "" (sentinela "Auto"), nao o `drawColor` da store.
     // Assim o texto recem-criado adapta a cor ao tema (light/dark) via
@@ -453,13 +503,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       texts: s.texts.map((t) => (t.id === id ? { ...t, ...patch } : t)),
     })),
 
-  removeText: (id) =>
+  removeText: (id) => {
+    get().pushHistory();
     set((s) => ({
       texts: s.texts.filter((t) => t.id !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
-    })),
+    }));
+  },
 
   addStroke: (stroke) => {
+    get().pushHistory();
     const id = nanoid();
     set((s) => ({ strokes: [...s.strokes, { ...stroke, id }] }));
     return id;
@@ -470,13 +523,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       strokes: s.strokes.map((st) => (st.id === id ? { ...st, ...patch } : st)),
     })),
 
-  removeStroke: (id) =>
+  removeStroke: (id) => {
+    get().pushHistory();
     set((s) => ({
       strokes: s.strokes.filter((t) => t.id !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
-    })),
+    }));
+  },
 
   addImage: (img) => {
+    get().pushHistory();
     const id = nanoid();
     set((s) => ({ images: [...s.images, { ...img, id }], selectedId: id }));
     return id;
@@ -487,11 +543,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       images: s.images.map((i) => (i.id === id ? { ...i, ...patch } : i)),
     })),
 
-  removeImage: (id) =>
+  removeImage: (id) => {
+    get().pushHistory();
     set((s) => ({
       images: s.images.filter((i) => i.id !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
-    })),
+    }));
+  },
 
   setViewport: (v) => set((s) => ({ viewport: { ...s.viewport, ...v } })),
 
@@ -566,21 +624,40 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     return null;
   },
 
+  eraseById: (id) => {
+    const s = get();
+    const kind = s.findSelectionKind(id);
+    if (kind === "card") s.removeCard(id);
+    else if (kind === "arrow") s.removeArrow(id);
+    else if (kind === "text") s.removeText(id);
+    else if (kind === "stroke") s.removeStroke(id);
+    else if (kind === "image") s.removeImage(id);
+  },
+
   removeSelected: () => {
     const s = get();
     const ids = s.selectedIds.size > 0
       ? [...s.selectedIds]
       : s.selectedId ? [s.selectedId] : [];
     if (ids.length === 0) return;
-    for (const id of ids) {
-      const kind = s.findSelectionKind(id);
-      if (kind === "card") s.removeCard(id);
-      else if (kind === "arrow") s.removeArrow(id);
-      else if (kind === "text") s.removeText(id);
-      else if (kind === "stroke") s.removeStroke(id);
-      else if (kind === "image") s.removeImage(id);
-    }
-    set({ selectedIds: new Set<string>(), selectedId: null });
+    // Um unico push de history pra todo o batch — senao Delete em N cards
+    // viraria N entries no past e o usuario teria que apertar Ctrl+Z N
+    // vezes pra recuperar a selecao.
+    s.pushHistory();
+    const idSet = new Set(ids);
+    set((curr) => ({
+      cards: curr.cards.filter((c) => !idSet.has(c.id)),
+      // Apaga arrows selecionadas E qualquer arrow cujos endpoints
+      // foram apagados (cascade equivalente ao removeCard original).
+      arrows: curr.arrows.filter(
+        (a) => !idSet.has(a.id) && !idSet.has(a.from) && !idSet.has(a.to),
+      ),
+      texts: curr.texts.filter((t) => !idSet.has(t.id)),
+      strokes: curr.strokes.filter((st) => !idSet.has(st.id)),
+      images: curr.images.filter((i) => !idSet.has(i.id)),
+      selectedId: null,
+      selectedIds: new Set<string>(),
+    }));
   },
 
   snapshotSelection: () => {
@@ -660,5 +737,90 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   toDoc: (): CanvasDoc => {
     const { cards, arrows, texts, strokes, images, viewport } = get();
     return { version: 1, cards, arrows, texts, strokes, images, viewport };
+  },
+
+  pushHistory: () => {
+    const s = get();
+    const snap: CanvasSnapshot = {
+      cards: s.cards,
+      arrows: s.arrows,
+      texts: s.texts,
+      strokes: s.strokes,
+      images: s.images,
+    };
+    // Debounce: se o ultimo snapshot tem as mesmas referencias, nao
+    // empurra de novo. Acontece quando duas mutacoes vem no mesmo tick
+    // e ambas chamam pushHistory.
+    const last = s.past[s.past.length - 1];
+    if (
+      last &&
+      last.cards === snap.cards &&
+      last.arrows === snap.arrows &&
+      last.texts === snap.texts &&
+      last.strokes === snap.strokes &&
+      last.images === snap.images
+    ) {
+      // future tambem precisa morrer — qualquer nova acao invalida o redo
+      if (s.future.length > 0) set({ future: [] });
+      return;
+    }
+    const past = s.past.length >= MAX_HISTORY
+      ? [...s.past.slice(s.past.length - MAX_HISTORY + 1), snap]
+      : [...s.past, snap];
+    set({ past, future: [] });
+  },
+
+  undo: () => {
+    const s = get();
+    if (s.past.length === 0) return;
+    const prev = s.past[s.past.length - 1];
+    const present: CanvasSnapshot = {
+      cards: s.cards,
+      arrows: s.arrows,
+      texts: s.texts,
+      strokes: s.strokes,
+      images: s.images,
+    };
+    set({
+      cards: prev.cards,
+      arrows: prev.arrows,
+      texts: prev.texts,
+      strokes: prev.strokes,
+      images: prev.images,
+      past: s.past.slice(0, -1),
+      future: [...s.future, present],
+      // Selecao pode referenciar items que sumiram no undo — limpa por
+      // seguranca. UX equivalente ao Figma/Excalidraw.
+      selectedId: null,
+      selectedIds: new Set<string>(),
+      linkingFromId: null,
+      linkingFromSide: null,
+    });
+  },
+
+  redo: () => {
+    const s = get();
+    if (s.future.length === 0) return;
+    const next = s.future[s.future.length - 1];
+    const present: CanvasSnapshot = {
+      cards: s.cards,
+      arrows: s.arrows,
+      texts: s.texts,
+      strokes: s.strokes,
+      images: s.images,
+    };
+    set({
+      cards: next.cards,
+      arrows: next.arrows,
+      texts: next.texts,
+      strokes: next.strokes,
+      images: next.images,
+      past: [...s.past, present],
+      future: s.future.slice(0, -1),
+      selectedId: null,
+      selectedIds: new Set<string>(),
+      linkingFromId: null,
+      linkingFromSide: null,
+    });
   },
 }));

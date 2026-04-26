@@ -22,6 +22,10 @@ export function ImageNode({ image }: Props) {
     translateSelection,
     viewport,
     tool,
+    linkingFromId,
+    beginLink,
+    completeLink,
+    pushHistory,
   } = useCanvasStore();
   const rootFolder = useAppStore((s) => s.rootFolder);
   const [url, setUrl] = useState<string | null>(null);
@@ -54,8 +58,21 @@ export function ImageNode({ image }: Props) {
   }, [rootFolder, image.src]);
 
   const onMouseDown = (e: React.MouseEvent) => {
-    if (tool !== "select") return;
     if ((e.target as HTMLElement).closest("[data-image-action]")) return;
+
+    if (tool === "eraser") {
+      e.stopPropagation();
+      removeImage(image.id);
+      return;
+    }
+    if (tool === "arrow") {
+      e.stopPropagation();
+      e.preventDefault();
+      if (linkingFromId) completeLink(image.id);
+      else beginLink(image.id);
+      return;
+    }
+    if (tool !== "select") return;
 
     e.stopPropagation();
 
@@ -66,6 +83,7 @@ export function ImageNode({ image }: Props) {
     if (isGroupDrag) {
       const snapshot = snapshotSelection();
       const orig = { startX: e.clientX, startY: e.clientY };
+      pushHistory();
       dragState.current = {
         startX: orig.startX,
         startY: orig.startY,
@@ -91,6 +109,7 @@ export function ImageNode({ image }: Props) {
 
     // Single-drag
     select(image.id);
+    pushHistory();
 
     const orig = {
       startX: e.clientX,
@@ -120,6 +139,7 @@ export function ImageNode({ image }: Props) {
   const onResizeDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    pushHistory();
     const startX = e.clientX;
     const origW = image.w;
     const origH = image.h;
@@ -145,7 +165,11 @@ export function ImageNode({ image }: Props) {
       onMouseDown={onMouseDown}
       className={clsx(
         "group",
-        tool === "select" ? "cursor-grab active:cursor-grabbing" : "cursor-default",
+        tool === "select"
+          ? "cursor-grab active:cursor-grabbing"
+          : tool === "eraser"
+          ? "cursor-cell"
+          : "cursor-default",
       )}
       style={{
         position: "absolute",

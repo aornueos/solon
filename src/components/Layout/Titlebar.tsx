@@ -12,6 +12,7 @@ import {
   Square,
   Copy,
   X,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAppStore } from "../../store/useAppStore";
@@ -106,6 +107,7 @@ export function Titlebar() {
     toggleFocusMode,
     theme,
     toggleTheme,
+    openSettings,
   } = useAppStore();
 
   const status = SCENE_STATUSES.find((s) => s.value === sceneMeta.status);
@@ -232,6 +234,9 @@ export function Titlebar() {
         </IconBtn>
         <IconBtn onClick={toggleFocusMode} active={focusMode} title="Modo Foco (F11)">
           <Focus size={14} />
+        </IconBtn>
+        <IconBtn onClick={openSettings} title="Preferências (Ctrl+,)">
+          <SettingsIcon size={14} />
         </IconBtn>
       </div>
 

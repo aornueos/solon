@@ -23,7 +23,6 @@ import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import { IndentExtension } from "./IndentExtension";
 import { useAppStore } from "../../store/useAppStore";
-import { useFileSystem } from "../../hooks/useFileSystem";
 import { EditorToolbar } from "./EditorToolbar";
 import { markdownToHtml, htmlToMarkdown } from "./markdownBridge";
 
@@ -37,6 +36,7 @@ export function Editor() {
   const setHeadings = useAppStore((s) => s.setHeadings);
   const setWordCount = useAppStore((s) => s.setWordCount);
   const setFileBody = useAppStore((s) => s.setFileBody);
+  const editorZoom = useAppStore((s) => s.editorZoom);
 
   const isLoadingRef = useRef(false);
   const lastLoadedPathRef = useRef<string | null>(null);
@@ -136,61 +136,73 @@ export function Editor() {
     return () => document.removeEventListener("solon:scroll-to", handler);
   }, [editor]);
 
+  // Sem arquivo ativo: renderiza o MESMO frame visual do editor (toolbar
+  // simulada + container max-w-680px com padding identico) e so um
+  // paragrafo placeholder dentro. NAO e uma "tela cheia centralizada com
+  // CTA" — isso virava percepcao de "segunda homepage". Agora parece
+  // literalmente um editor com pagina em branco, top-aligned como qualquer
+  // documento. A landing real (Solon serif gigante, sumario etc) so existe
+  // em activeView === "home".
   if (!activeFilePath) {
-    return <WelcomeScreen />;
+    return (
+      <div className="flex flex-col h-full">
+        {/* Espacador da altura da toolbar (so pra alinhamento visual com
+            quando ha arquivo aberto — sem renderizar a EditorToolbar
+            propriamente porque ela depende de uma instancia do editor). */}
+        {!focusMode && (
+          <div
+            className="h-[44px] flex-shrink-0"
+            style={{
+              background: "var(--bg-panel-2)",
+              borderBottom: "1px solid var(--border-subtle)",
+            }}
+          />
+        )}
+        <div className="flex-1 overflow-y-auto" style={{ background: "var(--bg-app)" }}>
+          <div className="max-w-[680px] mx-auto px-8 py-12">
+            <p
+              className="font-serif italic text-[1.05rem]"
+              style={{ color: "var(--text-placeholder)", lineHeight: 1.6 }}
+            >
+              Nenhum arquivo aberto. Escolha um no explorador à esquerda
+              ou volte para a página inicial pra começar.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
+
+  // Click na area branca em volta do EditorContent foca o editor no fim
+  // do documento. Sem isso, clicar abaixo do ultimo paragrafo nao iniciava
+  // nada — o usuario precisava posicionar o caret manualmente. TipTap so
+  // captura clicks dentro do `EditorContent`; o padding ao redor era area
+  // morta. Listener no wrapper resolve pra qualquer click fora do conteudo.
+  const focusEnd = (e: React.MouseEvent) => {
+    if (!editor) return;
+    // Se o click foi dentro do conteudo do TipTap, deixa o proprio TipTap
+    // posicionar o caret. So intervimos quando o target e o wrapper/padding.
+    const target = e.target as HTMLElement;
+    if (target.closest(".ProseMirror")) return;
+    editor.chain().focus("end").run();
+  };
+
+  // Zoom do editor: aplicado como CSS var no container do EditorContent.
+  // Os seletores em globals.css multiplicam font-size por essa var, entao
+  // o usuario pode aumentar/diminuir o tamanho do texto sem afetar a UI
+  // (sidebar, titlebar, statusbar continuam fixos).
+  const zoomVar = { ["--editor-zoom" as string]: String(editorZoom / 100) };
 
   return (
     <div className="flex flex-col h-full">
       {editor && !focusMode && <EditorToolbar editor={editor} />}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[680px] mx-auto px-8 py-12">
+      <div className="flex-1 overflow-y-auto" onClick={focusEnd}>
+        <div
+          className="max-w-[680px] mx-auto px-8 py-12 min-h-full cursor-text"
+          style={zoomVar as React.CSSProperties}
+        >
           <EditorContent editor={editor} />
         </div>
-      </div>
-    </div>
-  );
-}
-
-function WelcomeScreen() {
-  const { openFolder } = useFileSystem();
-  return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 text-center px-8">
-      <div className="space-y-1">
-        <h1
-          className="font-serif text-3xl font-bold tracking-tight"
-          style={{ color: "var(--text-primary)" }}
-        >
-          Solon
-        </h1>
-        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          Editor de escrita criativa
-        </p>
-      </div>
-      <div className="space-y-2 max-w-sm">
-        <p
-          className="text-sm leading-relaxed"
-          style={{ color: "var(--text-placeholder)" }}
-        >
-          Abra uma pasta para começar, ou selecione um arquivo no explorador à esquerda.
-        </p>
-      </div>
-      <button
-        onClick={openFolder}
-        className="px-5 py-2 rounded-md text-sm transition-colors"
-        style={{
-          background: "var(--accent)",
-          color: "var(--text-inverse)",
-        }}
-      >
-        Abrir pasta de projeto
-      </button>
-      <div
-        className="text-[0.7rem] mt-4 space-y-1"
-        style={{ color: "var(--text-placeholder)" }}
-      >
-        <p>Ctrl+S — Salvar · F11 — Focus Mode</p>
-        <p>Ctrl+B — Negrito · Ctrl+I — Itálico · Ctrl+Shift+L — Tema</p>
       </div>
     </div>
   );

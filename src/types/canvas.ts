@@ -104,7 +104,7 @@ export interface CanvasImage {
 }
 
 /** Modo da ferramenta ativa no canvas. */
-export type CanvasTool = "select" | "draw" | "text" | "arrow";
+export type CanvasTool = "select" | "draw" | "text" | "arrow" | "eraser";
 
 /**
  * Paleta de cores pro free-draw / textos flutuantes — simples e editorial,

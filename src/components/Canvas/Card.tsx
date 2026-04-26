@@ -29,6 +29,7 @@ export function Card({ card }: Props) {
     translateSelection,
     viewport,
     tool,
+    pushHistory,
   } = useCanvasStore();
 
   const setActiveView = useAppStore((s) => s.setActiveView);
@@ -78,6 +79,16 @@ export function Card({ card }: Props) {
       return;
     }
 
+    // Borracha: clicar em qualquer parte do card o apaga (incluindo
+    // arrows conectadas — `removeCard` ja faz cascade na store).
+    if (tool === "eraser") {
+      if (target.tagName === "TEXTAREA") return;
+      e.stopPropagation();
+      e.preventDefault();
+      removeCard(card.id);
+      return;
+    }
+
     if (target.closest("[data-card-action]")) return;
     if (target.tagName === "TEXTAREA") return;
 
@@ -105,6 +116,9 @@ export function Card({ card }: Props) {
       // Snapshot das posicoes originais de TODOS os itens do grupo.
       const snapshot = snapshotSelection();
       const orig = { startX: e.clientX, startY: e.clientY };
+      // History push antes do drag — Ctrl+Z volta a posicao do grupo
+      // inteira pre-drag de uma vez.
+      pushHistory();
       // NAO chamamos select() aqui — preservamos selectedId/selectedIds
       // como estavam. Tambem NAO chamamos bringToFront pra preservar a
       // z-order relativa dos itens do grupo.
@@ -129,6 +143,7 @@ export function Card({ card }: Props) {
     // Single-drag path
     bringToFront(card.id);
     select(card.id);
+    pushHistory();
 
     const orig = {
       startX: e.clientX,
@@ -224,6 +239,8 @@ export function Card({ card }: Props) {
         "rounded-md border transition-shadow group",
         linkingFromId || tool === "arrow"
           ? "cursor-crosshair"
+          : tool === "eraser"
+          ? "cursor-cell"
           : "cursor-grab active:cursor-grabbing",
       )}
       title={isScene ? "Duplo clique para abrir a cena no editor" : undefined}
@@ -377,26 +394,32 @@ export function Card({ card }: Props) {
 
       {/* Pontos de conexão (4 lados) — clique inicia/completa linking
           com lado explícito. Visíveis no hover do card, sempre durante
-          linking, e quando o card está selecionado. */}
-      <ConnectionDots
-        isLinkSource={isLinkSource}
-        isLinkCandidate={isLinkCandidate}
-        linkingFromSide={linkingFromSide}
-        isSelected={isSelected}
-        onPick={(side) => {
-          if (linkingFromId && linkingFromId !== card.id) {
-            completeLink(card.id, side);
-          } else {
-            // Sem linking em progresso OU estou no próprio card de origem
-            // (re-escolher o lado de saída). beginLink com mesmo id só
-            // atualiza o `linkingFromSide`.
-            beginLink(card.id, side);
-          }
-        }}
-      />
+          linking, e quando o card está selecionado.
+          Em modo eraser ficam escondidos: o stopPropagation deles comeria
+          o click e o card nao seria apagado, dando a sensacao de "borracha
+          nao funciona em alguns pontos do card". */}
+      {tool !== "eraser" && (
+        <ConnectionDots
+          isLinkSource={isLinkSource}
+          isLinkCandidate={isLinkCandidate}
+          linkingFromSide={linkingFromSide}
+          isSelected={isSelected}
+          onPick={(side) => {
+            if (linkingFromId && linkingFromId !== card.id) {
+              completeLink(card.id, side);
+            } else {
+              // Sem linking em progresso OU estou no próprio card de origem
+              // (re-escolher o lado de saída). beginLink com mesmo id só
+              // atualiza o `linkingFromSide`.
+              beginLink(card.id, side);
+            }
+          }}
+        />
+      )}
 
-      {/* Handle de resize (canto inf-dir) */}
-      <ResizeHandle card={card} />
+      {/* Handle de resize (canto inf-dir). Tambem escondido em eraser
+          pelo mesmo motivo dos ConnectionDots. */}
+      {tool !== "eraser" && <ResizeHandle card={card} />}
     </div>
   );
 }

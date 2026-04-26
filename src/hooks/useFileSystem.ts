@@ -190,14 +190,36 @@ O Conselho dos Seis governa a cidade há três gerações. Cada membro represent
     try {
       const last = localStorage.getItem("solon:rootFolder");
       if (!last) return;
-      const { exists } = await import("@tauri-apps/plugin-fs");
+      const { exists, readTextFile } = await import("@tauri-apps/plugin-fs");
       if (!(await exists(last))) {
         localStorage.removeItem("solon:rootFolder");
+        localStorage.removeItem("solon:lastFile");
         return;
       }
       setRootFolder(last);
       const tree = await buildFileTree(last);
       setFileTree(tree);
+
+      // Restaura tambem o ultimo arquivo aberto. Importante: NAO mudamos
+      // activeView aqui — a HomePage continua sendo o landing inicial,
+      // mas com `activeFilePath` ja settado o botao "Continuar" tem alvo.
+      // Silent: erro de leitura limpa a chave pra evitar pop-up vermelho
+      // toda vez que o app abre apos um arquivo ter sido movido/apagado.
+      const lastFile = localStorage.getItem("solon:lastFile");
+      if (lastFile) {
+        try {
+          if (await exists(lastFile)) {
+            const content = await readTextFile(lastFile);
+            const { meta, body } = parseDocument(content);
+            const name = lastFile.split(/[\\/]/).pop() ?? lastFile;
+            useAppStore.getState().setActiveFile(lastFile, name, body, meta);
+          } else {
+            localStorage.removeItem("solon:lastFile");
+          }
+        } catch {
+          localStorage.removeItem("solon:lastFile");
+        }
+      }
     } catch (err) {
       console.error("Erro ao restaurar pasta:", err);
     }
@@ -216,7 +238,11 @@ O Conselho dos Seis governa a cidade há três gerações. Cada membro represent
             .pushToast("error", "Já existe um arquivo com esse nome.");
           return;
         }
-        await writeTextFile(full, `# ${finalName.replace(/\.(md|txt)$/, "")}\n\n`);
+        // Arquivo nasce em branco — sem heading auto-injetado. O editor
+        // cuida da experiencia inicial via Placeholder ("Comece a escrever..."),
+        // o que e mais respeitoso pra ficcao: nem sempre a primeira linha
+        // e um titulo de capitulo (cena curta, fragmento, nota).
+        await writeTextFile(full, "");
         await refresh();
         await openFile(full, finalName);
       } catch (err) {

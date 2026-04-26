@@ -121,7 +121,10 @@
   user-select: text;
   cursor: text;
   font-family: "Lora", Georgia, serif !important;
-  font-size: 1.0625rem !important;
+  /* `--editor-zoom` e settado pelo wrapper do EditorContent (Editor.tsx).
+     Default 1 mantem comportamento atual quando settings inativas. Multi-
+     plicador aplicado em todos os font-sizes abaixo via calc(). */
+  font-size: calc(1.0625rem * var(--editor-zoom, 1)) !important;
   line-height: 1.85;
   color: var(--text-primary);
   caret-color: var(--accent);
@@ -138,7 +141,7 @@
 
 .ProseMirror h1 {
   font-family: "Lora", Georgia, serif !important;
-  font-size: 2rem !important;
+  font-size: calc(2rem * var(--editor-zoom, 1)) !important;
   font-weight: 700 !important;
   line-height: 1.15;
   margin-top: 3rem;
@@ -153,7 +156,7 @@
 
 .ProseMirror h2 {
   font-family: "Lora", Georgia, serif !important;
-  font-size: 1.35rem !important;
+  font-size: calc(1.35rem * var(--editor-zoom, 1)) !important;
   font-weight: 600 !important;
   line-height: 1.3;
   margin-top: 2.5rem;
@@ -166,7 +169,7 @@
 
 .ProseMirror h3 {
   font-family: "Inter", sans-serif !important;
-  font-size: 0.72rem !important;
+  font-size: calc(0.72rem * var(--editor-zoom, 1)) !important;
   font-weight: 700 !important;
   line-height: 1.4;
   margin-top: 2.5rem;
@@ -178,7 +181,7 @@
 
 .ProseMirror h4 {
   font-family: "Inter", sans-serif !important;
-  font-size: 0.7rem !important;
+  font-size: calc(0.7rem * var(--editor-zoom, 1)) !important;
   font-weight: 600 !important;
   margin-top: 1.75rem;
   margin-bottom: 0.4rem;
@@ -190,7 +193,7 @@
 .ProseMirror h5,
 .ProseMirror h6 {
   font-family: "Inter", sans-serif !important;
-  font-size: 0.68rem !important;
+  font-size: calc(0.68rem * var(--editor-zoom, 1)) !important;
   font-weight: 500 !important;
   margin-top: 1.25rem;
   margin-bottom: 0.3rem;
@@ -285,7 +288,7 @@
   overflow-x: auto;
   margin: 1rem 0;
   font-family: "JetBrains Mono", monospace;
-  font-size: 0.875rem;
+  font-size: calc(0.875rem * var(--editor-zoom, 1));
   line-height: 1.6;
 }
 
@@ -304,7 +307,7 @@
   table-layout: fixed;
   overflow: hidden;
   font-family: "Inter", sans-serif;
-  font-size: 0.92rem;
+  font-size: calc(0.92rem * var(--editor-zoom, 1));
 }
 .ProseMirror table td,
 .ProseMirror table th {
@@ -357,4 +360,74 @@
 .canvas-surface {
   background-color: var(--bg-app);
   background-image: radial-gradient(circle, var(--dot-grid) 1px, transparent 1px);
+}
+
+/* ─────────────────────────────────────────
+   Release notes (UpdateNotesDialog)
+   Markdown vindo do `marked` + DOMPurify. Mesma sensibilidade
+   editorial do .ProseMirror, mas escala um pouco menor pra caber
+   no dialog sem virar parede de texto.
+───────────────────────────────────────── */
+.update-notes {
+  font-family: 'Lora', 'EB Garamond', Georgia, serif;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+.update-notes h1, .update-notes h2, .update-notes h3 {
+  font-family: 'Lora', 'EB Garamond', Georgia, serif;
+  color: var(--text-primary);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 1.4em 0 0.5em;
+}
+.update-notes h1 { font-size: 1.4rem; }
+.update-notes h2 { font-size: 1.2rem; }
+.update-notes h3 { font-size: 1.05rem; }
+.update-notes h1:first-child,
+.update-notes h2:first-child,
+.update-notes h3:first-child { margin-top: 0; }
+.update-notes p { margin: 0.7em 0; }
+.update-notes ul, .update-notes ol {
+  margin: 0.7em 0;
+  padding-left: 1.4em;
+}
+.update-notes li { margin: 0.25em 0; }
+.update-notes strong { color: var(--text-primary); font-weight: 700; }
+.update-notes em { font-style: italic; }
+.update-notes a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.update-notes code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.85em;
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.update-notes pre {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.82rem;
+  padding: 0.85em 1em;
+  background: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+.update-notes pre code { background: transparent; padding: 0; }
+.update-notes blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 1em;
+  margin: 1em 0;
+  font-style: italic;
+  color: var(--text-muted);
+}
+.update-notes hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 1.5em 0;
 }

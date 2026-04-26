@@ -63,6 +63,30 @@ export interface ConfirmOptions {
   danger?: boolean;
 }
 
+/**
+ * Estado do sistema de update.
+ *  - `idle`: nada a fazer (boot inicial ou apos check vazio).
+ *  - `checking`: requisicao em andamento.
+ *  - `available`: tem versao nova; UI mostra banner/indicator.
+ *  - `downloading`: baixando bundle (com progress 0..1).
+ *  - `ready`: bundle instalado, esperando user clicar "Reiniciar".
+ *  - `error`: ultima checagem falhou (silencioso na UI; so log).
+ */
+export type UpdateInfo = {
+  version: string;
+  currentVersion: string;
+  notes: string;
+  date?: string;
+};
+
+export type UpdateStatus =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "available"; info: UpdateInfo }
+  | { kind: "downloading"; info: UpdateInfo; progress: number }
+  | { kind: "ready"; info: UpdateInfo }
+  | { kind: "error"; message: string };
+
 interface AppState {
   // Arquivo ativo
   activeFilePath: string | null;
@@ -98,6 +122,35 @@ interface AppState {
   toasts: Toast[];
   /** Dialog modal ativo (prompt/confirm in-app). */
   activeDialog: ActiveDialog | null;
+  /** Estado do sistema de update (auto-update via @tauri-apps/plugin-updater). */
+  updateStatus: UpdateStatus;
+  /** Dialog de release notes — quando true, AppLayout monta UpdateNotesDialog. */
+  showUpdateDialog: boolean;
+  /** Estado do auto-save — usado pela StatusBar pra dar feedback discreto.
+   *  `dirty`: ha alteracoes no buffer que ainda nao foram persistidas.
+   *  `saving`: write em andamento.
+   *  `saved`: ultima escrita teve sucesso (timestamp em `lastSavedAt`).
+   *  `idle`: sem arquivo ou nada mudou desde o ultimo load. */
+  saveStatus: "idle" | "dirty" | "saving" | "saved";
+  /** Timestamp da ultima escrita bem-sucedida (epoch ms), null se nunca salvou. */
+  lastSavedAt: number | null;
+
+  /** Estatisticas agregadas do projeto inteiro — calculadas pela HomePage
+   *  varrendo todos os .md/.txt da fileTree. `null` enquanto computa ou
+   *  quando nao ha pasta. Cache invalida quando o fileTree muda. */
+  projectStats: { wordCount: number; fileCount: number } | null;
+
+  // ─── Preferencias do usuario (persistidas em localStorage) ───
+  /** Zoom do texto do editor — 75..200, default 100. Multiplicador
+   *  aplicado via CSS var `--editor-zoom` no .ProseMirror. */
+  editorZoom: number;
+  /** Liga/desliga auto-save (so afeta o debounce; Ctrl+S sempre salva). */
+  autoSaveEnabled: boolean;
+  /** Liga/desliga check de update no boot. Tambem valido pra ja' marcar
+   *  "nao quero saber sobre updates" e suprimir o banner. */
+  autoCheckUpdates: boolean;
+  /** Visibilidade do dialog de preferencias. */
+  showSettings: boolean;
 
   // Actions
   setActiveFile: (path: string, name: string, body: string, meta: SceneMeta) => void;
@@ -124,6 +177,20 @@ interface AppState {
   openPrompt: (opts: PromptOptions) => Promise<string | null>;
   openConfirm: (opts: ConfirmOptions) => Promise<boolean>;
   closeDialog: (value: string | null) => void;
+  setUpdateStatus: (s: UpdateStatus) => void;
+  setUpdateProgress: (progress: number) => void;
+  openUpdateDialog: () => void;
+  closeUpdateDialog: () => void;
+  setSaveStatus: (s: AppState["saveStatus"]) => void;
+  setProjectStats: (s: { wordCount: number; fileCount: number } | null) => void;
+  setEditorZoom: (zoom: number) => void;
+  setAutoSaveEnabled: (v: boolean) => void;
+  setAutoCheckUpdates: (v: boolean) => void;
+  openSettings: () => void;
+  closeSettings: () => void;
+  /** Reset de todas as preferencias pro default (zoom 100%, theme light,
+   *  auto-save on, etc). Usado pelo botao "Restaurar padroes". */
+  resetSettings: () => void;
 }
 
 const THEME_KEY = "solon:theme";
@@ -133,6 +200,38 @@ function loadTheme(): "light" | "dark" {
     if (v === "dark" || v === "light") return v;
   } catch {}
   return "light";
+}
+
+// Defaults explicitos pra preferencias — usados na inicializacao e em
+// `resetSettings`. Em um lugar so pra evitar dessincronia.
+const DEFAULT_EDITOR_ZOOM = 100;
+const DEFAULT_AUTO_SAVE = true;
+const DEFAULT_AUTO_CHECK_UPDATES = true;
+const EDITOR_ZOOM_KEY = "solon:editorZoom";
+const AUTO_SAVE_KEY = "solon:autoSave";
+const AUTO_CHECK_UPDATES_KEY = "solon:autoCheckUpdates";
+
+function loadEditorZoom(): number {
+  try {
+    const v = localStorage.getItem(EDITOR_ZOOM_KEY);
+    if (!v) return DEFAULT_EDITOR_ZOOM;
+    const n = parseInt(v, 10);
+    // Clamp defensivo — entrada invalida (NaN, fora de range) cai no default
+    if (Number.isNaN(n) || n < 75 || n > 200) return DEFAULT_EDITOR_ZOOM;
+    return n;
+  } catch {
+    return DEFAULT_EDITOR_ZOOM;
+  }
+}
+
+function loadBoolPref(key: string, fallback: boolean): boolean {
+  try {
+    const v = localStorage.getItem(key);
+    if (v === null) return fallback;
+    return v === "1" || v === "true";
+  } catch {
+    return fallback;
+  }
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -155,14 +254,33 @@ export const useAppStore = create<AppState>((set) => ({
   theme: loadTheme(),
   toasts: [],
   activeDialog: null,
+  updateStatus: { kind: "idle" },
+  showUpdateDialog: false,
+  saveStatus: "idle",
+  lastSavedAt: null,
+  projectStats: null,
+  editorZoom: loadEditorZoom(),
+  autoSaveEnabled: loadBoolPref(AUTO_SAVE_KEY, DEFAULT_AUTO_SAVE),
+  autoCheckUpdates: loadBoolPref(AUTO_CHECK_UPDATES_KEY, DEFAULT_AUTO_CHECK_UPDATES),
+  showSettings: false,
 
-  setActiveFile: (path, name, body, meta) =>
+  setActiveFile: (path, name, body, meta) => {
+    // Persiste o ultimo arquivo aberto pra "Continuar" na HomePage e
+    // restore no proximo boot. Mesmo padrao do `solon:rootFolder` mais
+    // acima — chave separada porque arquivo pode mudar com mais
+    // frequencia que pasta.
+    try {
+      localStorage.setItem("solon:lastFile", path);
+    } catch {
+      /* storage cheio ou bloqueado — ignora */
+    }
     set({
       activeFilePath: path,
       activeFileName: name,
       fileBody: body,
       sceneMeta: meta,
-    }),
+    });
+  },
 
   setFileBody: (body) => set({ fileBody: body }),
 
@@ -270,6 +388,81 @@ export const useAppStore = create<AppState>((set) => ({
       s.activeDialog?.resolve(value);
       return { activeDialog: null };
     }),
+
+  setUpdateStatus: (s) => set({ updateStatus: s }),
+
+  // Patch parcial — so muda progresso se a gente esta no estado downloading.
+  // Outros estados ignoram pra evitar race (ex: status virou `ready` mas
+  // um event de progress velho chegou depois).
+  setUpdateProgress: (progress) =>
+    set((s) => {
+      if (s.updateStatus.kind !== "downloading") return {};
+      return {
+        updateStatus: { ...s.updateStatus, progress },
+      };
+    }),
+
+  openUpdateDialog: () => set({ showUpdateDialog: true }),
+  closeUpdateDialog: () => set({ showUpdateDialog: false }),
+
+  setSaveStatus: (s) =>
+    set((curr) => ({
+      saveStatus: s,
+      // `lastSavedAt` so atualiza no transition pra "saved" — assim a
+      // StatusBar pode mostrar "Salvo ha 12s" usando esse timestamp.
+      lastSavedAt: s === "saved" ? Date.now() : curr.lastSavedAt,
+    })),
+
+  setProjectStats: (s) => set({ projectStats: s }),
+
+  setEditorZoom: (zoom) => {
+    const clamped = Math.max(75, Math.min(200, Math.round(zoom)));
+    try {
+      localStorage.setItem(EDITOR_ZOOM_KEY, String(clamped));
+    } catch {
+      /* ignora */
+    }
+    set({ editorZoom: clamped });
+  },
+
+  setAutoSaveEnabled: (v) => {
+    try {
+      localStorage.setItem(AUTO_SAVE_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ autoSaveEnabled: v });
+  },
+
+  setAutoCheckUpdates: (v) => {
+    try {
+      localStorage.setItem(AUTO_CHECK_UPDATES_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ autoCheckUpdates: v });
+  },
+
+  openSettings: () => set({ showSettings: true }),
+  closeSettings: () => set({ showSettings: false }),
+
+  resetSettings: () => {
+    // Apaga todas as chaves de pref do localStorage e reseta o state pros
+    // defaults. Theme nao entra aqui — e' uma pref "vivendo" no proprio
+    // OS (dark mode preference) e o user pode estar em dark deliberadamente.
+    try {
+      localStorage.removeItem(EDITOR_ZOOM_KEY);
+      localStorage.removeItem(AUTO_SAVE_KEY);
+      localStorage.removeItem(AUTO_CHECK_UPDATES_KEY);
+    } catch {
+      /* ignora */
+    }
+    set({
+      editorZoom: DEFAULT_EDITOR_ZOOM,
+      autoSaveEnabled: DEFAULT_AUTO_SAVE,
+      autoCheckUpdates: DEFAULT_AUTO_CHECK_UPDATES,
+    });
+  },
 }));
 
 function toggleNodeExpanded(nodes: FileNode[], path: string): FileNode[] {

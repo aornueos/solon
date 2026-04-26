@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { startDrag } from "../../lib/drag";
-import { CardSide } from "../../types/canvas";
+import { CanvasText, CardSide } from "../../types/canvas";
+import { textRect } from "../../lib/canvasGeom";
+
+// Re-export local com nome curto pra usar nos rects do componente sem
+// poluir o escopo principal com `textRect` do canvasGeom.
+const textRectInline = (t: CanvasText) => textRect(t);
 
 /**
  * SVG overlay com as arrows entre cards.
@@ -33,6 +38,8 @@ export function ArrowLayer({
   const {
     cards,
     arrows,
+    texts,
+    images,
     removeArrow,
     selectedId,
     selectedIds,
@@ -43,7 +50,15 @@ export function ArrowLayer({
     linkingFromId,
     linkingFromSide,
   } = useCanvasStore();
-  const byId = new Map(cards.map((c) => [c.id, c]));
+  // Mapa de id → Rect cobrindo cards, texts e images. Antes a gente
+  // mapeava so cards, entao setas com endpoint em texto/imagem viravam
+  // null e desapareciam silenciosamente. `getEntityRect` resolve por
+  // tipo na hora — aqui pre-construimos o mapa pra evitar O(n) por
+  // arrow no render.
+  const rectById = new Map<string, { x: number; y: number; w: number; h: number }>();
+  for (const c of cards) rectById.set(c.id, { x: c.x, y: c.y, w: c.w, h: c.h });
+  for (const im of images) rectById.set(im.id, { x: im.x, y: im.y, w: im.w, h: im.h });
+  for (const t of texts) rectById.set(t.id, textRectInline(t));
 
   // Preview pointilhado enquanto o usuário está "linkando" — sai do card
   // de origem até o cursor. Sem isso o usuário clica e vai cego até o
@@ -195,8 +210,8 @@ export function ArrowLayer({
       </defs>
 
       {arrows.map((a) => {
-        const from = byId.get(a.from);
-        const to = byId.get(a.to);
+        const from = rectById.get(a.from);
+        const to = rectById.get(a.to);
         if (!from || !to) return null;
         const isSel = selectedId === a.id;
         // Grupo: seta capturada por marquee (ambos os cards endpoint dentro)
@@ -220,7 +235,10 @@ export function ArrowLayer({
         return (
           <g
             key={a.id}
-            style={{ pointerEvents: tool === "select" ? "auto" : "none" }}
+            style={{
+              pointerEvents:
+                tool === "select" || tool === "eraser" ? "auto" : "none",
+            }}
           >
             {/* Hit area invisível */}
             <path
@@ -228,9 +246,13 @@ export function ArrowLayer({
               stroke="transparent"
               strokeWidth={hitStroke}
               fill="none"
-              style={{ cursor: "pointer" }}
+              style={{ cursor: tool === "eraser" ? "cell" : "pointer" }}
               onClick={(e) => {
                 e.stopPropagation();
+                if (tool === "eraser") {
+                  removeArrow(a.id);
+                  return;
+                }
                 select(a.id);
               }}
               onDoubleClick={(e) => {
@@ -292,7 +314,7 @@ export function ArrowLayer({
       {linkingFromId &&
         previewWorld &&
         (() => {
-          const src = byId.get(linkingFromId);
+          const src = rectById.get(linkingFromId);
           if (!src) return null;
           const { p1, cp1, cp2, p2 } = routeArrowToPoint(
             src,

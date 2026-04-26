@@ -25,6 +25,10 @@ export function FloatingText({ text, autoEdit }: Props) {
     translateSelection,
     viewport,
     tool,
+    linkingFromId,
+    beginLink,
+    completeLink,
+    pushHistory,
   } = useCanvasStore();
 
   const isSelected = selectedId === text.id;
@@ -59,8 +63,27 @@ export function FloatingText({ text, autoEdit }: Props) {
 
   const onMouseDown = (e: React.MouseEvent) => {
     if (editing) return;
-    if (tool !== "select") return;
     if ((e.target as HTMLElement).closest("[data-text-action]")) return;
+
+    if (tool === "eraser") {
+      e.stopPropagation();
+      removeText(text.id);
+      return;
+    }
+
+    // Arrow tool em texto: comporta-se igual ao Card — primeiro click
+    // comeca o link, segundo (em outro item com bbox) completa. Antes
+    // textos eram inertes em modo arrow e o usuario nao sabia se setas
+    // podiam sair deles.
+    if (tool === "arrow") {
+      e.stopPropagation();
+      e.preventDefault();
+      if (linkingFromId) completeLink(text.id);
+      else beginLink(text.id);
+      return;
+    }
+
+    if (tool !== "select") return;
 
     e.stopPropagation();
 
@@ -72,6 +95,7 @@ export function FloatingText({ text, autoEdit }: Props) {
     if (isGroupDrag) {
       const snapshot = snapshotSelection();
       const orig = { startX: e.clientX, startY: e.clientY };
+      pushHistory();
       dragState.current = {
         startX: orig.startX,
         startY: orig.startY,
@@ -101,6 +125,7 @@ export function FloatingText({ text, autoEdit }: Props) {
 
     // Single-drag
     select(text.id);
+    pushHistory();
 
     const orig = {
       startX: e.clientX,
@@ -164,7 +189,13 @@ export function FloatingText({ text, autoEdit }: Props) {
       onDoubleClick={onDoubleClick}
       className={clsx(
         "group",
-        tool === "select" ? "cursor-grab active:cursor-grabbing" : "cursor-default",
+        tool === "select"
+          ? "cursor-grab active:cursor-grabbing"
+          : tool === "eraser"
+          ? "cursor-cell"
+          : tool === "arrow"
+          ? "cursor-crosshair"
+          : "cursor-default",
       )}
       style={{
         ...commonStyle,

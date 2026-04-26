@@ -119,6 +119,20 @@ export function CanvasView() {
         if (!selectedId && selectedIds.size === 0) return;
         removeSelected();
       }
+      // Undo/Redo. Ctrl+Z = undo; Ctrl+Shift+Z OU Ctrl+Y = redo.
+      // Convencao multi-plataforma — Windows usa Ctrl+Y, Mac usa Cmd+Shift+Z;
+      // a gente aceita os dois pra nao surpreender ninguem.
+      if ((e.key === "z" || e.key === "Z") && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        if (e.shiftKey) useCanvasStore.getState().redo();
+        else useCanvasStore.getState().undo();
+        return;
+      }
+      if ((e.key === "y" || e.key === "Y") && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        useCanvasStore.getState().redo();
+        return;
+      }
       if ((e.key === "d" || e.key === "D") && (e.ctrlKey || e.metaKey)) {
         // Ctrl+D duplica cards; em multi-selecao, duplica todos os cards
         // do grupo (outros kinds sao ignorados — stroke/text/image/arrow
@@ -143,6 +157,7 @@ export function CanvasView() {
       if (e.key === "p" || e.key === "P") setTool("draw");
       if (e.key === "t" || e.key === "T") setTool("text");
       if (e.key === "a" || e.key === "A") setTool("arrow");
+      if (e.key === "e" || e.key === "E") setTool("eraser");
       if (e.key === "f" || e.key === "F") {
         const state = useCanvasStore.getState();
         const boxes = [
@@ -522,6 +537,23 @@ export function CanvasView() {
   };
 
   const onBgMouseDown = (e: React.MouseEvent) => {
+    // Commit explicito de qualquer textarea/input em edicao no canvas
+    // (FloatingText editing, label de card etc.). Sem isso, o
+    // `e.preventDefault()` que viria abaixo (em startMarquee/startDraw)
+    // cancela o focus-change do click e o textarea NAO perde o foco —
+    // o usuario via "texto continua em edicao mesmo clicando fora".
+    // Forcar blur antes do preventDefault dispara o `onBlur` do textarea
+    // (que ja faz o commit) e remove o caret antes de processarmos o
+    // mousedown como pan/marquee/draw.
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      (active.tagName === "TEXTAREA" || active.tagName === "INPUT") &&
+      active.closest(".canvas-surface")
+    ) {
+      active.blur();
+    }
+
     const isPanTrigger = spaceDown.current || e.button === 1;
     if (isPanTrigger) return startPan(e);
 
@@ -552,6 +584,14 @@ export function CanvasView() {
       return;
     }
 
+    // Em modo borracha, click no vazio nao faz nada — eraser so afeta
+    // items existentes (clique direto). Marquee aqui daria a sensacao de
+    // "estou tentando apagar mas o cursor ta selecionando area" e poluiria
+    // o mental model de "borracha = clique pra apagar".
+    if (tool === "eraser") {
+      return;
+    }
+
     // select mode: drag = marquee, click puro desseleciona
     if (linkingFromId) {
       cancelLink();
@@ -573,6 +613,8 @@ export function CanvasView() {
       ? "text"
       : tool === "arrow" || linkingFromId
       ? "crosshair"
+      : tool === "eraser"
+      ? "cell" // sem cursor "eraser" nativo do CSS — `cell` da feedback
       : "default";
 
   return (
@@ -675,8 +717,20 @@ export function CanvasView() {
           }}
         >
           {linkingFromId
-            ? "Clique no card de destino (Esc p/ cancelar)"
-            : "Clique no card de origem, depois no de destino"}
+            ? "Clique no destino (Esc p/ cancelar)"
+            : "Clique em 2 itens para conectar (cards, textos, imagens)"}
+        </div>
+      )}
+
+      {tool === "eraser" && (
+        <div
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[0.72rem] px-3 py-1.5 rounded-full shadow-md z-10"
+          style={{
+            background: "var(--bg-inverse)",
+            color: "var(--text-inverse)",
+          }}
+        >
+          Borracha — clique em qualquer item para apagar (V p/ voltar)
         </div>
       )}
     </div>

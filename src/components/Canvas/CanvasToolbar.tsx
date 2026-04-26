@@ -8,6 +8,7 @@ import {
   Pencil,
   Type,
   MoveUpRight,
+  Eraser,
 } from "lucide-react";
 import { useRef } from "react";
 import clsx from "clsx";
@@ -116,6 +117,13 @@ export function CanvasToolbar() {
         onClick={() => setTool("arrow")}
       >
         <MoveUpRight size={13} />
+      </ToolBtn>
+      <ToolBtn
+        title="Borracha (E) — clique em qualquer item para apagar"
+        active={tool === "eraser"}
+        onClick={() => setTool("eraser")}
+      >
+        <Eraser size={13} />
       </ToolBtn>
       <Divider />
       <Btn title="Novo card (N)" onClick={() => addCard()}>
