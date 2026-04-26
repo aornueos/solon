@@ -257,11 +257,11 @@ export function SettingsDialog() {
 }
 
 /**
- * Versao do app — sincronizada com `package.json` e `tauri.conf.json`.
- * TODO: injetar via Vite `define` em vite.config.ts pra single source of
- * truth (`__APP_VERSION__: JSON.stringify(pkg.version)`).
+ * Versao do app, injetada em build-time via `vite.config.ts` (campo
+ * `define.__APP_VERSION__`). Single source of truth = `package.json`.
+ * Bumpa la' e ja' propaga pra Sobre no proximo build.
  */
-const APP_VERSION = "0.5.0";
+const APP_VERSION = __APP_VERSION__;
 
 function Section({
   title,

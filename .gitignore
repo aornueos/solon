@@ -1,0 +1,40 @@
+# dependencies
+node_modules/
+
+# build outputs
+dist/
+dist-ssr/
+build/
+*.local
+
+# Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Tauri signing keys — NUNCA committar
+# A chave privada de assinatura do updater fica em ~/.tauri/ por
+# convencao, mas se algum *.key parar dentro do repo por engano, esse
+# glob bloqueia. Perda dela = canal de update morto pra todos os users
+# que ja' instalaram (a publica ta compilada nos binaries).
+*.key
+.tauri/
+src-tauri/.tauri/
+
+# editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# env
+.env
+.env.*
+!.env.example
