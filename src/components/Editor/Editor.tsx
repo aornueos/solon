@@ -150,17 +150,19 @@ export function Editor() {
     return () => setCurrentEditor(null);
   }, [editor]);
 
-  // Pre-warming do spellcheck: dispara o load 2s apos o editor montar,
-  // em background, sem await. Quando o user fizer o primeiro right-click
-  // em uma palavra errada (~10s+ depois normalmente), o engine ja' esta
-  // pronto e as sugestoes aparecem instantaneas. Sem pre-warm, o
-  // primeiro right-click teria menu sem sugestoes (engine ainda
-  // carregando).
+  // Pre-warming do spellcheck: spawna o worker 2s apos o editor montar.
+  // Worker compila o dicionario em background sem travar a UI (~8-10s
+  // numa maquina lenta). Quando o user fizer o primeiro right-click em
+  // palavra errada, a engine ja' esta pronta e sugestoes aparecem em
+  // <100ms.
+  //
+  // ANTES essa funcao bloqueava a main thread durante o parsing —
+  // primeiro right-click congelava o app por 10s. Agora o worker
+  // isola completamente.
   useEffect(() => {
     if (!spellcheckEnabled) return;
     const t = window.setTimeout(() => {
-      // fire-and-forget — failures sao logadas dentro do facade
-      ensureSpellchecker();
+      ensureSpellchecker(); // sync, fire-and-forget; spawna worker
     }, 2000);
     return () => window.clearTimeout(t);
   }, [spellcheckEnabled]);

@@ -1,26 +1,39 @@
 /**
- * Facade do spellcheck. Modulo leve, sempre carregado — expoe a API
- * sincrona usada pelo ContextMenuProvider sem puxar a engine pesada
- * (~5MB com dicionario pt-BR). A engine real esta em
- * `./spellcheck-impl.ts` e e' carregada via dynamic import na primeira
- * chamada de `ensureSpellchecker`.
+ * Facade do spellcheck — comunica com Web Worker dedicado (`./spellcheck.worker.ts`).
  *
- * Padrao: facade sincrono, impl assincrono. Permite codigo cliente
- * escrever:
+ * Por que worker? O parsing inicial do dicionario Hunspell pt-BR
+ * (~4.4MB) bloqueava a main thread por ~8-10s. UI travava. Isolar
+ * num worker mantem o app responsivo durante o load.
  *
- *   if (isCorrect(word)) return;
- *   const sug = suggest(word);
+ * API publica:
+ *  - `ensureSpellchecker()`     — sync, dispara init em background
+ *  - `isSpellcheckerReady()`    — sync, retorna se engine ja' carregou
+ *  - `suggest(word)`            — async, Promise<string[]> (8 sugestoes max)
+ *  - `isCorrect(word)`          — async, Promise<boolean>
+ *  - `addToPersonalDict(word)`  — sync, adiciona ao dict pessoal + posta no worker
+ *  - `isInPersonalDict(word)`   — sync
+ *  - `getPersonalDictSize()`    — sync
+ *  - `removeFromPersonalDict(word)` — sync
  *
- * sem ter que awaitar nada — se a engine ainda nao carregou, `isCorrect`
- * retorna `true` (assumimos correto pra nao falsamente acusar) e
- * `suggest` retorna [].
+ * Personal dict (palavras que o user adicionou via "Adicionar ao dict")
+ * vive em localStorage + Set local. Checagens sync passam pelo Set
+ * antes de tocar no worker — palavras pessoais retornam true/[]
+ * imediatamente sem round-trip.
  */
-import type NSpell from "nspell";
 
 const PERSONAL_DICT_KEY = "solon:spellcheck:personal";
 
-let speller: NSpell | null = null;
-let loadingPromise: Promise<NSpell | null> | null = null;
+// ─── Worker e protocolo RPC ───
+let worker: Worker | null = null;
+let isReady = false;
+let nextId = 0;
+
+interface PendingHandler {
+  resolve: (value: unknown) => void;
+  reject: (reason?: unknown) => void;
+}
+const pending = new Map<number, PendingHandler>();
+
 let personalDict = loadPersonalDict();
 
 function loadPersonalDict(): Set<string> {
@@ -41,71 +54,143 @@ function savePersonalDict(): void {
       JSON.stringify([...personalDict]),
     );
   } catch {
-    /* storage full — ignora */
+    /* storage cheio — ignora */
   }
 }
 
-/**
- * Carrega a engine pt-BR. Idempotente: chamadas subsequentes retornam
- * a mesma instancia. Falhas (network, dicionario corrompido) sao
- * silenciosas — retornamos null e seguimos sem spellcheck.
- *
- * Pode ser chamado em "warming" (logo apos boot) sem await — o usuario
- * nao bloqueia esperando.
- */
-export async function ensureSpellchecker(): Promise<NSpell | null> {
-  if (speller) return speller;
-  if (loadingPromise) return loadingPromise;
+function getOrCreateWorker(): Worker {
+  if (worker) return worker;
 
-  loadingPromise = (async () => {
-    try {
-      const impl = await import("./spellcheck-impl");
-      const s = await impl.load();
-      // Re-aplica o dicionario pessoal — nspell so sabe do que esta no
-      // .dic carregado, nao das palavras que o user adicionou em sessoes
-      // anteriores. Sem isto, palavras adicionadas no boot anterior
+  // `new URL(..., import.meta.url)` e' o padrao Vite pra workers — gera
+  // um chunk separado, com cache busting via hash em build de prod.
+  // `type: 'module'` permite usar `import` dentro do worker.
+  worker = new Worker(
+    new URL("./spellcheck.worker.ts", import.meta.url),
+    { type: "module" },
+  );
+
+  worker.onmessage = (e: MessageEvent) => {
+    const msg = e.data as
+      | { type: "ready" }
+      | { type: "suggest"; id: number; suggestions: string[] }
+      | { type: "correct"; id: number; correct: boolean }
+      | { type: "error"; id: number; message: string };
+
+    if (msg.type === "ready") {
+      isReady = true;
+      // Re-aplica personal dict — o worker carregou um speller fresh,
+      // ele nao sabe nada das palavras que o user adicionou em sessoes
+      // anteriores. Sem isso, palavras adicionadas na ultima sessao
       // voltariam a aparecer como erro.
-      for (const word of personalDict) s.add(word);
-      speller = s;
-      return s;
-    } catch (err) {
-      console.error("[spellcheck] load failed:", err);
-      // Reset loadingPromise pra permitir retry numa proxima call.
-      loadingPromise = null;
-      return null;
+      for (const word of personalDict) {
+        worker?.postMessage({ type: "add", word });
+      }
+      return;
     }
-  })();
 
-  return loadingPromise;
-}
+    if (msg.type === "suggest") {
+      const handler = pending.get(msg.id);
+      if (handler) {
+        handler.resolve(msg.suggestions);
+        pending.delete(msg.id);
+      }
+      return;
+    }
+    if (msg.type === "correct") {
+      const handler = pending.get(msg.id);
+      if (handler) {
+        handler.resolve(msg.correct);
+        pending.delete(msg.id);
+      }
+      return;
+    }
+    if (msg.type === "error") {
+      console.error("[spellcheck worker]", msg.message);
+      const handler = pending.get(msg.id);
+      if (handler) {
+        handler.reject(new Error(msg.message));
+        pending.delete(msg.id);
+      }
+    }
+  };
 
-/** Retorna a instancia se ja' carregou, ou null. NAO dispara load. */
-export function getSpellcheckerIfReady(): NSpell | null {
-  return speller;
+  worker.onerror = (err) => {
+    console.error("[spellcheck worker] uncaught error:", err);
+  };
+
+  return worker;
 }
 
 /**
- * Verifica se a palavra e' "correta" (no dicionario ou na lista pessoal).
- * Sem engine, retorna true (nao queremos falsos negativos visiveis).
+ * Dispara init do worker em background. Idempotente. Nao espera nem
+ * bloqueia — chame e siga. O `isSpellcheckerReady()` vira true quando
+ * a engine acabar de carregar (depois de ~8-10s na primeira vez).
+ */
+export function ensureSpellchecker(): void {
+  const w = getOrCreateWorker();
+  w.postMessage({ type: "init" });
+}
+
+export function isSpellcheckerReady(): boolean {
+  return isReady;
+}
+
+/**
+ * Pede sugestoes ao worker. Resolve com array ate' 8 candidatos
+ * (vazio se nao acha sugestao razoavel).
  *
- * Comparacao com personalDict e' lowercase pra "Solon"/"solon" se
- * acharem como mesma entrada. nspell faz seu proprio case folding
- * internamente.
+ * Se a palavra esta no dict pessoal, retorna [] sem ir ao worker —
+ * fast path que economiza ~5ms por right-click em palavra conhecida.
+ *
+ * Timeout de 30s e' generoso pra cobrir engine carregando do zero.
+ * Em uso normal (engine ja' pronta) responses voltam em <100ms.
  */
-export function isCorrect(word: string): boolean {
-  if (!speller) return true;
+export async function suggest(word: string): Promise<string[]> {
+  if (personalDict.has(word.toLowerCase())) return [];
+  return rpc<string[]>("suggest", { word }, []);
+}
+
+export async function isCorrect(word: string): Promise<boolean> {
   if (personalDict.has(word.toLowerCase())) return true;
-  return speller.correct(word);
+  return rpc<boolean>("correct", { word }, true);
 }
 
 /**
- * Top-N sugestoes pra uma palavra errada. nspell retorna lista por
- * relevancia (proximidade); cortamos em 8 pra nao explodir o context
- * menu.
+ * Helper de RPC — envia mensagem com id unico, retorna Promise que
+ * resolve com a resposta. Em caso de timeout ou erro, retorna o
+ * fallback fornecido (nao queremos quebrar a UI por uma falha de
+ * spellcheck).
  */
-export function suggest(word: string): string[] {
-  if (!speller) return [];
-  return speller.suggest(word).slice(0, 8);
+function rpc<T>(
+  type: "suggest" | "correct",
+  payload: { word: string },
+  fallback: T,
+): Promise<T> {
+  const w = getOrCreateWorker();
+  const id = ++nextId;
+  return new Promise<T>((resolve) => {
+    const timer = window.setTimeout(() => {
+      if (pending.has(id)) {
+        pending.delete(id);
+        console.warn(`[spellcheck] ${type} timed out for "${payload.word}"`);
+        resolve(fallback);
+      }
+    }, 30000);
+
+    pending.set(id, {
+      resolve: (value) => {
+        window.clearTimeout(timer);
+        resolve(value as T);
+      },
+      // Erro = fallback silencioso. UI segue normal.
+      reject: () => {
+        window.clearTimeout(timer);
+        resolve(fallback);
+      },
+    });
+
+    w.postMessage({ type, id, ...payload });
+  });
 }
 
 export function addToPersonalDict(word: string): void {
@@ -113,9 +198,10 @@ export function addToPersonalDict(word: string): void {
   if (!normalized) return;
   personalDict.add(normalized.toLowerCase());
   savePersonalDict();
-  // Atualiza tambem a engine em memoria pra que checks subsequentes
-  // dessa palavra retornem true imediatamente, sem precisar reload.
-  speller?.add(normalized);
+  // Posta no worker pra que checks subsequentes ja considerem como
+  // correta sem reload. Se o worker ainda nao iniciou, o evento
+  // 'ready' re-aplicara o personal dict completo.
+  worker?.postMessage({ type: "add", word: normalized });
 }
 
 export function isInPersonalDict(word: string): boolean {
@@ -126,15 +212,12 @@ export function getPersonalDictSize(): number {
   return personalDict.size;
 }
 
-/**
- * Remove uma palavra do dicionario pessoal. Nao tem UI ainda, mas a
- * action existe pra futuras "preferencias > dicionario pessoal" e pra
- * `resetSettings()` poder limpar.
- */
 export function removeFromPersonalDict(word: string): void {
   const lower = word.toLowerCase();
   if (!personalDict.has(lower)) return;
   personalDict.delete(lower);
   savePersonalDict();
-  speller?.remove(word);
+  // nspell tem .remove() mas requer reload pra "esquecer" de verdade
+  // se a palavra estava em formas conjugadas. Best effort.
+  // (TODO: se virar problema, implementar reload do worker.)
 }

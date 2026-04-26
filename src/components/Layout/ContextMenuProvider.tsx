@@ -15,29 +15,33 @@ import { findWordAtCoords, replaceRange, getCurrentEditor } from "../../lib/edit
 import {
   addToPersonalDict,
   ensureSpellchecker,
-  getSpellcheckerIfReady,
   isCorrect,
   isInPersonalDict,
+  isSpellcheckerReady,
   suggest,
 } from "../../lib/spellcheck";
+import type { Editor } from "@tiptap/react";
 
 /**
  * Listener global de right-click: bloqueia o context menu nativo do
  * WebView e dispara o nosso (`openContextMenu`).
  *
- * O conteudo do menu varia por contexto:
- *  - Editor (.ProseMirror): cut/copy/paste/colar-sem-formatacao + bold/
- *    italic + undo/redo + spellcheck toggle + selecionar-tudo
- *  - Sidebar/outras areas: copy + selecionar-tudo (futuro: rename/delete
- *    quando target for um FileNode)
- *  - Generico (qualquer outro): so' selecionar-tudo + paste
+ * Fluxo:
+ *  1. Click direito → `onContextMenu` previne default
+ *  2. Build items sync conforme contexto (editor/input/generic)
+ *  3. Abre menu IMEDIATAMENTE com os items basicos
+ *  4. Se foi em palavra dentro do editor → dispara checagem async no
+ *     worker. Se misspelled, atualiza items do menu prepending com
+ *     sugestoes.
  *
- * Implementacao: um unico listener no document detecta o evento e
- * inspeciona o `target` pra decidir o set de items.
+ * Crucial: NADA na pipeline e' bloqueante. Menu abre instantaneo
+ * mesmo quando o spellcheck ainda esta carregando o dicionario (o
+ * que demora 8-10s na primeira vez, mas no worker nao trava a UI).
  */
 export function ContextMenuProvider() {
   const openContextMenu = useAppStore((s) => s.openContextMenu);
   const closeContextMenu = useAppStore((s) => s.closeContextMenu);
+  const updateContextMenuItems = useAppStore((s) => s.updateContextMenuItems);
   const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
   const setSpellcheckEnabled = useAppStore((s) => s.setSpellcheckEnabled);
   const pushToast = useAppStore((s) => s.pushToast);
@@ -47,25 +51,58 @@ export function ContextMenuProvider() {
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
-      // Areas onde a gente PROPOSITALMENTE deixa o native passar:
-      // - inputs <input type="file"> (picker do OS)
-      // - elementos com data-allow-native-context-menu (escape hatch)
       if (target.closest("[data-allow-native-context-menu]")) return;
 
       e.preventDefault();
       e.stopPropagation();
 
-      const items = buildItems({
-        target,
-        clientX: e.clientX,
-        clientY: e.clientY,
-        spellcheckEnabled,
-        setSpellcheckEnabled,
-        closeContextMenu,
-        pushToast,
-      });
-      if (items.length === 0) return;
-      openContextMenu(e.clientX, e.clientY, items);
+      // Build dos items sync — mesmo no caso "talvez tenha sugestao",
+      // precisamos abrir o menu imediato. Sugestoes vem depois via
+      // updateContextMenuItems.
+      const inEditor = !!target.closest(".ProseMirror");
+      const inEditableInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
+
+      const sel = window.getSelection();
+      const hasSelection =
+        !!sel && !sel.isCollapsed && sel.toString().length > 0;
+
+      let baseItems: ContextMenuItem[];
+      if (inEditor) {
+        baseItems = editorItems({
+          hasSelection,
+          spellcheckEnabled,
+          setSpellcheckEnabled,
+        });
+      } else if (inEditableInput) {
+        baseItems = inputItems({ hasSelection });
+      } else {
+        baseItems = genericItems({ hasSelection });
+      }
+
+      if (baseItems.length === 0) return;
+
+      // Abre o menu agora. Captura o id pra updates async.
+      const menuId = openContextMenu(e.clientX, e.clientY, baseItems);
+
+      // Se for editor + spellcheck on, dispara checagem async em paralelo.
+      if (inEditor && spellcheckEnabled) {
+        const editor = getCurrentEditor();
+        if (editor) {
+          attachSuggestionsAsync({
+            editor,
+            clientX: e.clientX,
+            clientY: e.clientY,
+            menuId,
+            baseItems,
+            updateContextMenuItems,
+            closeContextMenu,
+            pushToast,
+          });
+        }
+      }
     };
 
     document.addEventListener("contextmenu", onContextMenu);
@@ -73,6 +110,7 @@ export function ContextMenuProvider() {
   }, [
     openContextMenu,
     closeContextMenu,
+    updateContextMenuItems,
     spellcheckEnabled,
     setSpellcheckEnabled,
     pushToast,
@@ -81,129 +119,83 @@ export function ContextMenuProvider() {
   return null;
 }
 
-function buildItems({
-  target,
-  clientX,
-  clientY,
-  spellcheckEnabled,
-  setSpellcheckEnabled,
-  closeContextMenu,
-  pushToast,
-}: {
-  target: HTMLElement;
-  clientX: number;
-  clientY: number;
-  spellcheckEnabled: boolean;
-  setSpellcheckEnabled: (v: boolean) => void;
-  closeContextMenu: () => void;
-  pushToast: (kind: "info" | "success" | "error", msg: string) => void;
-}): ContextMenuItem[] {
-  const inEditor = !!target.closest(".ProseMirror");
-  const inEditableInput =
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.isContentEditable;
-
-  const sel = window.getSelection();
-  const hasSelection = !!sel && !sel.isCollapsed && (sel.toString().length > 0);
-
-  if (inEditor) {
-    // Detecta se o clique foi sobre uma palavra errada — se sim,
-    // prepende sugestoes + "Adicionar ao dicionario" no menu. Caso
-    // engine ainda nao esteja carregada, dispara o load e mostra o menu
-    // sem sugestoes (proximo right-click ja' tera).
-    const spellcheckPrefix = spellcheckEnabled
-      ? buildSpellcheckItems({
-          clientX,
-          clientY,
-          closeContextMenu,
-          pushToast,
-        })
-      : [];
-    return [
-      ...spellcheckPrefix,
-      ...editorItems({
-        hasSelection,
-        spellcheckEnabled,
-        setSpellcheckEnabled,
-      }),
-    ];
-  }
-  if (inEditableInput) {
-    return inputItems({ hasSelection });
-  }
-  return genericItems({ hasSelection });
-}
-
 /**
- * Items de spellcheck pra prepender ao menu do editor.
+ * Roda a checagem ortografica em background (worker) e, se a palavra
+ * estiver errada, atualiza o menu aberto prepending sugestoes +
+ * "Adicionar ao dicionario".
  *
- * Comportamento:
- *  1. Se nao ha editor ativo ou clique nao caiu em palavra → []
- *  2. Engine nao carregada AINDA → dispara load (warm-up acontece em
- *     paralelo, este right-click ja' fica sem sugestao mas o proximo
- *     pega) e retorna []
- *  3. Palavra correta (no dict ou no personal) → []
- *  4. Palavra errada → [...sugestoes, separator, "Adicionar ao dict",
- *     separator]
- *  5. Palavra errada SEM sugestoes (raro — palavra muito distante de
- *     qualquer entry) → ["Nenhuma sugestao" disabled, "Adicionar ao dict"]
- *
- * Importante: items de sugestao usam o `editor` que pegamos uma vez
- * aqui — se o editor for desmontado entre o build do menu e o click,
- * o command e' no-op silencioso.
+ * Como o menu ja' esta visivel quando entramos aqui, o usuario ve uma
+ * "atualizacao" do menu quando as sugestoes chegam — UX equivalente a
+ * loading inline. Tipicamente <100ms quando engine ja' carregada,
+ * 8-10s na primeira vez (engine compilando o .dic). UI fica responsiva
+ * porque worker nao bloqueia main thread.
  */
-function buildSpellcheckItems({
+async function attachSuggestionsAsync({
+  editor,
   clientX,
   clientY,
+  menuId,
+  baseItems,
+  updateContextMenuItems,
   closeContextMenu,
   pushToast,
 }: {
+  editor: Editor;
   clientX: number;
   clientY: number;
+  menuId: string;
+  baseItems: ContextMenuItem[];
+  updateContextMenuItems: (id: string, items: ContextMenuItem[]) => void;
   closeContextMenu: () => void;
-  pushToast: (kind: "info" | "success" | "error", msg: string) => void;
-}): ContextMenuItem[] {
-  const editor = getCurrentEditor();
-  if (!editor) return [];
-
+  pushToast: (
+    kind: "info" | "success" | "error",
+    message: string,
+  ) => void;
+}): Promise<void> {
   const wordInfo = findWordAtCoords(editor, clientX, clientY);
-  if (!wordInfo) return [];
+  if (!wordInfo) return;
 
-  // Numerais ("2026", "v0.5.0") nao sao palavras — pula. nspell
-  // marcaria como erro mas o user obviamente nao quer "sugestoes" pra
-  // um ano.
-  if (/^\d+$/.test(wordInfo.word)) return [];
+  // Numerais nao vao pro spellcheck — `2026`, `v0.5.0`, etc.
+  if (/^\d+$/.test(wordInfo.word)) return;
 
-  // Engine nao carregada: dispara warm-up se ainda nao foi e retorna
-  // sem prefix. Sem isso, o user clicaria, veria menu sem sugestoes,
-  // sem entender por que.
-  const speller = getSpellcheckerIfReady();
-  if (!speller) {
-    ensureSpellchecker(); // fire-and-forget
-    return [];
+  // Curta-circuita pelo dict pessoal antes de gastar round-trip.
+  if (isInPersonalDict(wordInfo.word)) return;
+
+  // Se engine nao esta pronta, kicka o init em background. A propria
+  // chamada de isCorrect abaixo vai esperar (no worker) ate ficar
+  // pronta, entao o menu so' atualiza apos o load completar — mas SEM
+  // travar UI no meio.
+  if (!isSpellcheckerReady()) {
+    ensureSpellchecker();
   }
 
-  // Ja' no dicionario pessoal — sumira como erro tambem; nada a fazer.
-  if (isInPersonalDict(wordInfo.word)) return [];
-  if (isCorrect(wordInfo.word)) return [];
+  let correct: boolean;
+  try {
+    correct = await isCorrect(wordInfo.word);
+  } catch {
+    return; // erro silencioso — menu ja esta aberto com items normais
+  }
+  if (correct) return;
 
-  const suggestions = suggest(wordInfo.word);
+  let suggestions: string[];
+  try {
+    suggestions = await suggest(wordInfo.word);
+  } catch {
+    suggestions = [];
+  }
 
-  const items: ContextMenuItem[] = [];
+  // Build do prefix com sugestoes
+  const prefix: ContextMenuItem[] = [];
 
   if (suggestions.length === 0) {
-    items.push({
+    prefix.push({
       label: "Nenhuma sugestão",
       disabled: true,
       onClick: () => {},
     });
   } else {
     for (const sug of suggestions) {
-      items.push({
-        // As sugestoes sao a acao primaria — listadas sem icone pra
-        // ficarem visualmente destacadas das acoes operacionais
-        // (recortar, etc) que tem icone. Texto puro = "voce quis dizer".
+      prefix.push({
         label: sug,
         onClick: () => {
           replaceRange(editor, wordInfo.from, wordInfo.to, sug);
@@ -213,18 +205,22 @@ function buildSpellcheckItems({
     }
   }
 
-  items.push({ kind: "separator" });
-  items.push({
+  prefix.push({ kind: "separator" });
+  prefix.push({
     label: `Adicionar "${wordInfo.word}" ao dicionário`,
     icon: <BookPlus size={12} />,
     onClick: () => {
       addToPersonalDict(wordInfo.word);
-      pushToast("success", `Adicionado "${wordInfo.word}" ao dicionário pessoal.`);
+      pushToast(
+        "success",
+        `Adicionado "${wordInfo.word}" ao dicionário pessoal.`,
+      );
     },
   });
-  items.push({ kind: "separator" });
+  prefix.push({ kind: "separator" });
 
-  return items;
+  // Atualiza o menu (se ainda for o mesmo — store check via menuId)
+  updateContextMenuItems(menuId, [...prefix, ...baseItems]);
 }
 
 function editorItems({
@@ -236,10 +232,6 @@ function editorItems({
   spellcheckEnabled: boolean;
   setSpellcheckEnabled: (v: boolean) => void;
 }): ContextMenuItem[] {
-  // Acoes no editor: usamos document.execCommand pra integrar com
-  // ProseMirror sem precisar de uma referencia direta ao editor TipTap.
-  // execCommand e' deprecated mas ainda funciona em todos os WebViews
-  // do Tauri 2 (Chromium + WebKit) e nao quebra a undo stack do TipTap.
   return [
     {
       label: "Recortar",
@@ -259,15 +251,12 @@ function editorItems({
       label: "Colar",
       icon: <ClipboardPaste size={12} />,
       shortcut: "Ctrl+V",
-      // Webviews bloqueiam clipboard.read() sem prompt — usamos
-      // execCommand pra colar com formatacao. Se rejeitado, no-op.
       onClick: async () => {
         try {
           const text = await navigator.clipboard.readText();
           if (text) document.execCommand("insertText", false, text);
         } catch {
-          // Fallback: deixa o user usar Ctrl+V mesmo. execCommand("paste")
-          // nao funciona sem user gesture em alguns webviews.
+          /* clipboard sem permissao — usar Ctrl+V */
         }
       },
     },
@@ -319,8 +308,6 @@ function editorItems({
       onClick: () => {
         const next = !spellcheckEnabled;
         setSpellcheckEnabled(next);
-        // Atualiza o atributo no .ProseMirror imperativamente — TipTap
-        // nao reactivo a editorProps.attributes pos-init.
         const pm = document.querySelector(
           ".ProseMirror",
         ) as HTMLElement | null;
@@ -336,7 +323,11 @@ function editorItems({
   ];
 }
 
-function inputItems({ hasSelection }: { hasSelection: boolean }): ContextMenuItem[] {
+function inputItems({
+  hasSelection,
+}: {
+  hasSelection: boolean;
+}): ContextMenuItem[] {
   return [
     {
       label: "Recortar",
@@ -374,10 +365,11 @@ function inputItems({ hasSelection }: { hasSelection: boolean }): ContextMenuIte
   ];
 }
 
-function genericItems({ hasSelection }: { hasSelection: boolean }): ContextMenuItem[] {
-  // Areas read-only (sidebar, canvas, paineis) — basicamente so copia
-  // do que ja' tiver selecionado. Selecionar-tudo nao faz sentido fora
-  // de inputs/editor, entao deixamos so' Copy.
+function genericItems({
+  hasSelection,
+}: {
+  hasSelection: boolean;
+}): ContextMenuItem[] {
   return [
     {
       label: "Copiar",

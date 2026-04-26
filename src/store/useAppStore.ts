@@ -83,9 +83,13 @@ export type ContextMenuItem =
     }
   | { kind: "separator" };
 
-/** Context menu ativo — coordenadas em viewport (clientX/Y). */
+/** Context menu ativo — coordenadas em viewport (clientX/Y).
+ *  `id` permite que callers async (ex: spellcheck no worker) atualizem
+ *  os items DESTE menu especifico via `updateContextMenuItems(id, ...)`,
+ *  sem risco de sobrescrever o menu errado se o user fechou e abriu
+ *  outro no meio do round-trip. */
 export interface ActiveContextMenu {
-  id: number;
+  id: string;
   x: number;
   y: number;
   items: ContextMenuItem[];
@@ -223,7 +227,13 @@ interface AppState {
   /** Reset de todas as preferencias pro default (zoom 100%, theme light,
    *  auto-save on, etc). Usado pelo botao "Restaurar padroes". */
   resetSettings: () => void;
-  openContextMenu: (x: number, y: number, items: ContextMenuItem[]) => void;
+  /** Abre context menu e retorna id unico — uso em fluxos async (ex:
+   *  spellcheck) que precisam atualizar items DESTE menu sem risco de
+   *  sobrescrever outro que tenha sido aberto no meio do caminho. */
+  openContextMenu: (x: number, y: number, items: ContextMenuItem[]) => string;
+  /** Substitui items do menu identificado por `id`. Se o id nao bate
+   *  com o menu ativo (foi fechado/trocado), no-op — protege de races. */
+  updateContextMenuItems: (id: string, items: ContextMenuItem[]) => void;
   closeContextMenu: () => void;
   setSpellcheckEnabled: (v: boolean) => void;
 }
@@ -505,14 +515,23 @@ export const useAppStore = create<AppState>((set) => ({
     });
   },
 
-  openContextMenu: (x, y, items) =>
-    set({
-      activeContextMenu: {
-        id: Date.now(),
-        x,
-        y,
-        items,
-      },
+  openContextMenu: (x, y, items) => {
+    // Id legivel + uniqueness o suficiente — Math.random + base36 da uns
+    // 11 chars de entropia. Nao precisa ser cripto-seguro; so' precisa
+    // distinguir menus consecutivos.
+    const id =
+      Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    set({ activeContextMenu: { id, x, y, items } });
+    return id;
+  },
+
+  updateContextMenuItems: (id, items) =>
+    set((s) => {
+      // Race protection: se o menu fechou ou foi substituido por outro
+      // entre o openContextMenu e o updateContextMenuItems, nao
+      // queremos sobrescrever o menu novo com items velhos.
+      if (!s.activeContextMenu || s.activeContextMenu.id !== id) return s;
+      return { activeContextMenu: { ...s.activeContextMenu, items } };
     }),
 
   closeContextMenu: () => set({ activeContextMenu: null }),
