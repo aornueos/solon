@@ -61,6 +61,7 @@ function savePersonalDict(): void {
 function getOrCreateWorker(): Worker {
   if (worker) return worker;
 
+  console.log("[spellcheck] spawning worker…");
   // `new URL(..., import.meta.url)` e' o padrao Vite pra workers — gera
   // um chunk separado, com cache busting via hash em build de prod.
   // `type: 'module'` permite usar `import` dentro do worker.
@@ -78,6 +79,9 @@ function getOrCreateWorker(): Worker {
 
     if (msg.type === "ready") {
       isReady = true;
+      console.log(
+        `[spellcheck] worker pronto. Personal dict: ${personalDict.size} palavras.`,
+      );
       // Re-aplica personal dict — o worker carregou um speller fresh,
       // ele nao sabe nada das palavras que o user adicionou em sessoes
       // anteriores. Sem isso, palavras adicionadas na ultima sessao
@@ -105,7 +109,7 @@ function getOrCreateWorker(): Worker {
       return;
     }
     if (msg.type === "error") {
-      console.error("[spellcheck worker]", msg.message);
+      console.error("[spellcheck] worker error:", msg.message);
       const handler = pending.get(msg.id);
       if (handler) {
         handler.reject(new Error(msg.message));
@@ -115,7 +119,18 @@ function getOrCreateWorker(): Worker {
   };
 
   worker.onerror = (err) => {
-    console.error("[spellcheck worker] uncaught error:", err);
+    // Frequentemente apenas com `message` em ErrorEvent. Loga tudo que
+    // tem pra ajudar a diagnosticar (ex: import path errado, worker
+    // file 404, etc).
+    console.error("[spellcheck] worker uncaught error:", {
+      message: err.message,
+      filename: err.filename,
+      lineno: err.lineno,
+      error: err.error,
+    });
+  };
+  worker.onmessageerror = (err) => {
+    console.error("[spellcheck] worker message deserialization error:", err);
   };
 
   return worker;

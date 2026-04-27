@@ -32,19 +32,31 @@ async function init(): Promise<void> {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
+    console.log("[spellcheck.worker] init: fetching dict files...");
+    const startFetch = performance.now();
     const [affRes, dicRes] = await Promise.all([
       fetch("/dict/pt.aff"),
       fetch("/dict/pt.dic"),
     ]);
+    console.log(
+      `[spellcheck.worker] fetch done in ${(performance.now() - startFetch).toFixed(0)}ms — aff=${affRes.status}, dic=${dicRes.status}`,
+    );
     if (!affRes.ok || !dicRes.ok) {
       throw new Error(
         `Falha ao carregar dicionario: aff=${affRes.status}, dic=${dicRes.status}. Verifique public/dict/pt.{aff,dic}.`,
       );
     }
     const [aff, dic] = await Promise.all([affRes.text(), dicRes.text()]);
+    console.log(
+      `[spellcheck.worker] aff=${aff.length} chars, dic=${dic.length} chars. Compilando NSpell…`,
+    );
+    const startCompile = performance.now();
     // Esse construtor e' o gargalo (~8-10s). Aqui no worker nao bloqueia
     // a main thread.
     speller = NSpell(aff, dic);
+    console.log(
+      `[spellcheck.worker] NSpell pronto em ${(performance.now() - startCompile).toFixed(0)}ms.`,
+    );
     self.postMessage({ type: "ready" });
   })();
 

@@ -84,24 +84,61 @@ export function ContextMenuProvider() {
 
       if (baseItems.length === 0) return;
 
-      // Abre o menu agora. Captura o id pra updates async.
-      const menuId = openContextMenu(e.clientX, e.clientY, baseItems);
+      // Se for editor + spellcheck on + caiu numa palavra checavel,
+      // prepende um placeholder "Verificando ortografia..." enquanto o
+      // worker checa. Isso da feedback IMEDIATO ao usuario de que o
+      // sistema esta trabalhando — antes o menu abria sem nada de
+      // spellcheck mesmo quando a palavra estava errada, e o usuario
+      // pensava que a feature so' nao funcionava.
+      let menuItems = baseItems;
+      let wordToCheck: { word: string; from: number; to: number } | null =
+        null;
+      let editorRef: ReturnType<typeof getCurrentEditor> = null;
 
-      // Se for editor + spellcheck on, dispara checagem async em paralelo.
       if (inEditor && spellcheckEnabled) {
-        const editor = getCurrentEditor();
-        if (editor) {
-          attachSuggestionsAsync({
-            editor,
-            clientX: e.clientX,
-            clientY: e.clientY,
-            menuId,
-            baseItems,
-            updateContextMenuItems,
-            closeContextMenu,
-            pushToast,
-          });
+        editorRef = getCurrentEditor();
+        if (editorRef) {
+          const wordInfo = findWordAtCoords(
+            editorRef,
+            e.clientX,
+            e.clientY,
+          );
+          // So' mostra placeholder se for uma palavra "checavel" — nao
+          // numero, nao no dict pessoal. Senao deixa o menu abrir
+          // limpo (sem placeholder que ficaria pra sempre).
+          if (
+            wordInfo &&
+            !/^\d+$/.test(wordInfo.word) &&
+            !isInPersonalDict(wordInfo.word)
+          ) {
+            wordToCheck = wordInfo;
+            menuItems = [
+              {
+                label: "Verificando ortografia…",
+                disabled: true,
+                onClick: () => {},
+              },
+              { kind: "separator" },
+              ...baseItems,
+            ];
+          }
         }
+      }
+
+      // Abre o menu agora (com ou sem placeholder).
+      const menuId = openContextMenu(e.clientX, e.clientY, menuItems);
+
+      // Se prepended placeholder, dispara o async pra resolver.
+      if (wordToCheck && editorRef) {
+        attachSuggestionsAsync({
+          editor: editorRef,
+          wordInfo: wordToCheck,
+          menuId,
+          baseItems,
+          updateContextMenuItems,
+          closeContextMenu,
+          pushToast,
+        });
       }
     };
 
@@ -132,8 +169,7 @@ export function ContextMenuProvider() {
  */
 async function attachSuggestionsAsync({
   editor,
-  clientX,
-  clientY,
+  wordInfo,
   menuId,
   baseItems,
   updateContextMenuItems,
@@ -141,8 +177,7 @@ async function attachSuggestionsAsync({
   pushToast,
 }: {
   editor: Editor;
-  clientX: number;
-  clientY: number;
+  wordInfo: { word: string; from: number; to: number };
   menuId: string;
   baseItems: ContextMenuItem[];
   updateContextMenuItems: (id: string, items: ContextMenuItem[]) => void;
@@ -152,14 +187,9 @@ async function attachSuggestionsAsync({
     message: string,
   ) => void;
 }): Promise<void> {
-  const wordInfo = findWordAtCoords(editor, clientX, clientY);
-  if (!wordInfo) return;
-
-  // Numerais nao vao pro spellcheck — `2026`, `v0.5.0`, etc.
-  if (/^\d+$/.test(wordInfo.word)) return;
-
-  // Curta-circuita pelo dict pessoal antes de gastar round-trip.
-  if (isInPersonalDict(wordInfo.word)) return;
+  console.log(
+    `[spellcheck] check "${wordInfo.word}" (worker ready: ${isSpellcheckerReady()})`,
+  );
 
   // Se engine nao esta pronta, kicka o init em background. A propria
   // chamada de isCorrect abaixo vai esperar (no worker) ate ficar
@@ -172,17 +202,31 @@ async function attachSuggestionsAsync({
   let correct: boolean;
   try {
     correct = await isCorrect(wordInfo.word);
-  } catch {
-    return; // erro silencioso — menu ja esta aberto com items normais
+  } catch (err) {
+    console.error("[spellcheck] isCorrect threw:", err);
+    // Remove placeholder restaurando baseItems pra nao deixar
+    // "Verificando ortografia…" la' pra sempre.
+    updateContextMenuItems(menuId, baseItems);
+    return;
   }
-  if (correct) return;
+  console.log(`[spellcheck] "${wordInfo.word}" correct=${correct}`);
+  if (correct) {
+    // Palavra correta — remove placeholder restaurando o menu normal.
+    updateContextMenuItems(menuId, baseItems);
+    return;
+  }
 
   let suggestions: string[];
   try {
     suggestions = await suggest(wordInfo.word);
-  } catch {
+  } catch (err) {
+    console.error("[spellcheck] suggest threw:", err);
     suggestions = [];
   }
+  console.log(
+    `[spellcheck] "${wordInfo.word}" → ${suggestions.length} suggestions:`,
+    suggestions,
+  );
 
   // Build do prefix com sugestoes
   const prefix: ContextMenuItem[] = [];
