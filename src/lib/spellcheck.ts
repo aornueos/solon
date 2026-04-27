@@ -1,13 +1,20 @@
 /**
  * Facade do spellcheck — comunica com Web Worker dedicado (`./spellcheck.worker.ts`).
  *
- * Engine: hunspell-asm (Hunspell oficial em WASM). Antes era nspell
- * (puro JS), mas estourava com "Too many properties to enumerate" no
- * dicionario pt-BR (~300k palavras com morfologia complexa).
+ * Engine: implementacao custom (Set + Levenshtein) em puro JS, sem libs
+ * externas. Tentativas anteriores fracassaram:
+ *  - nspell e typo-js (puro JS): estouravam "Too many properties to
+ *    enumerate" no V8 ao processar morfologia pt-BR
+ *  - hunspell-asm (WASM): build browser e' UMD legacy, incompativel
+ *    com Vite + Worker type:'module'
  *
- * Por que worker? Mesmo com hunspell-asm, o load do WASM + parsing
- * do dict leva alguns segundos. Worker isola pra que main thread
- * permaneca responsiva.
+ * Solucao: o postinstall extrai a lista de palavras-base do .dic do
+ * `dictionary-pt` num arquivo simples (`public/dict/pt-words.txt`,
+ * ~312k palavras). Worker carrega como Set, lookup O(1) pra check.
+ * Sugestoes via Levenshtein bounded com poda por comprimento.
+ *
+ * Por que worker? Carregar 3.5MB + popular Set + manter array pra
+ * sugestoes leva alguns segundos. Isolar mantem main thread responsiva.
  *
  * API publica:
  *  - `ensureSpellchecker()`     — sync, dispara init em background
