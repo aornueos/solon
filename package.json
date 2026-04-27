@@ -51,7 +51,7 @@
     "turndown": "^7.2.0",
     "turndown-plugin-gfm": "^1.0.2",
     "dompurify": "^3.2.3",
-    "nspell": "^2.1.5",
+    "hunspell-asm": "^3.0.2",
     "dictionary-pt": "^4.0.0"
   },
   "devDependencies": {
@@ -61,7 +61,6 @@
     "@types/js-yaml": "^4.0.9",
     "@types/turndown": "^5.0.5",
     "@types/dompurify": "^3.2.0",
-    "@types/nspell": "^2.1.6",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",

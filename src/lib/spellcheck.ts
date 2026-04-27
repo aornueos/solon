@@ -1,9 +1,13 @@
 /**
  * Facade do spellcheck — comunica com Web Worker dedicado (`./spellcheck.worker.ts`).
  *
- * Por que worker? O parsing inicial do dicionario Hunspell pt-BR
- * (~4.4MB) bloqueava a main thread por ~8-10s. UI travava. Isolar
- * num worker mantem o app responsivo durante o load.
+ * Engine: hunspell-asm (Hunspell oficial em WASM). Antes era nspell
+ * (puro JS), mas estourava com "Too many properties to enumerate" no
+ * dicionario pt-BR (~300k palavras com morfologia complexa).
+ *
+ * Por que worker? Mesmo com hunspell-asm, o load do WASM + parsing
+ * do dict leva alguns segundos. Worker isola pra que main thread
+ * permaneca responsiva.
  *
  * API publica:
  *  - `ensureSpellchecker()`     — sync, dispara init em background
