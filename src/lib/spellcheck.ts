@@ -1,51 +1,42 @@
 /**
- * Facade do spellcheck — comunica com Web Worker dedicado (`./spellcheck.worker.ts`).
+ * Facade do spellcheck — agora 100% backend nativo via Tauri commands.
  *
- * Engine: implementacao custom (Set + Levenshtein) em puro JS, sem libs
- * externas. Tentativas anteriores fracassaram:
- *  - nspell e typo-js (puro JS): estouravam "Too many properties to
- *    enumerate" no V8 ao processar morfologia pt-BR
+ * Historia das tentativas:
+ *  - nspell (JS): "Too many properties to enumerate" no V8
  *  - hunspell-asm (WASM): build browser e' UMD legacy, incompativel
  *    com Vite + Worker type:'module'
+ *  - typo-js (JS): mesmo problema do nspell
+ *  - Web Worker custom (Set + Levenshtein em JS): funcionava, mas user
+ *    nao via sugestoes confiaveis; foco e' desktop
+ *  - **ATUAL**: Rust backend via Tauri invoke. HashSet + Levenshtein
+ *    em rust nativo. Sem limite V8, sem WASM, sem worker. Funciona
+ *    sempre.
  *
- * Solucao: o postinstall extrai a lista de palavras-base do .dic do
- * `dictionary-pt` num arquivo simples (`public/dict/pt-words.txt`,
- * ~312k palavras). Worker carrega como Set, lookup O(1) pra check.
- * Sugestoes via Levenshtein bounded com poda por comprimento.
+ * Trade: roda so' em Tauri (no `npm run dev` puro browser, e' no-op).
+ * Decisao explicita do user — foco e' desktop.
  *
- * Por que worker? Carregar 3.5MB + popular Set + manter array pra
- * sugestoes leva alguns segundos. Isolar mantem main thread responsiva.
- *
- * API publica:
- *  - `ensureSpellchecker()`     — sync, dispara init em background
- *  - `isSpellcheckerReady()`    — sync, retorna se engine ja' carregou
- *  - `suggest(word)`            — async, Promise<string[]> (8 sugestoes max)
+ * API publica (mesma interface dos providers anteriores):
+ *  - `ensureSpellchecker()`     — sync, dispara warm-up
+ *  - `isSpellcheckerReady()`    — sync, retorna se backend esta vivo
+ *  - `suggest(word)`            — async, Promise<string[]>
  *  - `isCorrect(word)`          — async, Promise<boolean>
- *  - `addToPersonalDict(word)`  — sync, adiciona ao dict pessoal + posta no worker
+ *  - `addToPersonalDict(word)`  — sync, persiste + notifica backend
  *  - `isInPersonalDict(word)`   — sync
  *  - `getPersonalDictSize()`    — sync
  *  - `removeFromPersonalDict(word)` — sync
- *
- * Personal dict (palavras que o user adicionou via "Adicionar ao dict")
- * vive em localStorage + Set local. Checagens sync passam pelo Set
- * antes de tocar no worker — palavras pessoais retornam true/[]
- * imediatamente sem round-trip.
  */
+import { invoke } from "@tauri-apps/api/core";
 
 const PERSONAL_DICT_KEY = "solon:spellcheck:personal";
 
-// ─── Worker e protocolo RPC ───
-let worker: Worker | null = null;
 let isReady = false;
-let nextId = 0;
-
-interface PendingHandler {
-  resolve: (value: unknown) => void;
-  reject: (reason?: unknown) => void;
-}
-const pending = new Map<number, PendingHandler>();
-
+let warmupPromise: Promise<void> | null = null;
 let personalDict = loadPersonalDict();
+
+const isTauri = (): boolean =>
+  typeof window !== "undefined" &&
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).__TAURI_INTERNALS__ !== undefined;
 
 function loadPersonalDict(): Set<string> {
   try {
@@ -69,92 +60,48 @@ function savePersonalDict(): void {
   }
 }
 
-function getOrCreateWorker(): Worker {
-  if (worker) return worker;
-
-  console.log("[spellcheck] spawning worker…");
-  // `new URL(..., import.meta.url)` e' o padrao Vite pra workers — gera
-  // um chunk separado, com cache busting via hash em build de prod.
-  // `type: 'module'` permite usar `import` dentro do worker.
-  worker = new Worker(
-    new URL("./spellcheck.worker.ts", import.meta.url),
-    { type: "module" },
-  );
-
-  worker.onmessage = (e: MessageEvent) => {
-    const msg = e.data as
-      | { type: "ready" }
-      | { type: "suggest"; id: number; suggestions: string[] }
-      | { type: "correct"; id: number; correct: boolean }
-      | { type: "error"; id: number; message: string };
-
-    if (msg.type === "ready") {
-      isReady = true;
-      console.log(
-        `[spellcheck] worker pronto. Personal dict: ${personalDict.size} palavras.`,
-      );
-      // Re-aplica personal dict — o worker carregou um speller fresh,
-      // ele nao sabe nada das palavras que o user adicionou em sessoes
-      // anteriores. Sem isso, palavras adicionadas na ultima sessao
-      // voltariam a aparecer como erro.
-      for (const word of personalDict) {
-        worker?.postMessage({ type: "add", word });
-      }
-      return;
-    }
-
-    if (msg.type === "suggest") {
-      const handler = pending.get(msg.id);
-      if (handler) {
-        handler.resolve(msg.suggestions);
-        pending.delete(msg.id);
-      }
-      return;
-    }
-    if (msg.type === "correct") {
-      const handler = pending.get(msg.id);
-      if (handler) {
-        handler.resolve(msg.correct);
-        pending.delete(msg.id);
-      }
-      return;
-    }
-    if (msg.type === "error") {
-      console.error("[spellcheck] worker error:", msg.message);
-      const handler = pending.get(msg.id);
-      if (handler) {
-        handler.reject(new Error(msg.message));
-        pending.delete(msg.id);
-      }
-    }
-  };
-
-  worker.onerror = (err) => {
-    // Frequentemente apenas com `message` em ErrorEvent. Loga tudo que
-    // tem pra ajudar a diagnosticar (ex: import path errado, worker
-    // file 404, etc).
-    console.error("[spellcheck] worker uncaught error:", {
-      message: err.message,
-      filename: err.filename,
-      lineno: err.lineno,
-      error: err.error,
-    });
-  };
-  worker.onmessageerror = (err) => {
-    console.error("[spellcheck] worker message deserialization error:", err);
-  };
-
-  return worker;
-}
-
 /**
- * Dispara init do worker em background. Idempotente. Nao espera nem
- * bloqueia — chame e siga. O `isSpellcheckerReady()` vira true quando
- * a engine acabar de carregar (depois de ~8-10s na primeira vez).
+ * Warm-up assincrono: dispara um `spell_size` no backend pra forcar a
+ * inicializacao das estruturas Lazy do Rust (HashSet + Vec). E' tipo
+ * "wake the server up" — o primeiro suggest depois desse warm vai ser
+ * fast porque a lista ja esta carregada na memoria do processo.
+ *
+ * Tambem re-aplica o dict pessoal — palavras adicionadas em sessoes
+ * anteriores precisam ser re-injetadas no backend (que sobe vazio em
+ * cada start).
+ *
+ * Idempotente: chamadas repetidas retornam o mesmo Promise pendente
+ * ou nao fazem nada se ja' completou.
  */
 export function ensureSpellchecker(): void {
-  const w = getOrCreateWorker();
-  w.postMessage({ type: "init" });
+  if (!isTauri()) return;
+  if (isReady) return;
+  if (warmupPromise) return;
+
+  console.log("[spellcheck] warm-up iniciando…");
+  warmupPromise = (async () => {
+    try {
+      const start = performance.now();
+      const size = await invoke<number>("spell_size");
+      console.log(
+        `[spellcheck] backend ativo: ${size.toLocaleString("pt-BR")} palavras (${(performance.now() - start).toFixed(0)}ms)`,
+      );
+
+      // Re-aplica dict pessoal
+      for (const word of personalDict) {
+        try {
+          await invoke("spell_add", { word });
+        } catch (err) {
+          console.warn("[spellcheck] falha ao re-aplicar palavra pessoal:", word, err);
+        }
+      }
+
+      isReady = true;
+    } catch (err) {
+      console.error("[spellcheck] warm-up falhou:", err);
+      warmupPromise = null;
+    }
+  })();
 }
 
 export function isSpellcheckerReady(): boolean {
@@ -162,61 +109,38 @@ export function isSpellcheckerReady(): boolean {
 }
 
 /**
- * Pede sugestoes ao worker. Resolve com array ate' 8 candidatos
- * (vazio se nao acha sugestao razoavel).
- *
- * Se a palavra esta no dict pessoal, retorna [] sem ir ao worker —
- * fast path que economiza ~5ms por right-click em palavra conhecida.
- *
- * Timeout de 30s e' generoso pra cobrir engine carregando do zero.
- * Em uso normal (engine ja' pronta) responses voltam em <100ms.
+ * Verifica se a palavra e' correta. Curta-circuita pelo dict pessoal
+ * pra evitar round-trip ao backend pra palavras conhecidas. No browser
+ * dev (sem Tauri), retorna true (assume correto pra nao falsamente
+ * marcar tudo como erro).
  */
-export async function suggest(word: string): Promise<string[]> {
-  if (personalDict.has(word.toLowerCase())) return [];
-  return rpc<string[]>("suggest", { word }, []);
-}
-
 export async function isCorrect(word: string): Promise<boolean> {
+  if (!isTauri()) return true;
   if (personalDict.has(word.toLowerCase())) return true;
-  return rpc<boolean>("correct", { word }, true);
+  try {
+    return await invoke<boolean>("spell_check", { word });
+  } catch (err) {
+    console.warn("[spellcheck] check falhou:", err);
+    return true;
+  }
 }
 
 /**
- * Helper de RPC — envia mensagem com id unico, retorna Promise que
- * resolve com a resposta. Em caso de timeout ou erro, retorna o
- * fallback fornecido (nao queremos quebrar a UI por uma falha de
- * spellcheck).
+ * Pede sugestoes ao backend. Retorna array de ate' 8 candidatos
+ * ordenados por edit distance (asc) + alfabetico (tiebreaker).
+ *
+ * Backend faz a iteracao em ~5-15ms — nao precisamos de cache
+ * extra aqui.
  */
-function rpc<T>(
-  type: "suggest" | "correct",
-  payload: { word: string },
-  fallback: T,
-): Promise<T> {
-  const w = getOrCreateWorker();
-  const id = ++nextId;
-  return new Promise<T>((resolve) => {
-    const timer = window.setTimeout(() => {
-      if (pending.has(id)) {
-        pending.delete(id);
-        console.warn(`[spellcheck] ${type} timed out for "${payload.word}"`);
-        resolve(fallback);
-      }
-    }, 30000);
-
-    pending.set(id, {
-      resolve: (value) => {
-        window.clearTimeout(timer);
-        resolve(value as T);
-      },
-      // Erro = fallback silencioso. UI segue normal.
-      reject: () => {
-        window.clearTimeout(timer);
-        resolve(fallback);
-      },
-    });
-
-    w.postMessage({ type, id, ...payload });
-  });
+export async function suggest(word: string): Promise<string[]> {
+  if (!isTauri()) return [];
+  if (personalDict.has(word.toLowerCase())) return [];
+  try {
+    return await invoke<string[]>("spell_suggest", { word });
+  } catch (err) {
+    console.warn("[spellcheck] suggest falhou:", err);
+    return [];
+  }
 }
 
 export function addToPersonalDict(word: string): void {
@@ -224,10 +148,13 @@ export function addToPersonalDict(word: string): void {
   if (!normalized) return;
   personalDict.add(normalized.toLowerCase());
   savePersonalDict();
-  // Posta no worker pra que checks subsequentes ja considerem como
-  // correta sem reload. Se o worker ainda nao iniciou, o evento
-  // 'ready' re-aplicara o personal dict completo.
-  worker?.postMessage({ type: "add", word: normalized });
+  // Notifica backend pra que checks subsequentes ja considerem essa
+  // palavra como correta sem round-trip pelo localStorage.
+  if (isTauri()) {
+    invoke("spell_add", { word: normalized }).catch((err) => {
+      console.warn("[spellcheck] add falhou:", err);
+    });
+  }
 }
 
 export function isInPersonalDict(word: string): boolean {
@@ -243,7 +170,9 @@ export function removeFromPersonalDict(word: string): void {
   if (!personalDict.has(lower)) return;
   personalDict.delete(lower);
   savePersonalDict();
-  // nspell tem .remove() mas requer reload pra "esquecer" de verdade
-  // se a palavra estava em formas conjugadas. Best effort.
-  // (TODO: se virar problema, implementar reload do worker.)
+  if (isTauri()) {
+    invoke("spell_remove", { word: lower }).catch((err) => {
+      console.warn("[spellcheck] remove falhou:", err);
+    });
+  }
 }

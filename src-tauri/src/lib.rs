@@ -1,3 +1,5 @@
+mod spellcheck;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -13,6 +15,18 @@ pub fn run() {
         // falha em runtime — isso e intencional: prefere quebrar agora a
         // aceitar update nao assinado.
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Spellcheck nativo. Tres tentativas em JS falharam (V8
+        // explodia com "Too many properties to enumerate" ao processar
+        // o dict pt-BR). Backend Rust nao tem esse limite, lookup
+        // contra HashSet e' O(1), e Levenshtein nativo lista 312k
+        // candidatos em ~5-15ms.
+        .invoke_handler(tauri::generate_handler![
+            spellcheck::spell_size,
+            spellcheck::spell_check,
+            spellcheck::spell_suggest,
+            spellcheck::spell_add,
+            spellcheck::spell_remove,
+        ])
         .run(tauri::generate_context!())
         .expect("Erro ao inicializar o Solon");
 }
