@@ -1,33 +1,27 @@
 /**
- * Worker dedicado pro spellcheck. Roda Hunspell (compilado em WASM) +
- * dicionario pt-BR fora da main thread.
+ * Worker dedicado pro spellcheck. Roda Typo.js + dicionario Hunspell
+ * pt-BR fora da main thread.
  *
- * Por que Hunspell-asm e nao nspell? O nspell (puro JS) explodia no
- * dicionario pt-BR com "Too many properties to enumerate" — o V8 tem
- * limite de propriedades por objeto e o nspell estoura ao indexar
- * 300k+ palavras com regras morfologicas complexas (conjugacoes,
- * generos, etc).
- *
- * Hunspell-asm usa o Hunspell oficial em C++ compilado pra WebAssembly.
- * Mesmo motor que LibreOffice/Firefox/etc usam — sem limite por
- * propriedade JS, performance previsivel, lida com dict de qualquer
- * tamanho.
+ * Historico de engines tentadas:
+ *  - nspell: explodia com "Too many properties to enumerate" no V8.
+ *    Causa: indexa cada palavra+variacao morfologica como propriedade
+ *    de objeto JS; pt-BR tem 300k+ palavras, o V8 desiste.
+ *  - hunspell-asm: build pra browser e' UMD legacy, incompativel com
+ *    Vite + Worker `type: 'module'`. O loadModule importa hard-coded
+ *    a versao Node.
+ *  - typo-js (atual): pure JS mas usa abordagem diferente — expande
+ *    afixos em RUNTIME (so' quando voce chama check/suggest), nao
+ *    pre-computa tudo. Sem explosao de propriedades. Funciona em
+ *    qualquer ambiente JS.
  *
  * Protocolo de mensagens (igual ao anterior):
  *  - init: dispara load do dic (idempotente). Worker emite 'ready' apos.
  *  - suggest/correct: aguarda init, processa, devolve com mesmo `id`.
- *  - add: adiciona palavra ao runtime do hunspell (dict pessoal).
+ *  - add: adiciona palavra ao runtime (dict pessoal).
  */
-import { loadModule } from "hunspell-asm";
+import Typo from "typo-js";
 
-interface HunspellInstance {
-  spell(word: string): boolean;
-  suggest(word: string): string[];
-  addWord(word: string): void;
-  dispose(): void;
-}
-
-let speller: HunspellInstance | null = null;
+let speller: Typo | null = null;
 let initPromise: Promise<void> | null = null;
 
 type ReqInit = { type: "init" };
@@ -41,14 +35,7 @@ async function init(): Promise<void> {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    console.log("[spellcheck.worker] init: loading hunspell-asm WASM...");
-    const startWasm = performance.now();
-    const factory = await loadModule();
-    console.log(
-      `[spellcheck.worker] WASM ready in ${(performance.now() - startWasm).toFixed(0)}ms`,
-    );
-
-    console.log("[spellcheck.worker] fetching dict files...");
+    console.log("[spellcheck.worker] init: fetching dict files...");
     const startFetch = performance.now();
     const [affRes, dicRes] = await Promise.all([
       fetch("/dict/pt.aff"),
@@ -62,23 +49,17 @@ async function init(): Promise<void> {
         `Falha ao carregar dicionario: aff=${affRes.status}, dic=${dicRes.status}. Verifique public/dict/pt.{aff,dic}.`,
       );
     }
-
-    // hunspell-asm precisa dos arquivos como Uint8Array — ele monta no
-    // virtual filesystem do emscripten e passa o path pro Hunspell.
-    const [affBuf, dicBuf] = await Promise.all([
-      affRes.arrayBuffer(),
-      dicRes.arrayBuffer(),
-    ]);
+    const [aff, dic] = await Promise.all([affRes.text(), dicRes.text()]);
     console.log(
-      `[spellcheck.worker] aff=${affBuf.byteLength} bytes, dic=${dicBuf.byteLength} bytes. Inicializando Hunspell…`,
+      `[spellcheck.worker] aff=${aff.length} chars, dic=${dic.length} chars. Inicializando Typo…`,
     );
 
     const startCompile = performance.now();
-    const affPath = factory.mountBuffer(new Uint8Array(affBuf), "pt.aff");
-    const dicPath = factory.mountBuffer(new Uint8Array(dicBuf), "pt.dic");
-    speller = factory.create(affPath, dicPath) as HunspellInstance;
+    // Typo("pt_BR", affData, dicData, settings?) — passa null no dictionary
+    // path porque ja' temos os conteudos como string. Settings vazio = default.
+    speller = new Typo("pt_BR", aff, dic, { platform: "any" });
     console.log(
-      `[spellcheck.worker] Hunspell pronto em ${(performance.now() - startCompile).toFixed(0)}ms.`,
+      `[spellcheck.worker] Typo pronto em ${(performance.now() - startCompile).toFixed(0)}ms.`,
     );
     self.postMessage({ type: "ready" });
   })();
@@ -99,22 +80,34 @@ self.onmessage = async (e: MessageEvent<Request>) => {
       return;
     }
     if (msg.type === "add") {
-      // 'add' nao precisa esperar init — se a engine ainda nao subiu,
-      // a palavra e' descartada. O facade re-aplica o personal dict no
-      // evento 'ready', entao nada se perde permanentemente.
-      if (speller) speller.addWord(msg.word);
+      // Typo nao tem API publica de add — usamos hack: empurra direto na
+      // dict interna. Se a engine nao subiu ainda, descarta; o facade
+      // re-aplica no evento 'ready'.
+      if (speller) {
+        // Typo guarda palavras conhecidas em `dictionaryTable` (Map-like).
+        // Adicionar uma entry com flags vazias = palavra correta sem
+        // afixacao adicional.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const internalTable = (speller as any).dictionaryTable;
+        if (internalTable) internalTable[msg.word.toLowerCase()] = null;
+      }
       return;
     }
     // suggest / correct precisam de engine pronta
     await init();
     if (msg.type === "suggest") {
-      const suggestions = speller!.suggest(msg.word).slice(0, 8);
+      // Typo.suggest(word, limit) — limit default 5, queremos 8.
+      const result = speller!.suggest(msg.word, 8);
+      // Typo retorna array de strings ou as vezes wrap weird; normalizamos.
+      const suggestions = Array.isArray(result)
+        ? result.map((s) => (typeof s === "string" ? s : String(s)))
+        : [];
       self.postMessage({ type: "suggest", id: msg.id, suggestions });
       return;
     }
     if (msg.type === "correct") {
-      // Hunspell.spell retorna true pra palavra correta.
-      const correct = speller!.spell(msg.word);
+      // Typo.check(word) retorna true se palavra correta.
+      const correct = speller!.check(msg.word);
       self.postMessage({ type: "correct", id: msg.id, correct });
       return;
     }
