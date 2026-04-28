@@ -106,9 +106,9 @@ export function HomePage() {
       return;
     }
     const name = await openPrompt({
-      title: "Novo arquivo",
-      message: "O nome vira o titulo da cena. Pode incluir .md ou nao.",
-      placeholder: "Ex: capitulo-01",
+      title: "Nova nota",
+      message: "Vira o título da cena/capítulo no editor.",
+      placeholder: "Ex: minha-cena",
       confirmLabel: "Criar",
     });
     if (!name) return;

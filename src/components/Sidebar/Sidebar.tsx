@@ -44,11 +44,13 @@ export function Sidebar() {
   }, [menu]);
 
   const handleNewFile = async (parentDir: string) => {
+    // NAO pre-fill com "Nova nota" porque isso gera arquivos chamados
+    // "Nova nota" "Nova nota 2" etc se o user so' clicar Enter por habito.
+    // Placeholder vazio + dica visual e' mais limpo.
     const name = await openPrompt({
-      title: "Novo arquivo",
-      message: "Informe o nome do novo arquivo Markdown.",
-      defaultValue: "Novo capítulo.md",
-      placeholder: "exemplo.md",
+      title: "Nova nota",
+      message: "Informe o nome da nova nota.",
+      placeholder: "Ex: capitulo-01",
       confirmLabel: "Criar",
     });
     if (name?.trim()) await createFile(parentDir, name.trim());
@@ -66,13 +68,43 @@ export function Sidebar() {
   };
 
   const handleRename = async (node: FileNode) => {
+    const isFile = node.type === "file";
+
+    // Pra arquivos, separa basename da extensao (.md/.txt). O input
+    // mostra so' o basename — assim o user nao consegue apagar a
+    // extensao por engano (e quebrar o arquivo). Se ele digitar uma
+    // extensao no novo nome, a gente strippa silenciosamente e
+    // re-anexa a original.
+    let baseName = node.name;
+    let ext = "";
+    if (isFile) {
+      const m = node.name.match(/^(.+?)(\.(?:md|txt))$/i);
+      if (m) {
+        baseName = m[1];
+        ext = m[2];
+      }
+    }
+
     const newName = await openPrompt({
-      title: node.type === "folder" ? "Renomear pasta" : "Renomear arquivo",
-      defaultValue: node.name,
+      title: isFile ? "Renomear nota" : "Renomear pasta",
+      message: isFile
+        ? "A extensão do arquivo é preservada automaticamente."
+        : undefined,
+      defaultValue: baseName,
       confirmLabel: "Renomear",
     });
-    if (newName?.trim() && newName.trim() !== node.name) {
-      await renameNode(node.path, newName.trim());
+    if (!newName) return;
+
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    // Se for arquivo, strip qualquer .md/.txt que o user tenha digitado
+    // por habito e re-anexa a extensao original — extensao e' imutavel.
+    const cleanedBase = isFile
+      ? trimmed.replace(/\.(?:md|txt)$/i, "")
+      : trimmed;
+    const finalName = cleanedBase + ext;
+    if (finalName !== node.name) {
+      await renameNode(node.path, finalName);
     }
   };
 
