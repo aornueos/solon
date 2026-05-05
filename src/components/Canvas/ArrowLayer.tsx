@@ -349,19 +349,28 @@ type Rect = { x: number; y: number; w: number; h: number };
 type Side = CardSide;
 
 /**
- * Qual lado de `r` "encara" o centro de `other`. Normalizado pelas
- * meia-dimensões para respeitar o aspecto (cards muito largos tendem a
- * conectar horizontalmente, muito altos verticalmente).
+ * Qual lado de `r` "encara" o centro de `other`. Compara delta CRU
+ * (sem normalizacao) — se o other esta mais a' direita do que abaixo,
+ * conecta pelo lado direito.
+ *
+ * Antes a gente normalizava por meia-largura/altura, o que invertia a
+ * intuicao em cards retangulares: pra um card 220x120, half-w=110 e
+ * half-h=60. Target 50px direito + 50px baixo dava nx=0.45, ny=0.83 →
+ * |ny|>|nx| → escolhia bottom. Bug clasico: usuario puxava horizontal
+ * e a flecha desviava pra baixo do alvo.
+ *
+ * Com delta cru (dx, dy), o mesmo target da' dx=dy=50 → escolhe right
+ * (>= prefere horizontal). Comportamento intuitivo.
  */
 function sideFacing(r: Rect, other: Rect): Side {
   const rcx = r.x + r.w / 2;
   const rcy = r.y + r.h / 2;
   const ocx = other.x + other.w / 2;
   const ocy = other.y + other.h / 2;
-  const nx = (ocx - rcx) / (r.w / 2 || 1);
-  const ny = (ocy - rcy) / (r.h / 2 || 1);
-  if (Math.abs(nx) >= Math.abs(ny)) return nx >= 0 ? "right" : "left";
-  return ny >= 0 ? "bottom" : "top";
+  const dx = ocx - rcx;
+  const dy = ocy - rcy;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "right" : "left";
+  return dy >= 0 ? "bottom" : "top";
 }
 
 function sidePoint(r: Rect, side: Side) {
@@ -448,16 +457,20 @@ function routeArrowToPoint(
   if (overrideFromSide) {
     fromSide = overrideFromSide;
   } else {
+    // Mesmo principio do `sideFacing`: delta CRU (sem normalizar por
+    // meia-dimensao). Drag pro lado direito do card → sai pelo lado
+    // direito. Antes normalizavamos e em cards largos a flecha desviava
+    // pra cima/baixo mesmo quando o cursor estava lateral.
     const fcx = from.x + from.w / 2;
     const fcy = from.y + from.h / 2;
-    const nx = (target.x - fcx) / (from.w / 2 || 1);
-    const ny = (target.y - fcy) / (from.h / 2 || 1);
+    const dx = target.x - fcx;
+    const dy = target.y - fcy;
     fromSide =
-      Math.abs(nx) >= Math.abs(ny)
-        ? nx >= 0
+      Math.abs(dx) >= Math.abs(dy)
+        ? dx >= 0
           ? "right"
           : "left"
-        : ny >= 0
+        : dy >= 0
         ? "bottom"
         : "top";
   }

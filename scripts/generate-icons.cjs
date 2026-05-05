@@ -67,35 +67,45 @@ const PNG_TARGETS = [
     `[icons] source: ${src.bitmap.width}x${src.bitmap.height}, alpha=${sourceHasAlpha}`,
   );
 
-  // Se o source veio sem canal alpha (color type 2 = RGB), aplicamos
-  // chroma key: pixels brancos viram transparentes. Funciona bem pra
-  // logos com fundo branco solido (caso do app-icon.png da Solon).
-  // Threshold conservador (250) pra preservar anti-aliasing de bordas
-  // — pixels quase-brancos ficam parcialmente transparentes via gradient.
-  if (!sourceHasAlpha) {
-    console.log("[icons] source sem alpha → aplicando chroma key (branco → transparente)");
+  // Chroma key (branco → transparente) — DESLIGADO por default.
+  //
+  // Habilita via env var: REMOVE_WHITE_BG=1 npm run icons
+  //
+  // Por que default OFF? Em dark mode do Windows, o icone sem fundo
+  // branco fica com pouco contraste (moldura marrom sobre cinza
+  // escuro do taskbar). Manter o fundo branco original do logo
+  // garante que aparece como uma "card" brilhante em qualquer tema.
+  //
+  // Se o user um dia tiver um icone que JA' E' alpha-aware (PNG-32
+  // com transparencia desejada nas partes certas), ele simplesmente
+  // funciona — o chroma key so' rodaria pra forcar transparencia em
+  // PNGs RGB sem alpha, e isso so' acontece com flag explicita.
+  if (!sourceHasAlpha && process.env.REMOVE_WHITE_BG === "1") {
+    console.log(
+      "[icons] REMOVE_WHITE_BG=1 → aplicando chroma key (branco → transparente)",
+    );
     let removed = 0;
-    let total = src.bitmap.width * src.bitmap.height;
+    const total = src.bitmap.width * src.bitmap.height;
     src.scan(0, 0, src.bitmap.width, src.bitmap.height, function (_x, _y, idx) {
       const r = this.bitmap.data[idx + 0];
       const g = this.bitmap.data[idx + 1];
       const b = this.bitmap.data[idx + 2];
-      // Quao "branco" e' o pixel? 255 = totalmente branco, 0 = preto.
       const whiteness = Math.min(r, g, b);
       if (whiteness >= 250) {
-        // Branco puro → totalmente transparente
         this.bitmap.data[idx + 3] = 0;
         removed++;
       } else if (whiteness >= 220) {
-        // Quase branco (anti-alias da borda) → alpha proporcional.
-        // 220→opacity 50%, 250→opacity 0%. Suaviza serrilhado.
         const alpha = Math.round(((250 - whiteness) / 30) * 255);
         this.bitmap.data[idx + 3] = alpha;
       }
-      // < 220: pixel "real" do logo, mantem alpha=255 (default).
     });
     const pct = ((removed / total) * 100).toFixed(1);
-    console.log(`[icons] ${removed.toLocaleString("pt-BR")} pixels (${pct}%) → transparentes`);
+    console.log(
+      `[icons] ${removed.toLocaleString("pt-BR")} pixels (${pct}%) → transparentes`,
+    );
+  } else if (!sourceHasAlpha) {
+    console.log("[icons] source RGB sem alpha — mantendo fundo original (branco).");
+    console.log("        (use REMOVE_WHITE_BG=1 npm run icons pra forcar transparencia)");
   }
 
   for (const { file, size } of PNG_TARGETS) {

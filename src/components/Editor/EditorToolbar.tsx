@@ -17,8 +17,13 @@ import {
   Rows,
   Columns,
   Trash2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  Highlighter,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 
 interface Props {
@@ -117,6 +122,36 @@ export function EditorToolbar({ editor }: Props) {
     },
   ];
 
+  // Alinhamento — paragrafos e headings. Default 'left' nao precisa
+  // estar marcado como ativo (pra evitar 4 botoes acesos quando voce
+  // nao escolheu nada). isActive checa explicit alignment via attrs.
+  const alignTools: ToolSpec[] = [
+    {
+      icon: <AlignLeft size={15} />,
+      title: "Alinhar à esquerda",
+      run: (e) => e.chain().focus().setTextAlign("left").run(),
+      isActive: (e) => e.isActive({ textAlign: "left" }),
+    },
+    {
+      icon: <AlignCenter size={15} />,
+      title: "Centralizar",
+      run: (e) => e.chain().focus().setTextAlign("center").run(),
+      isActive: (e) => e.isActive({ textAlign: "center" }),
+    },
+    {
+      icon: <AlignRight size={15} />,
+      title: "Alinhar à direita",
+      run: (e) => e.chain().focus().setTextAlign("right").run(),
+      isActive: (e) => e.isActive({ textAlign: "right" }),
+    },
+    {
+      icon: <AlignJustify size={15} />,
+      title: "Justificar",
+      run: (e) => e.chain().focus().setTextAlign("justify").run(),
+      isActive: (e) => e.isActive({ textAlign: "justify" }),
+    },
+  ];
+
   return (
     <div
       className="flex items-center gap-0.5 px-4 py-1.5"
@@ -134,6 +169,10 @@ export function EditorToolbar({ editor }: Props) {
       <ToolGroup editor={editor} tools={blockTools} />
       <Divider />
       <ToolGroup editor={editor} tools={listTools} />
+      <Divider />
+      <ToolGroup editor={editor} tools={alignTools} />
+      <Divider />
+      <HighlightPicker editor={editor} />
       <Divider />
 
       <div className="relative">
@@ -213,6 +252,108 @@ function ToolBtn({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Paleta de cores do grifo. Tons translúcidos pra que o texto continue
+ * legivel por cima — saturacoes baixas, alphas explicitas no hex
+ * (`80` = 50%). Inspirados em marcadores de texto reais (amarelo,
+ * verde, rosa, azul, lilas, cinza).
+ */
+const HIGHLIGHT_COLORS: { label: string; value: string }[] = [
+  { label: "Amarelo", value: "#fff48080" },
+  { label: "Verde", value: "#b7eb8f80" },
+  { label: "Rosa", value: "#ffadd280" },
+  { label: "Azul", value: "#91d5ff80" },
+  { label: "Lilás", value: "#d3adf780" },
+  { label: "Laranja", value: "#ffd59180" },
+];
+
+function HighlightPicker({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  // Fecha ao clicar fora — usuario pode escolher cor ou abandonar.
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const isActive = editor.isActive("highlight");
+  const currentColor =
+    (editor.getAttributes("highlight")?.color as string | undefined) ?? null;
+
+  return (
+    <div ref={ref} className="relative">
+      <ToolBtn
+        title="Grifar (escolher cor)"
+        active={isActive}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Highlighter size={15} />
+      </ToolBtn>
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1 z-20 rounded shadow-md py-2 px-2 flex flex-col gap-1.5"
+          style={{
+            background: "var(--bg-panel)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div className="flex gap-1">
+            {HIGHLIGHT_COLORS.map((c) => (
+              <button
+                key={c.value}
+                title={c.label}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  editor
+                    .chain()
+                    .focus()
+                    .setHighlight({ color: c.value })
+                    .run();
+                  setOpen(false);
+                }}
+                className={clsx(
+                  "w-6 h-6 rounded transition-transform hover:scale-110",
+                  currentColor === c.value && "ring-2 ring-offset-1",
+                )}
+                style={{
+                  background: c.value,
+                  border: "1px solid var(--border)",
+                }}
+              />
+            ))}
+          </div>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().unsetHighlight().run();
+              setOpen(false);
+            }}
+            className="text-[0.72rem] py-1 px-2 rounded transition-colors text-left"
+            style={{ color: "var(--text-muted)" }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLElement).style.background =
+                "var(--bg-hover)")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLElement).style.background =
+                "transparent")
+            }
+          >
+            Remover grifo
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

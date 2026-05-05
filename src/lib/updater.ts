@@ -34,6 +34,7 @@ export type UpdateCheckResult =
   | { kind: "skipped"; version: string }
   | { kind: "available"; info: UpdateInfo }
   | { kind: "error"; message: string }
+  | { kind: "unconfigured"; message: string }
   | { kind: "unsupported" };
 
 const isTauri = (): boolean =>
@@ -119,8 +120,26 @@ export async function checkForUpdate(
     // com toast vermelho de rede. Surface só em log.
     const message = err instanceof Error ? err.message : String(err);
     console.warn("[updater] check failed:", message);
+    if (isMissingUpdateFeed(message)) {
+      writeLastCheck();
+      cachedUpdate = null;
+      return {
+        kind: "unconfigured",
+        message:
+          "Canal de atualizacoes ainda nao publicado (latest.json ausente).",
+      };
+    }
     return { kind: "error", message };
   }
+}
+
+function isMissingUpdateFeed(message: string): boolean {
+  const text = message.toLowerCase();
+  return (
+    text.includes("404") ||
+    text.includes("not found") ||
+    (text.includes("latest.json") && text.includes("failed"))
+  );
 }
 
 function buildAvailable(update: Update): UpdateCheckResult {

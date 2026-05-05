@@ -13,7 +13,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["devtools"] }
+# `devtools` feature controla se Ctrl+Shift+I funciona no APP INSTALADO.
+# Em dev (`tauri dev`) o devtools sempre fica habilitado independente
+# desta flag — Tauri sabe que e' build de desenvolvimento e libera.
+# Removemos o flag pra que builds de release/produção (.msi instalado)
+# nao exponham o inspector — escritor nao deve estar abrindo F12 no
+# app final.
+tauri = { version = "2", features = [] }
 tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"

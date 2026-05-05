@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "postinstall": "node scripts/copy-spellcheck-dict.cjs",
     "version:set": "node scripts/bump-version.cjs",
-    "icons": "node scripts/generate-icons.cjs"
+    "icons": "node scripts/generate-icons.cjs",
+    "kill": "node scripts/kill-solon.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
@@ -27,6 +28,7 @@
     "@tiptap/extension-code-block": "^2.10.3",
     "@tiptap/extension-document": "^2.10.3",
     "@tiptap/extension-heading": "^2.10.3",
+    "@tiptap/extension-highlight": "^2.27.2",
     "@tiptap/extension-history": "^2.10.3",
     "@tiptap/extension-horizontal-rule": "^2.10.3",
     "@tiptap/extension-italic": "^2.10.3",
@@ -40,6 +42,7 @@
     "@tiptap/extension-table-header": "^2.10.3",
     "@tiptap/extension-table-row": "^2.10.3",
     "@tiptap/extension-text": "^2.10.3",
+    "@tiptap/extension-text-align": "^2.27.2",
     "@tiptap/extension-typography": "^2.10.3",
     "@tiptap/react": "^2.10.3",
     "clsx": "^2.1.1",

@@ -15,6 +15,7 @@ import {
 import { readSceneSnapshot } from "../../lib/sceneSnapshot";
 import { saveImageForCanvas } from "../../lib/canvasImages";
 import { startDrag } from "../../lib/drag";
+import { textRect } from "../../lib/canvasGeom";
 
 /**
  * Infinite canvas Miro-inspired.
@@ -163,12 +164,7 @@ export function CanvasView() {
         const boxes = [
           ...state.cards,
           ...state.images,
-          ...state.texts.map((t) => ({
-            x: t.x,
-            y: t.y,
-            w: t.size * 4,
-            h: t.size,
-          })),
+          ...state.texts.map(textRect),
         ];
         if (boxes.length === 0) {
           state.setViewport({ x: 0, y: 0, zoom: 1 });
@@ -455,36 +451,6 @@ export function CanvasView() {
         const hit = (x: number, y: number, w: number, h: number) =>
           x + w >= wx0 && x <= wx1 && y + h >= wy0 && y <= wy1;
 
-        // Bbox de um texto flutuante. A estimativa antiga `chars * size * 0.55`
-        // dependia do char count e errava feio em duas direcoes:
-        //  - serif large com letras estreitas (i, l, t) superestimava;
-        //  - texto com letras largas (M, W) ou acentos subestimava.
-        // Resultado: marquee "passava por cima" do texto sem selecionar.
-        // Agora medimos com `canvas.measureText` na mesma fonte/tamanho do
-        // FloatingText, batendo na largura real ate o pixel. Cache do
-        // contexto reaproveita entre textos no mesmo marquee.
-        const measureCanvas = document.createElement("canvas");
-        const measureCtx = measureCanvas.getContext("2d");
-        const textBBox = (t: { text: string; size: number; bold?: boolean }) => {
-          const raw = t.text || " ";
-          const lines = raw.split("\n");
-          let maxW = 24;
-          if (measureCtx) {
-            measureCtx.font = `${t.bold ? "700 " : ""}${t.size}px 'EB Garamond', Georgia, serif`;
-            for (const line of lines) {
-              const m = measureCtx.measureText(line || " ");
-              if (m.width > maxW) maxW = m.width;
-            }
-          } else {
-            // Fallback se canvas 2d nao estiver disponivel (improvavel em
-            // Tauri/Chromium). Usa a estimativa generosa antiga.
-            const maxChars = Math.max(1, ...lines.map((l) => l.length));
-            maxW = Math.max(24, maxChars * t.size * 0.55);
-          }
-          const h = Math.max(t.size * 1.35, lines.length * t.size * 1.35);
-          return { w: maxW, h };
-        };
-
         // Bbox de um stroke: varre todos os pontos (pairs x,y) e guarda
         // min/max. Strokes podem ser longos, mas são só arrays numéricos
         // então isso é O(n) sem alocação extra.
@@ -506,8 +472,8 @@ export function CanvasView() {
         const ids: string[] = [];
         for (const c of cards) if (hit(c.x, c.y, c.w, c.h)) ids.push(c.id);
         for (const t of texts) {
-          const { w, h } = textBBox(t);
-          if (hit(t.x, t.y, w, h)) ids.push(t.id);
+          const r = textRect(t);
+          if (hit(r.x, r.y, r.w, r.h)) ids.push(t.id);
         }
         for (const i of images) if (hit(i.x, i.y, i.w, i.h)) ids.push(i.id);
         for (const s of strokes) {

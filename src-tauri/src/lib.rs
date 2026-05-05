@@ -23,6 +23,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             spellcheck::spell_size,
             spellcheck::spell_check,
+            spellcheck::spell_check_many,
             spellcheck::spell_suggest,
             spellcheck::spell_add,
             spellcheck::spell_remove,

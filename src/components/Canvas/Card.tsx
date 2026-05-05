@@ -693,10 +693,11 @@ function MetaItem({
 }
 
 function ResizeHandle({ card }: { card: CanvasCard }) {
-  const { updateCard, viewport } = useCanvasStore();
+  const { updateCard, viewport, pushHistory } = useCanvasStore();
   const onDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    pushHistory();
     const startX = e.clientX;
     const startY = e.clientY;
     const origW = card.w;

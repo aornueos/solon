@@ -16,8 +16,20 @@ type TurndownNode = HTMLElement & { isBlock: boolean };
  * etc. que poderiam ser injetados via Markdown malicioso (documento que
  * veio de outra máquina, colado do clipboard, etc.).
  *
- * Conhecido — IndentExtension (text-indent) não é persistido em Markdown.
+ * Persistencia de atributos editoriais:
+ *  - IndentExtension (text-indent estilo romance): marker EM SPACE no
+ *    inicio do paragrafo. Marked passa direto, post-processing reaplica
+ *    `data-indent="true"` antes do sanitize.
+ *  - TextAlign (alinhamento): emitido como `<p style="text-align: …">`
+ *    HTML literal. Marked passa HTML inline direto.
+ *  - Highlight (grifo colorido): emitido como `<mark style="background-
+ *    color: …">` HTML literal.
  */
+
+// EM SPACE como constante nomeada — o codepoint U+2003 e' invisivel no
+// codigo-fonte e foda de identificar. Usamos como marker do indent porque
+// e' "neutro" em markdown (nao quebra parser nem visualiza estranho).
+const EM_SPACE = " ";
 
 marked.setOptions({
   gfm: true,       // GFM: tabelas, ~~strike~~, task lists
@@ -41,8 +53,47 @@ turndown.use([gfm, tables, strikethrough]);
 
 turndown.addRule("paragraphStrip", {
   filter: "p",
-  replacement: (content) => `\n\n${content}\n\n`,
+  replacement: (content, node) => {
+    const el = node as HTMLElement;
+    const indented = el.getAttribute("data-indent") === "true";
+    const prefix = indented ? EM_SPACE : "";
+    // TextAlign: emite HTML literal quando ha alinhamento custom.
+    const align = el.style.textAlign;
+    if (align && align !== "left" && align !== "start") {
+      return `\n\n<p style="text-align: ${align}">${prefix}${content}</p>\n\n`;
+    }
+    return `\n\n${prefix}${content}\n\n`;
+  },
 });
+
+// Highlight (grifo) — emite <mark> com style preservado.
+turndown.addRule("highlight", {
+  filter: "mark",
+  replacement: (content, node) => {
+    const bg = (node as HTMLElement).style.backgroundColor;
+    if (bg) {
+      return `<mark style="background-color: ${bg}">${content}</mark>`;
+    }
+    return `<mark>${content}</mark>`;
+  },
+});
+
+// Headings com text-align: emite HTML literal (perde sintaxe `#` mas
+// preserva alinhamento). Turndown default nao suporta atributos em
+// headings markdown.
+for (const level of [1, 2, 3, 4, 5, 6] as const) {
+  turndown.addRule(`heading${level}WithAlign`, {
+    filter: (node) => {
+      if (node.nodeName !== `H${level}`) return false;
+      const align = (node as HTMLElement).style.textAlign;
+      return !!align && align !== "left" && align !== "start";
+    },
+    replacement: (content, node) => {
+      const align = (node as HTMLElement).style.textAlign;
+      return `\n\n<h${level} style="text-align: ${align}">${content}</h${level}>\n\n`;
+    },
+  });
+}
 
 /**
  * Tags/atributos permitidos no HTML renderizado. Lista mínima baseada no
@@ -55,26 +106,59 @@ const ALLOWED_TAGS = [
   "ul", "ol", "li",
   "blockquote",
   "table", "thead", "tbody", "tr", "th", "td",
+  // <mark> e' usado pelo Highlight extension. Sem isso o grifo
+  // colorido seria stripado no save/load roundtrip.
+  "mark",
 ];
 
 /**
- * Atributos seguros. Removemos `style`, `on*`, `srcdoc`, etc.
- * `colspan`/`rowspan` são úteis em tabelas e não abrem vetores.
+ * Atributos seguros. `style` esta na whitelist pra suportar:
+ *  - text-align (TextAlign extension)
+ *  - background-color (Highlight extension, cores customizadas)
+ *
+ * O DOMPurify ja' sanitiza o conteudo do `style` internamente — bloqueia
+ * `expression()`, `javascript:`, `-moz-binding`, etc. Como o markdown
+ * vem so' de input do proprio user (nao de fontes hostis externas no
+ * caso desktop), o risco residual e' baixo.
+ *
+ * `data-indent` carrega indent do IndentExtension sem precisar de style.
  */
-const ALLOWED_ATTR = ["colspan", "rowspan", "colwidth", "align"];
+const ALLOWED_ATTR = [
+  "colspan",
+  "rowspan",
+  "colwidth",
+  "align",
+  "data-indent",
+  "style",
+];
 
 export function markdownToHtml(md: string): string {
   if (!md) return "";
   const rawHtml = marked.parse(md, { async: false }) as string;
-  return DOMPurify.sanitize(rawHtml, {
+  // Reverse do marker EM SPACE: paragrafos cujo conteudo comeca com EM
+  // SPACE sao identados. A regex pega `<p>` ou `<p ... >` (caso
+  // marked adicione atributos no futuro). Removemos o marker pra que
+  // ele nao apareca como texto literal no editor.
+  const withIndent = rawHtml.replace(
+    new RegExp(`<p([^>]*)>${EM_SPACE}`, "g"),
+    '<p data-indent="true"$1>',
+  );
+  return DOMPurify.sanitize(withIndent, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
-    // Garante que não sobra href="javascript:..." ou similares.
-    FORBID_ATTR: ["style", "srcdoc", "href", "src", "onerror", "onload"],
+    // `style` saiu do FORBID porque virou whitelist (suporta text-align
+    // e highlight color). Mantemos os outros vetores classicos de XSS.
+    FORBID_ATTR: ["srcdoc", "href", "src", "onerror", "onload"],
   });
 }
 
 export function htmlToMarkdown(html: string): string {
   if (!html) return "";
-  return turndown.turndown(html).trim();
+  // Trim CONSERVADOR: so' newlines e space ASCII. Nao usamos `.trim()`
+  // padrao porque ele considera EM SPACE como whitespace e come o
+  // marker de indent do primeiro paragrafo.
+  return turndown
+    .turndown(html)
+    .replace(/^[\n ]+/, "")
+    .replace(/[\n ]+$/, "\n");
 }

@@ -118,6 +118,8 @@ interface CanvasState {
   ) => void;
   /** Reaponta cards de `oldPath` para `newPath` (após rename). */
   rewireScenePath: (oldPath: string, newPath: string) => void;
+  /** Reaponta cards cujos arquivos estejam dentro de uma pasta movida/renomeada. */
+  rewireScenePathPrefix: (oldPrefix: string, newPrefix: string) => void;
   removeCard: (id: string) => void;
   /** Duplica o card selecionado, offsetado um pouco. */
   duplicateCard: (id: string) => string | null;
@@ -219,6 +221,28 @@ const nanoid = () => {
   // Último recurso (Tauri sempre terá crypto; esse branch é só defensivo).
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 };
+
+function normalizedPath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+function rebasePath(
+  path: string | undefined,
+  oldPrefix: string,
+  newPrefix: string,
+): string | null {
+  if (!path) return null;
+  const p = normalizedPath(path);
+  const oldP = normalizedPath(oldPrefix);
+  if (p !== oldP && !p.startsWith(`${oldP}/`)) return null;
+  const rel = p === oldP ? "" : p.slice(oldP.length + 1);
+  const sep = newPrefix.includes("\\") && !newPrefix.includes("/") ? "\\" : "/";
+  if (!rel) return newPrefix;
+  const normalizedRel = rel.replace(/[\\/]/g, sep);
+  return newPrefix.endsWith("/") || newPrefix.endsWith("\\")
+    ? `${newPrefix}${normalizedRel}`
+    : `${newPrefix}${sep}${normalizedRel}`;
+}
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   filePath: null,
@@ -375,6 +399,19 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         if (c.kind !== "scene" || c.scenePath !== oldPath) return c;
         changed = true;
         return { ...c, scenePath: newPath };
+      });
+      return changed ? { cards } : s;
+    }),
+
+  rewireScenePathPrefix: (oldPrefix, newPrefix) =>
+    set((s) => {
+      let changed = false;
+      const cards = s.cards.map((c) => {
+        if (c.kind !== "scene") return c;
+        const nextPath = rebasePath(c.scenePath, oldPrefix, newPrefix);
+        if (!nextPath || nextPath === c.scenePath) return c;
+        changed = true;
+        return { ...c, scenePath: nextPath };
       });
       return changed ? { cards } : s;
     }),

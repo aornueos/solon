@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { SceneMeta } from "../types/scene";
+import type { SidebarOrder } from "../lib/sidebarOrder";
 
 export interface FileNode {
   name: string;
@@ -131,6 +132,10 @@ interface AppState {
   // Pastas abertas
   rootFolder: string | null;
   fileTree: FileNode[];
+  /** Ordem manual de items no Sidebar (drag-and-drop). Persistida em
+   *  `<rootFolder>/.solon/order.json`. Items nao listados ficam ao
+   *  fim em ordem alfabetica. */
+  sidebarOrder: SidebarOrder;
 
   // Outline
   headings: HeadingItem[];
@@ -187,6 +192,13 @@ interface AppState {
   activeContextMenu: ActiveContextMenu | null;
   /** Liga/desliga spellcheck visual (red underlines) no editor. */
   spellcheckEnabled: boolean;
+  /** Largura maxima da coluna de texto do editor (px). Afeta a "medida"
+   *  da linha — escritor pode preferir mais estreito (560-680, classico
+   *  livro) ou mais ar (820-1000). Default 680 e' o sweet spot pt-BR. */
+  editorMaxWidth: number;
+  /** View pra qual o app abre no boot. Default 'home' (landing). User
+   *  que abre o app varias vezes ao dia pode preferir 'editor' direto. */
+  startView: "home" | "editor" | "canvas";
 
   // Actions
   setActiveFile: (path: string, name: string, body: string, meta: SceneMeta) => void;
@@ -195,6 +207,7 @@ interface AppState {
   patchSceneMeta: (patch: Partial<SceneMeta>) => void;
   setRootFolder: (path: string) => void;
   setFileTree: (tree: FileNode[]) => void;
+  setSidebarOrder: (order: SidebarOrder) => void;
   setHeadings: (headings: HeadingItem[]) => void;
   toggleFolder: (path: string) => void;
   setSidebarWidth: (w: number) => void;
@@ -222,6 +235,8 @@ interface AppState {
   setEditorZoom: (zoom: number) => void;
   setAutoSaveEnabled: (v: boolean) => void;
   setAutoCheckUpdates: (v: boolean) => void;
+  setEditorMaxWidth: (w: number) => void;
+  setStartView: (v: "home" | "editor" | "canvas") => void;
   openSettings: () => void;
   closeSettings: () => void;
   /** Reset de todas as preferencias pro default (zoom 100%, theme light,
@@ -253,10 +268,41 @@ const DEFAULT_EDITOR_ZOOM = 100;
 const DEFAULT_AUTO_SAVE = true;
 const DEFAULT_AUTO_CHECK_UPDATES = true;
 const DEFAULT_SPELLCHECK = true;
+const DEFAULT_EDITOR_MAX_WIDTH = 680;
+const DEFAULT_START_VIEW: "home" | "editor" | "canvas" = "home";
 const EDITOR_ZOOM_KEY = "solon:editorZoom";
 const AUTO_SAVE_KEY = "solon:autoSave";
 const AUTO_CHECK_UPDATES_KEY = "solon:autoCheckUpdates";
 const SPELLCHECK_KEY = "solon:spellcheck";
+const EDITOR_MAX_WIDTH_KEY = "solon:editorMaxWidth";
+const START_VIEW_KEY = "solon:startView";
+
+/** Larguras suportadas pra coluna do editor (em px). */
+export const EDITOR_MAX_WIDTHS = [560, 680, 820, 1000] as const;
+function loadEditorMaxWidth(): number {
+  try {
+    const v = localStorage.getItem(EDITOR_MAX_WIDTH_KEY);
+    if (!v) return DEFAULT_EDITOR_MAX_WIDTH;
+    const n = parseInt(v, 10);
+    if (
+      Number.isNaN(n) ||
+      !(EDITOR_MAX_WIDTHS as readonly number[]).includes(n)
+    ) {
+      return DEFAULT_EDITOR_MAX_WIDTH;
+    }
+    return n;
+  } catch {
+    return DEFAULT_EDITOR_MAX_WIDTH;
+  }
+}
+
+function loadStartView(): "home" | "editor" | "canvas" {
+  try {
+    const v = localStorage.getItem(START_VIEW_KEY);
+    if (v === "home" || v === "editor" || v === "canvas") return v;
+  } catch {}
+  return DEFAULT_START_VIEW;
+}
 
 function loadEditorZoom(): number {
   try {
@@ -288,6 +334,7 @@ export const useAppStore = create<AppState>((set) => ({
   sceneMeta: {},
   rootFolder: null,
   fileTree: [],
+  sidebarOrder: { version: 1, folders: {} },
   headings: [],
   sidebarWidth: 240,
   outlineWidth: 260,
@@ -297,7 +344,9 @@ export const useAppStore = create<AppState>((set) => ({
   focusMode: false,
   wordCount: 0,
   charCount: 0,
-  activeView: "home",
+  // ActiveView inicial respeita a pref `startView` (default "home").
+  // Se o user escolheu abrir direto no editor/canvas, comeca por la'.
+  activeView: loadStartView(),
   theme: loadTheme(),
   toasts: [],
   activeDialog: null,
@@ -312,6 +361,8 @@ export const useAppStore = create<AppState>((set) => ({
   showSettings: false,
   activeContextMenu: null,
   spellcheckEnabled: loadBoolPref(SPELLCHECK_KEY, DEFAULT_SPELLCHECK),
+  editorMaxWidth: loadEditorMaxWidth(),
+  startView: loadStartView(),
 
   setActiveFile: (path, name, body, meta) => {
     // Persiste o ultimo arquivo aberto pra "Continuar" na HomePage e
@@ -346,6 +397,7 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   setFileTree: (tree) => set({ fileTree: tree }),
+  setSidebarOrder: (order) => set({ sidebarOrder: order }),
 
   setHeadings: (headings) => set({ headings }),
 
@@ -504,6 +556,8 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.removeItem(AUTO_SAVE_KEY);
       localStorage.removeItem(AUTO_CHECK_UPDATES_KEY);
       localStorage.removeItem(SPELLCHECK_KEY);
+      localStorage.removeItem(EDITOR_MAX_WIDTH_KEY);
+      localStorage.removeItem(START_VIEW_KEY);
     } catch {
       /* ignora */
     }
@@ -512,6 +566,8 @@ export const useAppStore = create<AppState>((set) => ({
       autoSaveEnabled: DEFAULT_AUTO_SAVE,
       autoCheckUpdates: DEFAULT_AUTO_CHECK_UPDATES,
       spellcheckEnabled: DEFAULT_SPELLCHECK,
+      editorMaxWidth: DEFAULT_EDITOR_MAX_WIDTH,
+      startView: DEFAULT_START_VIEW,
     });
   },
 
@@ -543,6 +599,27 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ spellcheckEnabled: v });
+  },
+
+  setEditorMaxWidth: (w) => {
+    // So' aceita valores da lista oficial; previne corruption por
+    // localStorage manipulado ou legado de versao anterior.
+    if (!(EDITOR_MAX_WIDTHS as readonly number[]).includes(w)) return;
+    try {
+      localStorage.setItem(EDITOR_MAX_WIDTH_KEY, String(w));
+    } catch {
+      /* ignora */
+    }
+    set({ editorMaxWidth: w });
+  },
+
+  setStartView: (v) => {
+    try {
+      localStorage.setItem(START_VIEW_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ startView: v });
   },
 }));
 

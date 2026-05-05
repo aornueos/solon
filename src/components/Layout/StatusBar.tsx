@@ -1,6 +1,7 @@
 import { Sparkles, Check, Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
+import { useFileSystem } from "../../hooks/useFileSystem";
 import clsx from "clsx";
 
 export function StatusBar() {
@@ -12,6 +13,7 @@ export function StatusBar() {
   const openUpdateDialog = useAppStore((s) => s.openUpdateDialog);
   const saveStatus = useAppStore((s) => s.saveStatus);
   const lastSavedAt = useAppStore((s) => s.lastSavedAt);
+  const { openFolder } = useFileSystem();
   const target = sceneMeta.wordTarget ?? 0;
   const progress = target > 0 ? Math.min(100, (wordCount / target) * 100) : 0;
   const onTarget = target > 0 && wordCount >= target;
@@ -28,11 +30,28 @@ export function StatusBar() {
       <div className="truncate max-w-[40%] flex items-center gap-3">
         {activeFilePath ? (
           <>
-            <span className="truncate font-mono opacity-60">{activeFilePath}</span>
+            {/* Path do arquivo clicavel: chama openFolder pra trocar
+                a pasta de trabalho. Atalho rapido pra "estou aqui mas
+                quero mudar de projeto" sem ter que ir no sidebar.
+                Underline-on-hover sinaliza clicabilidade discretamente. */}
+            <button
+              onClick={openFolder}
+              title="Trocar pasta de trabalho"
+              className="truncate font-mono opacity-60 hover:opacity-100 hover:underline underline-offset-2 transition-opacity"
+              style={{ background: "transparent", color: "inherit" }}
+            >
+              {activeFilePath}
+            </button>
             <SaveIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
           </>
         ) : (
-          <span>Nenhum arquivo</span>
+          <button
+            onClick={openFolder}
+            className="hover:underline underline-offset-2 transition-opacity"
+            style={{ background: "transparent", color: "inherit" }}
+          >
+            Abrir pasta…
+          </button>
         )}
       </div>
       <div className="flex items-center gap-4">

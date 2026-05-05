@@ -2,18 +2,49 @@ import { useEffect, useRef, useState } from "react";
 import { CanvasText, DRAW_COLORS } from "../../types/canvas";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { startDrag } from "../../lib/drag";
-import { Trash2, Palette, Bold, Minus, Plus } from "lucide-react";
+import { textRect } from "../../lib/canvasGeom";
+import {
+  Trash2,
+  Palette,
+  Bold,
+  Italic,
+  Underline,
+  Highlighter,
+  Type,
+} from "lucide-react";
 import clsx from "clsx";
 
 interface Props {
   text: CanvasText;
-  /** Força entrar em modo edição logo após criação (click-to-place). */
+  /** Forca entrar em modo edicao logo apos criacao (click-to-place). */
   autoEdit?: boolean;
 }
 
-/**
- * Texto cru flutuante (sem card). Renderizado em world coords.
- */
+const HIGHLIGHT_COLORS: { label: string; value: string }[] = [
+  { label: "Sem grifo", value: "" },
+  { label: "Amarelo", value: "#fff48080" },
+  { label: "Verde", value: "#b7eb8f80" },
+  { label: "Rosa", value: "#ffadd280" },
+  { label: "Azul", value: "#91d5ff80" },
+  { label: "Lilas", value: "#d3adf780" },
+  { label: "Laranja", value: "#ffd59180" },
+];
+
+const TEXT_SIZES = [12, 14, 18, 24, 32, 48] as const;
+
+type ResizeDir = "n" | "e" | "s" | "w" | "ne" | "nw" | "se" | "sw";
+
+const RESIZE_HANDLES: { dir: ResizeDir; cursor: string; title: string }[] = [
+  { dir: "nw", cursor: "nwse-resize", title: "Redimensionar" },
+  { dir: "n", cursor: "ns-resize", title: "Redimensionar altura" },
+  { dir: "ne", cursor: "nesw-resize", title: "Redimensionar" },
+  { dir: "e", cursor: "ew-resize", title: "Redimensionar largura" },
+  { dir: "se", cursor: "nwse-resize", title: "Redimensionar" },
+  { dir: "s", cursor: "ns-resize", title: "Redimensionar altura" },
+  { dir: "sw", cursor: "nesw-resize", title: "Redimensionar" },
+  { dir: "w", cursor: "ew-resize", title: "Redimensionar largura" },
+];
+
 export function FloatingText({ text, autoEdit }: Props) {
   const {
     updateText,
@@ -34,7 +65,9 @@ export function FloatingText({ text, autoEdit }: Props) {
   const isSelected = selectedId === text.id;
   const isInGroup = selectedId !== text.id && selectedIds.has(text.id);
   const [editing, setEditing] = useState(!!autoEdit);
-  const [showPalette, setShowPalette] = useState(false);
+  const [openMenu, setOpenMenu] = useState<
+    null | "color" | "highlight" | "size"
+  >(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dragState = useRef<{
     startX: number;
@@ -44,6 +77,23 @@ export function FloatingText({ text, autoEdit }: Props) {
     moved: boolean;
   } | null>(null);
 
+  const naturalRect = textRect({
+    ...text,
+    width: undefined,
+    height: undefined,
+  });
+  const implicitWidth = Math.max(80, Math.min(800, Math.ceil(naturalRect.w)));
+  const measuredRect = textRect({
+    ...text,
+    width: text.width ?? implicitWidth,
+    height: text.height,
+  });
+  const boxWidth = Math.max(60, Math.round(text.width ?? implicitWidth));
+  const boxHeight = Math.max(
+    Math.max(28, text.size * 1.35),
+    Math.round(text.height ?? measuredRect.h),
+  );
+
   useEffect(() => {
     if (editing && textareaRef.current) {
       textareaRef.current.focus();
@@ -52,14 +102,14 @@ export function FloatingText({ text, autoEdit }: Props) {
   }, [editing]);
 
   useEffect(() => {
-    if (!showPalette) return;
-    const onClick = () => setShowPalette(false);
+    if (!openMenu) return;
+    const onClick = () => setOpenMenu(null);
     const id = window.setTimeout(
       () => document.addEventListener("click", onClick, { once: true }),
       0,
     );
     return () => window.clearTimeout(id);
-  }, [showPalette]);
+  }, [openMenu]);
 
   const onMouseDown = (e: React.MouseEvent) => {
     if (editing) return;
@@ -71,10 +121,13 @@ export function FloatingText({ text, autoEdit }: Props) {
       return;
     }
 
-    // Arrow tool em texto: comporta-se igual ao Card — primeiro click
-    // comeca o link, segundo (em outro item com bbox) completa. Antes
-    // textos eram inertes em modo arrow e o usuario nao sabia se setas
-    // podiam sair deles.
+    if (linkingFromId && linkingFromId !== text.id) {
+      e.stopPropagation();
+      e.preventDefault();
+      completeLink(text.id);
+      return;
+    }
+
     if (tool === "arrow") {
       e.stopPropagation();
       e.preventDefault();
@@ -87,8 +140,6 @@ export function FloatingText({ text, autoEdit }: Props) {
 
     e.stopPropagation();
 
-    // Group drag: preserva a selecao multipla e translada tudo junto.
-    // Mesmo padrao do Card.tsx — ver la pra detalhes.
     const currentIds = useCanvasStore.getState().selectedIds;
     const isGroupDrag = currentIds.size > 1 && currentIds.has(text.id);
 
@@ -123,7 +174,6 @@ export function FloatingText({ text, autoEdit }: Props) {
       return;
     }
 
-    // Single-drag
     select(text.id);
     pushHistory();
 
@@ -160,27 +210,120 @@ export function FloatingText({ text, autoEdit }: Props) {
     setEditing(true);
   };
 
-  // Cor de render: vazio ("Auto") ou o legado "#2a2420" (Tinta sepia escuro
-  // que era o default antigo) viram `var(--text-primary)` — assim canvases
-  // criados em tema claro continuam legiveis ao trocar pra dark. Cores
-  // deliberadas (sangue, indigo, marcador, floresta) sao preservadas porque
-  // sao escolhas explicitas do usuario.
+  const onResizeMouseDown = (dir: ResizeDir, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    pushHistory();
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const orig = {
+      x: text.x,
+      y: text.y,
+      w: boxWidth,
+      h: boxHeight,
+      storedW: text.width,
+      storedH: text.height,
+    };
+    const minW = 60;
+    const minH = Math.max(28, text.size * 1.35);
+    const maxW = 2000;
+    const maxH = 1600;
+
+    startDrag({
+      onMove: (ev) => {
+        const dx = (ev.clientX - startX) / viewport.zoom;
+        const dy = (ev.clientY - startY) / viewport.zoom;
+
+        let x = orig.x;
+        let y = orig.y;
+        let w = orig.w;
+        let h = orig.h;
+
+        if (dir.includes("e")) w = orig.w + dx;
+        if (dir.includes("s")) h = orig.h + dy;
+        if (dir.includes("w")) {
+          w = orig.w - dx;
+          x = orig.x + dx;
+        }
+        if (dir.includes("n")) {
+          h = orig.h - dy;
+          y = orig.y + dy;
+        }
+
+        if (w < minW) {
+          if (dir.includes("w")) x = orig.x + orig.w - minW;
+          w = minW;
+        }
+        if (h < minH) {
+          if (dir.includes("n")) y = orig.y + orig.h - minH;
+          h = minH;
+        }
+
+        w = Math.min(maxW, w);
+        h = Math.min(maxH, h);
+        updateText(text.id, {
+          x: Math.round(x),
+          y: Math.round(y),
+          width: Math.round(w),
+          height: Math.round(h),
+        });
+      },
+      onCancel: () => {
+        updateText(text.id, {
+          x: orig.x,
+          y: orig.y,
+          width: orig.storedW,
+          height: orig.storedH,
+        });
+      },
+    });
+  };
+
   const renderColor =
     !text.color || text.color === "#2a2420"
       ? "var(--text-primary)"
       : text.color;
 
-  const commonStyle: React.CSSProperties = {
+  const rootStyle: React.CSSProperties = {
     position: "absolute",
     left: text.x,
     top: text.y,
+    width: boxWidth,
+    height: boxHeight,
+    minWidth: 60,
+    minHeight: Math.max(28, text.size * 1.35),
+    overflow: "visible",
+    ...(isSelected
+      ? {
+          outline: "1px solid var(--selection-ring)",
+          outlineOffset: "2px",
+        }
+      : isInGroup
+        ? {
+            outline: "1px dashed var(--selection-ring)",
+            outlineOffset: "2px",
+          }
+        : null),
+  };
+
+  const contentStyle: React.CSSProperties = {
+    width: "100%",
+    height: "100%",
+    boxSizing: "border-box",
     color: renderColor,
     fontSize: text.size,
     fontWeight: text.bold ? 700 : 400,
+    fontStyle: text.italic ? "italic" : "normal",
+    textDecoration: text.underline ? "underline" : "none",
     lineHeight: 1.25,
     fontFamily: "'EB Garamond', Georgia, serif",
     whiteSpace: "pre-wrap",
-    minWidth: 40,
+    wordBreak: "break-word",
+    overflow: "hidden",
+    padding: text.highlight ? "1px 4px" : 0,
+    background: text.highlight || "transparent",
+    borderRadius: text.highlight ? 2 : 0,
   };
 
   return (
@@ -192,29 +335,12 @@ export function FloatingText({ text, autoEdit }: Props) {
         tool === "select"
           ? "cursor-grab active:cursor-grabbing"
           : tool === "eraser"
-          ? "cursor-cell"
-          : tool === "arrow"
-          ? "cursor-crosshair"
-          : "cursor-default",
+            ? "cursor-cell"
+            : tool === "arrow"
+              ? "cursor-crosshair"
+              : "cursor-default",
       )}
-      style={{
-        ...commonStyle,
-        // Destaque visual pra selecao: primaria (outline solid) ou grupo
-        // (outline dashed). Sem isso, FloatingText nao indicava visualmente
-        // que foi capturado num marquee — o usuario so descobria ao tentar
-        // arrastar.
-        ...(isSelected
-          ? {
-              outline: "1px solid var(--selection-ring)",
-              outlineOffset: "2px",
-            }
-          : isInGroup
-          ? {
-              outline: "1px dashed var(--selection-ring)",
-              outlineOffset: "2px",
-            }
-          : null),
-      }}
+      style={rootStyle}
     >
       {editing ? (
         <textarea
@@ -234,38 +360,44 @@ export function FloatingText({ text, autoEdit }: Props) {
             e.stopPropagation();
           }}
           onMouseDown={(e) => e.stopPropagation()}
-          placeholder="Digite…"
+          placeholder="Digite..."
           style={{
-            font: "inherit",
-            color: "inherit",
-            fontWeight: "inherit",
-            lineHeight: "inherit",
-            background: "transparent",
+            ...contentStyle,
             border: "1px dashed var(--accent-2)",
-            padding: "2px 4px",
             resize: "none",
             outline: "none",
-            minWidth: 140,
-            minHeight: text.size * 1.4,
-            overflow: "hidden",
+            background: text.highlight || "transparent",
           }}
-          rows={Math.max(1, text.text.split("\n").length)}
         />
       ) : (
-        <span>
+        <div style={contentStyle}>
           {text.text || (
             <span className="italic opacity-50">(texto vazio)</span>
           )}
-        </span>
+        </div>
       )}
 
-      {/* Ações quando selecionado */}
+      {isSelected && !editing && text.text.trim().length > 0 && (
+        <>
+          {RESIZE_HANDLES.map((h) => (
+            <ResizeHandle
+              key={h.dir}
+              dir={h.dir}
+              cursor={h.cursor}
+              title={h.title}
+              zoom={viewport.zoom}
+              onMouseDown={(e) => onResizeMouseDown(h.dir, e)}
+            />
+          ))}
+        </>
+      )}
+
       {isSelected && !editing && (
         <div
           data-text-action
-          className="absolute left-0 flex items-center gap-0.5 rounded px-1 py-0.5"
+          className="absolute left-0 z-20 flex items-center gap-0.5 rounded px-1 py-0.5"
           style={{
-            top: -28 / viewport.zoom,
+            top: -32 / viewport.zoom,
             transform: `scale(${1 / viewport.zoom})`,
             transformOrigin: "top left",
             background: "var(--bg-panel)",
@@ -274,15 +406,6 @@ export function FloatingText({ text, autoEdit }: Props) {
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <TinyBtn
-            title="Cor"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowPalette((v) => !v);
-            }}
-          >
-            <Palette size={11} />
-          </TinyBtn>
           <TinyBtn
             title="Negrito"
             active={text.bold}
@@ -294,27 +417,135 @@ export function FloatingText({ text, autoEdit }: Props) {
             <Bold size={11} />
           </TinyBtn>
           <TinyBtn
-            title="Menor"
+            title="Italico"
+            active={text.italic}
             onClick={(e) => {
               e.stopPropagation();
-              updateText(text.id, { size: Math.max(10, text.size - 2) });
+              updateText(text.id, { italic: !text.italic });
             }}
           >
-            <Minus size={11} />
+            <Italic size={11} />
           </TinyBtn>
           <TinyBtn
-            title="Maior"
+            title="Sublinhado"
+            active={text.underline}
             onClick={(e) => {
               e.stopPropagation();
-              updateText(text.id, { size: Math.min(96, text.size + 2) });
+              updateText(text.id, { underline: !text.underline });
             }}
           >
-            <Plus size={11} />
+            <Underline size={11} />
           </TinyBtn>
-          <div
-            className="w-px h-3.5 mx-0.5"
-            style={{ background: "var(--border-subtle)" }}
-          />
+          <Divider />
+
+          <div className="relative">
+            <TinyBtn
+              title="Tamanho"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenMenu(openMenu === "size" ? null : "size");
+              }}
+            >
+              <Type size={11} />
+            </TinyBtn>
+            {openMenu === "size" && (
+              <Popover>
+                {TEXT_SIZES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateText(text.id, { size: s });
+                      setOpenMenu(null);
+                    }}
+                    className="px-2 py-0.5 text-[10px] rounded transition-colors"
+                    style={{
+                      background:
+                        text.size === s ? "var(--bg-hover)" : "transparent",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </Popover>
+            )}
+          </div>
+
+          <div className="relative">
+            <TinyBtn
+              title="Cor do texto"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenMenu(openMenu === "color" ? null : "color");
+              }}
+            >
+              <Palette size={11} />
+            </TinyBtn>
+            {openMenu === "color" && (
+              <Popover>
+                {DRAW_COLORS.map((c) => (
+                  <button
+                    key={c.value || "auto"}
+                    title={c.label}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateText(text.id, { color: c.value });
+                      setOpenMenu(null);
+                    }}
+                    style={{
+                      background:
+                        c.value ||
+                        "linear-gradient(135deg, var(--text-primary) 0 50%, var(--bg-panel-2) 50% 100%)",
+                      border: "1px solid var(--border)",
+                    }}
+                    className="w-4 h-4 rounded-full hover:scale-110 transition-transform"
+                  />
+                ))}
+              </Popover>
+            )}
+          </div>
+
+          <div className="relative">
+            <TinyBtn
+              title="Grifar"
+              active={!!text.highlight}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenMenu(openMenu === "highlight" ? null : "highlight");
+              }}
+            >
+              <Highlighter size={11} />
+            </TinyBtn>
+            {openMenu === "highlight" && (
+              <Popover>
+                {HIGHLIGHT_COLORS.map((c) => (
+                  <button
+                    key={c.value || "none"}
+                    title={c.label}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateText(text.id, { highlight: c.value || undefined });
+                      setOpenMenu(null);
+                    }}
+                    style={{
+                      background:
+                        c.value ||
+                        "repeating-linear-gradient(45deg, var(--bg-panel-2) 0 3px, transparent 3px 6px)",
+                      border: "1px solid var(--border)",
+                    }}
+                    className={clsx(
+                      "w-4 h-4 rounded transition-transform hover:scale-110",
+                      text.highlight === (c.value || undefined) &&
+                        "ring-1 ring-accent",
+                    )}
+                  />
+                ))}
+              </Popover>
+            )}
+          </div>
+
+          <Divider />
           <TinyBtn
             title="Excluir"
             danger
@@ -325,42 +556,85 @@ export function FloatingText({ text, autoEdit }: Props) {
           >
             <Trash2 size={11} />
           </TinyBtn>
-
-          {showPalette && (
-            <div
-              className="absolute top-full left-0 mt-1 flex gap-1 rounded px-1.5 py-1"
-              style={{
-                background: "var(--bg-panel)",
-                border: "1px solid var(--border)",
-                boxShadow: "var(--shadow-sm)",
-              }}
-            >
-              {DRAW_COLORS.map((c) => (
-                <button
-                  key={c.value || "auto"}
-                  title={c.label}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    updateText(text.id, { color: c.value });
-                    setShowPalette(false);
-                  }}
-                  style={{
-                    // Swatch "Auto" (value vazio) usa um gradient diagonal
-                    // light↔dark pra sinalizar "adapta ao tema" — sem isso
-                    // o circulo ficaria transparente e o usuario nao
-                    // identificaria a opcao.
-                    background:
-                      c.value ||
-                      "linear-gradient(135deg, var(--text-primary) 0 50%, var(--bg-panel-2) 50% 100%)",
-                    border: "1px solid var(--border)",
-                  }}
-                  className="w-4 h-4 rounded-full hover:scale-110 transition-transform"
-                />
-              ))}
-            </div>
-          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function ResizeHandle({
+  dir,
+  cursor,
+  title,
+  zoom,
+  onMouseDown,
+}: {
+  dir: ResizeDir;
+  cursor: string;
+  title: string;
+  zoom: number;
+  onMouseDown: (e: React.MouseEvent) => void;
+}) {
+  const size = 8 / zoom;
+  const long = 24 / zoom;
+  const half = size / 2;
+  const isCorner = dir.length === 2;
+
+  const style: React.CSSProperties = {
+    position: "absolute",
+    width: isCorner ? size : dir === "n" || dir === "s" ? long : size,
+    height: isCorner ? size : dir === "e" || dir === "w" ? long : size,
+    background: "var(--accent)",
+    border: `${1 / zoom}px solid var(--bg-panel)`,
+    borderRadius: 999,
+    boxShadow: "var(--shadow-sm)",
+    cursor,
+    zIndex: 10,
+  };
+
+  if (dir.includes("n")) style.top = -half;
+  if (dir.includes("s")) style.bottom = -half;
+  if (dir.includes("w")) style.left = -half;
+  if (dir.includes("e")) style.right = -half;
+  if (dir === "n" || dir === "s") {
+    style.left = "50%";
+    style.transform = "translateX(-50%)";
+  }
+  if (dir === "e" || dir === "w") {
+    style.top = "50%";
+    style.transform = "translateY(-50%)";
+  }
+
+  return (
+    <div
+      data-text-action
+      title={title}
+      onMouseDown={onMouseDown}
+      style={style}
+    />
+  );
+}
+
+function Divider() {
+  return (
+    <div
+      className="w-px h-3.5 mx-0.5"
+      style={{ background: "var(--border-subtle)" }}
+    />
+  );
+}
+
+function Popover({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="absolute top-full left-0 mt-1 flex gap-1 rounded px-1.5 py-1 z-30"
+      style={{
+        background: "var(--bg-panel)",
+        border: "1px solid var(--border)",
+        boxShadow: "var(--shadow-sm)",
+      }}
+    >
+      {children}
     </div>
   );
 }
@@ -379,23 +653,20 @@ function TinyBtn({
   danger?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
-  // 3 estados — active (preenchido com accent-2), hover (danger ou neutro),
-  // idle (transparente + text-muted). No light tema o accent-2 é âmbar
-  // claro; no dark tema é âmbar saturado — ambos lêem como "ON".
   const bg = active
     ? "var(--accent-2)"
     : hovered
-    ? danger
-      ? "var(--danger)"
-      : "var(--bg-hover)"
-    : "transparent";
+      ? danger
+        ? "var(--danger)"
+        : "var(--bg-hover)"
+      : "transparent";
   const fg = active
     ? "var(--text-inverse)"
     : hovered
-    ? danger
-      ? "var(--text-inverse)"
-      : "var(--text-secondary)"
-    : "var(--text-muted)";
+      ? danger
+        ? "var(--text-inverse)"
+        : "var(--text-secondary)"
+      : "var(--text-muted)";
   return (
     <button
       title={title}

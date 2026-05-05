@@ -20,13 +20,13 @@ export function useAutoSave() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
 
-    const flushNow = async () => {
+    const flushNow = async (): Promise<boolean> => {
       if (timer) {
         clearTimeout(timer);
         timer = null;
       }
       const s = useAppStore.getState();
-      if (!s.activeFilePath) return;
+      if (!s.activeFilePath) return false;
       const content = serializeDocument(s.sceneMeta, s.fileBody);
       s.setSaveStatus("saving");
       try {
@@ -39,10 +39,15 @@ export function useAutoSave() {
         if (after.activeFilePath === s.activeFilePath) {
           after.setSaveStatus("saved");
         }
+        return true;
       } catch {
         // saveFile ja toasta erro internamente. Volta pra dirty pra
         // sinalizar que ainda ha pendencia.
-        useAppStore.getState().setSaveStatus("dirty");
+        const after = useAppStore.getState();
+        if (after.activeFilePath === s.activeFilePath) {
+          after.setSaveStatus("dirty");
+        }
+        return false;
       }
     };
 
@@ -51,11 +56,18 @@ export function useAutoSave() {
       // com auto-save desligado — trocar arquivo SEM salvar perderia o
       // trabalho silenciosamente, o que e' pior que ignorar a pref).
       if (state.activeFilePath !== prev.activeFilePath) {
-        if (timer && prev.activeFilePath) {
-          clearTimeout(timer);
+        const shouldFlushPrevious =
+          !!prev.activeFilePath &&
+          (prev.saveStatus === "dirty" ||
+            (timer !== null && prev.saveStatus !== "saved"));
+        if (shouldFlushPrevious) {
+          if (timer) clearTimeout(timer);
           timer = null;
           const content = serializeDocument(prev.sceneMeta, prev.fileBody);
-          saveFile(prev.activeFilePath, content);
+          void saveFile(prev.activeFilePath!, content).catch(() => {
+            // saveFile ja mostrou toast. Evita unhandled rejection neste
+            // flush fire-and-forget durante troca de arquivo.
+          });
         }
         // Reset do status visual quando troca de arquivo. Sem isso, abrir
         // arquivo B logo apos salvar A mostraria "Salvo" pro arquivo B
@@ -83,14 +95,14 @@ export function useAutoSave() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        flushNow();
-        // Confirmação visual — sem isso o usuário não sabe se o Ctrl+S
-        // surtiu efeito (o debounce já salvaria em 1.2s de qualquer forma).
-        if (useAppStore.getState().activeFilePath) {
-          useAppStore
-            .getState()
-            .pushToast("success", "Salvo", FORCE_FLUSH_HINT_MS);
-        }
+        void (async () => {
+          const ok = await flushNow();
+          if (ok && useAppStore.getState().activeFilePath) {
+            useAppStore
+              .getState()
+              .pushToast("success", "Salvo", FORCE_FLUSH_HINT_MS);
+          }
+        })();
       }
     };
     document.addEventListener("keydown", onKey);

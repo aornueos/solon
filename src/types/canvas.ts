@@ -76,6 +76,15 @@ export interface CanvasText {
   size: number;   // em px (world coords)
   color: string;  // hex
   bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  /** Cor de grifo (background). Vazio/undefined = sem grifo. */
+  highlight?: string;
+  /** Largura maxima da caixa (world px). Quando settada, texto quebra
+   *  linha em vez de cortar. Default: undefined = auto-grow horizontal. */
+  width?: number;
+  /** Altura da caixa (world px). Undefined = altura natural do conteudo. */
+  height?: number;
 }
 
 /**

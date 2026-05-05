@@ -15,9 +15,15 @@ export const IndentExtension = Extension.create({
         attributes: {
           indent: {
             default: false,
-            parseHTML: (el) => el.style.textIndent === "2em",
+            // Antes usavamos `style="text-indent: 2em"`. Problema: o
+            // DOMPurify do markdownBridge bloqueia `style` (vetor de
+            // XSS), entao o indent era perdido ao recarregar a nota.
+            // Agora usamos um data-attribute custom + CSS rule no
+            // globals.css. data-indent passa pelo DOMPurify (whitelist)
+            // e nao tem risco de injection.
+            parseHTML: (el) => el.getAttribute("data-indent") === "true",
             renderHTML: (attrs) =>
-              attrs.indent ? { style: "text-indent: 2em" } : {},
+              attrs.indent ? { "data-indent": "true" } : {},
           },
         },
       },

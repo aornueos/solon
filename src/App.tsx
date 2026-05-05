@@ -7,6 +7,11 @@ import { useCanvasPersistence } from "./hooks/useCanvasPersistence";
 import { useSceneCardSync } from "./hooks/useSceneCardSync";
 import { checkForUpdate } from "./lib/updater";
 
+const isTauriRuntime = (): boolean =>
+  typeof window !== "undefined" &&
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).__TAURI_INTERNALS__ !== undefined;
+
 export default function App() {
   // Seletores granulares: destructure direto de `useAppStore()` assinaria
   // a cada mudança de qualquer field do store (wordCount, cards, toasts...),
@@ -67,6 +72,26 @@ export default function App() {
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
+
+  // No app desktop, bloqueia os atalhos classicos de DevTools. No browser
+  // web eles continuam livres, o que ajuda no desenvolvimento da versao web.
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    const handler = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      const devtoolsShortcut =
+        e.key === "F12" ||
+        ((e.ctrlKey || e.metaKey) &&
+          e.shiftKey &&
+          (key === "i" || key === "j" || key === "c")) ||
+        ((e.ctrlKey || e.metaKey) && key === "u");
+      if (!devtoolsShortcut) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, []);
 
   // Atalhos globais de painel
   useEffect(() => {

@@ -66,13 +66,30 @@ pub fn spell_check(word: String) -> bool {
     WORDS.read().map(|w| w.contains(&lower)).unwrap_or(false)
 }
 
-/// Retorna ate' MAX_SUGGESTIONS palavras com edit distance ate'
-/// MAX_DISTANCE. Ordenado por distance asc, depois alfabetico.
+/// Checa varias palavras em uma unica chamada Tauri. Usado pelo underline
+/// visual do editor para evitar centenas de round-trips JS -> Rust.
+#[tauri::command]
+pub fn spell_check_many(words: Vec<String>) -> Vec<bool> {
+    let guard = match WORDS.read() {
+        Ok(w) => w,
+        Err(_) => return words.iter().map(|_| true).collect(),
+    };
+    words
+        .into_iter()
+        .map(|word| guard.contains(&word.to_lowercase()))
+        .collect()
+}
+
+/// Retorna ate' MAX_SUGGESTIONS palavras candidatas ranqueadas.
 ///
-/// Implementacao: itera o Vec inteiro com poda agressiva — palavras com
-/// diferenca de comprimento > max_dist sao descartadas sem rodar o DP.
-/// O Levenshtein em si tem early-exit por linha (se a linha minima
-/// excede max_dist, retorna max+1 imediatamente).
+/// Heuristica de scoring (menor score = melhor sugestao):
+///  1. **Diacritico-only match** (ex: "nao" ↔ "não"): prioridade
+///     absoluta. Cobre o caso mais comum em pt-BR — usuario digita
+///     sem acento e quer o acento de volta.
+///  2. **Prefixo compartilhado**: palavras com inicio em comum sao
+///     preferidas. Sem isso, "nao" sugeriria "ao" (delete primeiro
+///     char) antes de "naco" (insert um char) por ordem alfabetica.
+///  3. **Edit distance** (Levenshtein): bruto, capado em MAX_DISTANCE.
 ///
 /// Performance em maquina tipica: ~5-15ms pra palavra de 5 caracteres
 /// vs lista de 312k. Roda numa thread Tauri que nao bloqueia nem o
@@ -82,8 +99,12 @@ pub fn spell_suggest(word: String) -> Vec<String> {
     let lower = word.to_lowercase();
     let target_chars: Vec<char> = lower.chars().collect();
     let target_len = target_chars.len();
+    // Versao "achatada" do target — sem acentos. Usado pra detectar
+    // candidatos que diferem APENAS em diacriticos (caso mais comum
+    // de typo em pt-BR: usuario nao digita o til/cedilha/acento).
+    let target_flat: String = lower.chars().map(strip_accent).collect();
 
-    let mut candidates: Vec<(String, usize)> = Vec::new();
+    let mut candidates: Vec<(String, i32)> = Vec::new();
 
     for candidate in WORD_LIST.iter() {
         let cand_chars: Vec<char> = candidate.chars().collect();
@@ -97,17 +118,70 @@ pub fn spell_suggest(word: String) -> Vec<String> {
             continue;
         }
         let dist = levenshtein_bounded(&target_chars, &cand_chars, MAX_DISTANCE);
-        if dist <= MAX_DISTANCE {
-            candidates.push((candidate.clone(), dist));
+        if dist > MAX_DISTANCE {
+            continue;
         }
+
+        // Score combinado: bonus enorme se for so' diferenca de acento,
+        // bonus menor por prefixo em comum, penalidade pela distance.
+        let cand_flat: String = candidate.chars().map(strip_accent).collect();
+        let accent_only = cand_flat == target_flat;
+        let prefix = shared_prefix_len(&target_chars, &cand_chars);
+
+        // -1000 garante que QUALQUER match diacritico-only fica no
+        // topo, mesmo com distance maior. Os tiebreakers (dist, prefix)
+        // ainda ordenam dentro desse "tier".
+        let score = if accent_only {
+            -1000 + (dist as i32) * 10 - (prefix as i32)
+        } else {
+            (dist as i32) * 100 - (prefix as i32) * 10
+        };
+
+        candidates.push((candidate.clone(), score));
     }
 
+    // Sort: score asc, depois alfabetico pra desempatar.
     candidates.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
     candidates
         .into_iter()
         .take(MAX_SUGGESTIONS)
         .map(|(w, _)| w)
         .collect()
+}
+
+/// Conta caracteres iniciais identicos entre dois slices. Usado como
+/// bonus de scoring — palavras com prefixo igual sao mais provaveis
+/// de ser a "intencao real" do user que palavras com primeira letra
+/// trocada.
+fn shared_prefix_len(a: &[char], b: &[char]) -> usize {
+    let mut i = 0;
+    while i < a.len() && i < b.len() && a[i] == b[i] {
+        i += 1;
+    }
+    i
+}
+
+/// Remove acentos/cedilha de um caractere pt-BR. Mapping manual cobre
+/// os casos comuns sem precisar de unicode-normalization (que adiciona
+/// dependencia + custo). Caracteres nao-mapeados retornam tal qual.
+fn strip_accent(c: char) -> char {
+    match c {
+        'á' | 'à' | 'â' | 'ã' | 'ä' => 'a',
+        'Á' | 'À' | 'Â' | 'Ã' | 'Ä' => 'A',
+        'é' | 'è' | 'ê' | 'ë' => 'e',
+        'É' | 'È' | 'Ê' | 'Ë' => 'E',
+        'í' | 'ì' | 'î' | 'ï' => 'i',
+        'Í' | 'Ì' | 'Î' | 'Ï' => 'I',
+        'ó' | 'ò' | 'ô' | 'õ' | 'ö' => 'o',
+        'Ó' | 'Ò' | 'Ô' | 'Õ' | 'Ö' => 'O',
+        'ú' | 'ù' | 'û' | 'ü' => 'u',
+        'Ú' | 'Ù' | 'Û' | 'Ü' => 'U',
+        'ç' => 'c',
+        'Ç' => 'C',
+        'ñ' => 'n',
+        'Ñ' => 'N',
+        c => c,
+    }
 }
 
 /// Adiciona palavra ao dicionario em memoria (dict pessoal). O facade

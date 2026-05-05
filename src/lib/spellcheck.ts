@@ -60,6 +60,11 @@ function savePersonalDict(): void {
   }
 }
 
+function notifyPersonalDictChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("solon:spellcheck-dict-changed"));
+}
+
 /**
  * Warm-up assincrono: dispara um `spell_size` no backend pra forcar a
  * inicializacao das estruturas Lazy do Rust (HashSet + Vec). E' tipo
@@ -125,6 +130,35 @@ export async function isCorrect(word: string): Promise<boolean> {
   }
 }
 
+export async function checkWords(words: string[]): Promise<Map<string, boolean>> {
+  const unique = Array.from(new Set(words.map((w) => w.toLowerCase())));
+  const result = new Map<string, boolean>();
+  if (unique.length === 0) return result;
+  if (!isTauri()) {
+    for (const word of unique) result.set(word, true);
+    return result;
+  }
+
+  const pending = unique.filter((word) => !personalDict.has(word));
+  for (const word of unique) {
+    if (personalDict.has(word)) result.set(word, true);
+  }
+  if (pending.length === 0) return result;
+
+  try {
+    const checks = await invoke<boolean[]>("spell_check_many", {
+      words: pending,
+    });
+    pending.forEach((word, idx) => {
+      result.set(word, checks[idx] ?? true);
+    });
+  } catch (err) {
+    console.warn("[spellcheck] batch check falhou:", err);
+    for (const word of pending) result.set(word, true);
+  }
+  return result;
+}
+
 /**
  * Pede sugestoes ao backend. Retorna array de ate' 8 candidatos
  * ordenados por edit distance (asc) + alfabetico (tiebreaker).
@@ -148,6 +182,7 @@ export function addToPersonalDict(word: string): void {
   if (!normalized) return;
   personalDict.add(normalized.toLowerCase());
   savePersonalDict();
+  notifyPersonalDictChanged();
   // Notifica backend pra que checks subsequentes ja considerem essa
   // palavra como correta sem round-trip pelo localStorage.
   if (isTauri()) {
@@ -170,6 +205,7 @@ export function removeFromPersonalDict(word: string): void {
   if (!personalDict.has(lower)) return;
   personalDict.delete(lower);
   savePersonalDict();
+  notifyPersonalDictChanged();
   if (isTauri()) {
     invoke("spell_remove", { word: lower }).catch((err) => {
       console.warn("[spellcheck] remove falhou:", err);

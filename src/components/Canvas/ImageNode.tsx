@@ -43,13 +43,17 @@ export function ImageNode({ image }: Props) {
 
   useEffect(() => {
     let alive = true;
+    setMissing(false);
+    setUrl(null);
     (async () => {
       const u = await resolveImageUrl(rootFolder, image.src);
       if (!alive) return;
       if (!u) {
         setMissing(true);
+        setUrl(null);
         return;
       }
+      setMissing(false);
       setUrl(u);
     })();
     return () => {
@@ -63,6 +67,15 @@ export function ImageNode({ image }: Props) {
     if (tool === "eraser") {
       e.stopPropagation();
       removeImage(image.id);
+      return;
+    }
+    // Link em progresso (iniciado por outro card/texto/imagem via
+    // botao Link2 ou em arrow tool) → completar aqui, independente
+    // do tool atual. Sem isso, "card → imagem" falhava em select mode.
+    if (linkingFromId && linkingFromId !== image.id) {
+      e.stopPropagation();
+      e.preventDefault();
+      completeLink(image.id);
       return;
     }
     if (tool === "arrow") {

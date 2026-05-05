@@ -207,7 +207,49 @@
 }
 
 .ProseMirror p {
-  margin-bottom: 0.85em;
+  /* 0.4em em vez de 0.85em — paragrafos ficam visivelmente
+     separados (suficiente pra distinguir como blocos) mas sem o
+     "ar" excessivo do default tipo Word. Combina com line-height
+     1.5 do .ProseMirror pra um bloco de texto mais denso. */
+  margin-bottom: 0.4em;
+}
+
+/* IndentExtension — paragrafos marcados com data-indent="true"
+   recebem text-indent na primeira linha (estilo romance). Fica
+   separado em CSS pra que o atributo possa passar pelo DOMPurify
+   sem precisar do `style` inline (que e' bloqueado por seguranca). */
+.ProseMirror p[data-indent="true"] {
+  text-indent: 2em;
+}
+
+/* TextAlign — TipTap renderiza como `text-align` inline em <p>/<h*>.
+   Mas o DOMPurify do markdownBridge bloqueia `style`. Aqui usamos
+   data attribute "data-text-align" via custom transform no
+   markdownBridge (similar ao indent). Por enquanto, o style inline
+   e' bloqueado entao o alinhamento NAO sobrevive ao reload — a fix
+   e' a mesma do indent: re-mapear no markdownBridge. */
+.ProseMirror [data-text-align="left"] { text-align: left; }
+.ProseMirror [data-text-align="center"] { text-align: center; }
+.ProseMirror [data-text-align="right"] { text-align: right; }
+.ProseMirror [data-text-align="justify"] { text-align: justify; }
+
+/* Highlight (grifo) — extension @tiptap/extension-highlight com
+   multicolor. Cada cor vem como style="background-color: ..." inline,
+   bloqueado pelo DOMPurify. Usamos a mesma estrategia do indent:
+   re-mapear via data-color. Mas o componente Highlight do TipTap usa
+   `style` por default. Pra fazer funcionar agora, deixamos mark.solon-mark
+   render via CSS, e o markdownBridge converte de/pra HTML preservando
+   a cor via data-color. Default sem cor = highlight transparente
+   amarelo (legibilidade). */
+.ProseMirror mark.solon-mark {
+  /* Quando a extension nao injeta style inline (post-sanitize), aplica
+     amarelo padrao. Browser pinta normalmente quando ha style. */
+  background-color: rgba(255, 244, 128, 0.5);
+  border-radius: 2px;
+  padding: 0 0.1em;
+}
+.ProseMirror mark.solon-mark[data-color] {
+  background-color: var(--mark-color, rgba(255, 244, 128, 0.5));
 }
 
 .ProseMirror blockquote {
@@ -298,6 +340,14 @@
 
 .ProseMirror ::selection {
   background: var(--accent-soft);
+}
+
+.ProseMirror .solon-spell-error {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--danger);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 }
 
 /* ─────────────────────────────────────────

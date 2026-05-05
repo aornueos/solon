@@ -1,19 +1,33 @@
 import { useEffect, useState } from "react";
-import { X, Sun, Moon, RotateCcw, Save, Sparkles, SpellCheck } from "lucide-react";
-import { useAppStore } from "../../store/useAppStore";
+import {
+  X,
+  Sun,
+  Moon,
+  RotateCcw,
+  Save,
+  Sparkles,
+  SpellCheck,
+  Type,
+  Home,
+  FileText,
+  LayoutGrid,
+  Loader2,
+} from "lucide-react";
+import { useAppStore, EDITOR_MAX_WIDTHS } from "../../store/useAppStore";
 import { getPersonalDictSize } from "../../lib/spellcheck";
+import { checkForUpdate } from "../../lib/updater";
 
 /**
  * Dialog de Preferencias.
  *
- * Editorial — sem dezenas de toggles. So o que o usuario realmente
- * configuraria num app de escrita: aparencia (tema, zoom do texto),
- * comportamento de save, updates. Botao "Restaurar padroes" no rodape
- * pra desfazer experimentacao.
+ * Tipografia: 100% sans-serif (Inter), pra harmonizar com o Inspector
+ * e a Sidebar — locais de UI utilitaria do app. Antes era serif/itálico
+ * misturado com sans, dando dissonancia visual com o resto. Settings e'
+ * configuracao, nao conteudo editorial — comportamento e' "ferramenta",
+ * nao "livro".
  *
- * Persistencia: cada setter da store grava no localStorage diretamente
- * (mesmo padrao do `setTheme`/`setRootFolder`). O dialog so le/escreve
- * via store — nao toca em localStorage diretamente.
+ * Persistencia: cada setter da store grava no localStorage diretamente.
+ * O dialog so' le/escreve via store.
  */
 export function SettingsDialog() {
   const show = useAppStore((s) => s.showSettings);
@@ -22,24 +36,31 @@ export function SettingsDialog() {
   const setTheme = useAppStore((s) => s.setTheme);
   const editorZoom = useAppStore((s) => s.editorZoom);
   const setEditorZoom = useAppStore((s) => s.setEditorZoom);
+  const editorMaxWidth = useAppStore((s) => s.editorMaxWidth);
+  const setEditorMaxWidth = useAppStore((s) => s.setEditorMaxWidth);
+  const startView = useAppStore((s) => s.startView);
+  const setStartView = useAppStore((s) => s.setStartView);
   const autoSaveEnabled = useAppStore((s) => s.autoSaveEnabled);
   const setAutoSaveEnabled = useAppStore((s) => s.setAutoSaveEnabled);
   const autoCheckUpdates = useAppStore((s) => s.autoCheckUpdates);
   const setAutoCheckUpdates = useAppStore((s) => s.setAutoCheckUpdates);
   const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
   const setSpellcheckEnabled = useAppStore((s) => s.setSpellcheckEnabled);
+  const setUpdateStatus = useAppStore((s) => s.setUpdateStatus);
+  const pushToast = useAppStore((s) => s.pushToast);
   const resetSettings = useAppStore((s) => s.resetSettings);
 
   // Re-le o tamanho do dicionario pessoal toda vez que o dialog abre.
-  // Sem reactividade real — a store nao tracka isso (ficaria barulhento
-  // pra um numero que muda raro). Snapshot na abertura e' suficiente.
+  // Snapshot na abertura — store nao tracka isso reativamente.
   const [personalDictSize, setPersonalDictSize] = useState(0);
   useEffect(() => {
     if (show) setPersonalDictSize(getPersonalDictSize());
   }, [show]);
 
-  // Esc fecha o dialog. Listener no nivel da janela (e' dialog modal,
-  // entao um Esc deveria fecha-lo independente de foco).
+  // Estado local pro botao "Verificar atualizacoes" (loading + cooldown).
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  // Esc fecha o dialog.
   useEffect(() => {
     if (!show) return;
     const onKey = (e: KeyboardEvent) => {
@@ -53,6 +74,45 @@ export function SettingsDialog() {
   }, [show, close]);
 
   if (!show) return null;
+
+  const onCheckUpdates = async () => {
+    setCheckingUpdate(true);
+    setUpdateStatus({ kind: "checking" });
+    try {
+      const result = await checkForUpdate({ force: true });
+      if (result.kind === "available") {
+        setUpdateStatus({ kind: "available", info: result.info });
+        pushToast(
+          "info",
+          `Solon ${result.info.version} disponível — confira no banner.`,
+        );
+      } else if (result.kind === "skipped") {
+        setUpdateStatus({ kind: "idle" });
+        pushToast(
+          "info",
+          `Versão ${result.version} foi ignorada anteriormente.`,
+        );
+      } else if (result.kind === "error") {
+        setUpdateStatus({ kind: "idle" });
+        pushToast("error", "Erro ao verificar atualizações.");
+      } else if (result.kind === "unconfigured") {
+        setUpdateStatus({ kind: "idle" });
+        pushToast("info", result.message);
+      } else if (result.kind === "unsupported") {
+        setUpdateStatus({ kind: "idle" });
+        pushToast(
+          "info",
+          "Atualizações estão disponíveis apenas no app desktop.",
+        );
+      } else {
+        // 'none' — esta na ultima versao
+        setUpdateStatus({ kind: "idle" });
+        pushToast("success", "Você está na versão mais recente.");
+      }
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   return (
     <div
@@ -73,25 +133,19 @@ export function SettingsDialog() {
           color: "var(--text-primary)",
         }}
       >
-        {/* Header */}
+        {/* Header — utilitario, mesma estetica de Inspector/Sidebar.
+            Antes era 'PREFERÊNCIAS' grande em serif, destoava do resto. */}
         <div
-          className="px-6 pt-5 pb-4 flex items-start justify-between"
+          className="px-5 py-3 flex items-center justify-between"
           style={{ borderBottom: "1px solid var(--border-subtle)" }}
         >
-          <div>
-            <div
-              className="text-[0.62rem] uppercase tracking-[0.25em] mb-1"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Solon
-            </div>
-            <h2
-              id="settings-title"
-              className="font-serif text-2xl tracking-tight"
-            >
-              Preferências
-            </h2>
-          </div>
+          <h2
+            id="settings-title"
+            className="text-[0.7rem] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Preferências
+          </h2>
           <button
             onClick={close}
             title="Fechar (Esc)"
@@ -106,23 +160,20 @@ export function SettingsDialog() {
                 "transparent")
             }
           >
-            <X size={16} />
+            <X size={14} />
           </button>
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto px-6 py-5 flex flex-col gap-7">
+        <div className="overflow-y-auto px-5 py-5 flex flex-col gap-6">
           {/* Aparencia */}
           <Section title="Aparência">
-            <Row
-              label="Tema"
-              hint="O dark sépia preserva a paleta editorial."
-            >
+            <Row label="Tema" hint="Sépia claro ou escuro — o tom da paleta editorial.">
               <SegmentedControl
                 value={theme}
                 options={[
-                  { value: "light", label: "Claro", icon: <Sun size={12} /> },
-                  { value: "dark", label: "Escuro", icon: <Moon size={12} /> },
+                  { value: "light", label: "Claro", icon: <Sun size={11} /> },
+                  { value: "dark", label: "Escuro", icon: <Moon size={11} /> },
                 ]}
                 onChange={(v) => setTheme(v as "light" | "dark")}
               />
@@ -130,14 +181,15 @@ export function SettingsDialog() {
 
             <Row
               label="Zoom do texto"
-              hint={`${editorZoom}% — afeta só o editor; UI fica fixa.`}
+              hint={`${editorZoom}% — afeta só o conteúdo do editor; UI fica fixa.`}
+              icon={<Type size={11} />}
             >
-              <div className="flex items-center gap-3 w-full">
+              <div className="flex items-center gap-2 w-full">
                 <button
                   title="Diminuir"
                   onClick={() => setEditorZoom(editorZoom - 5)}
                   disabled={editorZoom <= 75}
-                  className="px-2 py-1 rounded text-[0.78rem] font-mono transition-opacity disabled:opacity-30"
+                  className="px-2 py-0.5 rounded text-[0.72rem] font-mono transition-opacity disabled:opacity-30"
                   style={{
                     background: "var(--bg-hover)",
                     color: "var(--text-secondary)",
@@ -152,14 +204,14 @@ export function SettingsDialog() {
                   step={5}
                   value={editorZoom}
                   onChange={(e) => setEditorZoom(parseInt(e.target.value, 10))}
-                  className="flex-1 accent-current"
-                  style={{ color: "var(--accent)" }}
+                  className="flex-1"
+                  style={{ accentColor: "var(--accent)" }}
                 />
                 <button
                   title="Aumentar"
                   onClick={() => setEditorZoom(editorZoom + 5)}
                   disabled={editorZoom >= 200}
-                  className="px-2 py-1 rounded text-[0.85rem] font-mono transition-opacity disabled:opacity-30"
+                  className="px-2 py-0.5 rounded text-[0.78rem] font-mono transition-opacity disabled:opacity-30"
                   style={{
                     background: "var(--bg-hover)",
                     color: "var(--text-secondary)",
@@ -170,7 +222,7 @@ export function SettingsDialog() {
                 <button
                   title="100%"
                   onClick={() => setEditorZoom(100)}
-                  className="px-2 py-1 rounded text-[0.7rem] transition-opacity"
+                  className="px-1.5 py-0.5 rounded text-[0.65rem]"
                   style={{
                     border: "1px solid var(--border)",
                     color: "var(--text-muted)",
@@ -180,14 +232,36 @@ export function SettingsDialog() {
                 </button>
               </div>
             </Row>
+
+            <Row
+              label="Largura do editor"
+              hint={
+                editorMaxWidth <= 600
+                  ? "Estreito — colunas mais curtas, leitura intensa."
+                  : editorMaxWidth <= 720
+                    ? "Médio — proporção clássica de livro impresso."
+                    : editorMaxWidth <= 870
+                      ? "Amplo — mais ar, menos quebras de linha."
+                      : "Largo — quase página inteira."
+              }
+            >
+              <SegmentedControl
+                value={String(editorMaxWidth)}
+                options={EDITOR_MAX_WIDTHS.map((w) => ({
+                  value: String(w),
+                  label: String(w),
+                }))}
+                onChange={(v) => setEditorMaxWidth(parseInt(v, 10))}
+              />
+            </Row>
           </Section>
 
           {/* Editor */}
           <Section title="Editor">
             <Row
               label="Auto-save"
-              hint="Grava a cada 1.2s após você parar de digitar. Ctrl+S sempre salva."
-              icon={<Save size={13} />}
+              hint="Grava 1.2s após você parar de digitar. Ctrl+S sempre salva."
+              icon={<Save size={11} />}
             >
               <Toggle
                 checked={autoSaveEnabled}
@@ -201,9 +275,9 @@ export function SettingsDialog() {
               hint={
                 personalDictSize > 0
                   ? `Sublinhado vermelho + sugestões no clique direito. ${personalDictSize} ${personalDictSize === 1 ? "palavra" : "palavras"} no dicionário pessoal.`
-                  : "Sublinhado vermelho em palavras erradas + sugestões clicáveis no clique direito. Carregado sob demanda."
+                  : "Sublinhado vermelho + sugestões via clique direito."
               }
-              icon={<SpellCheck size={13} />}
+              icon={<SpellCheck size={11} />}
             >
               <Toggle
                 checked={spellcheckEnabled}
@@ -213,12 +287,30 @@ export function SettingsDialog() {
             </Row>
           </Section>
 
-          {/* Atualizacoes */}
+          {/* Inicialização */}
+          <Section title="Inicialização">
+            <Row
+              label="Ao abrir o app, mostrar"
+              hint="Onde você quer cair quando o Solon inicia."
+            >
+              <SegmentedControl
+                value={startView}
+                options={[
+                  { value: "home", label: "Início", icon: <Home size={11} /> },
+                  { value: "editor", label: "Editor", icon: <FileText size={11} /> },
+                  { value: "canvas", label: "Canvas", icon: <LayoutGrid size={11} /> },
+                ]}
+                onChange={(v) => setStartView(v as "home" | "editor" | "canvas")}
+              />
+            </Row>
+          </Section>
+
+          {/* Atualizações */}
           <Section title="Atualizações">
             <Row
-              label="Verificar atualizações no boot"
-              hint="Só roda no Tauri (no dev em browser fica inativo). Falhas de rede são silenciosas."
-              icon={<Sparkles size={13} />}
+              label="Verificar no boot"
+              hint="Falhas de rede são silenciosas. Só ativo no app desktop."
+              icon={<Sparkles size={11} />}
             >
               <Toggle
                 checked={autoCheckUpdates}
@@ -226,43 +318,57 @@ export function SettingsDialog() {
                 label={autoCheckUpdates ? "Ativado" : "Desativado"}
               />
             </Row>
-          </Section>
-
-          {/* Sobre */}
-          <Section title="Sobre">
-            <div
-              className="text-[0.82rem] leading-relaxed"
-              style={{ color: "var(--text-secondary)" }}
+            <Row
+              label="Verificar agora"
+              hint="Bypassa o throttle de 6h e busca a versão mais recente imediatamente."
             >
-              <p className="font-serif italic mb-2">
-                Solon — um editor para quem escreve devagar.
-              </p>
-              <div
-                className="text-[0.75rem]"
-                style={{ color: "var(--text-muted)" }}
+              <button
+                onClick={onCheckUpdates}
+                disabled={checkingUpdate}
+                className="inline-flex items-center gap-2 px-3 py-1 rounded text-[0.78rem] font-medium transition-colors disabled:opacity-60"
+                style={{
+                  background: "var(--bg-inverse)",
+                  color: "var(--text-inverse, #fff)",
+                }}
               >
-                Versão {APP_VERSION} · MIT
-              </div>
-            </div>
+                {checkingUpdate ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin" />
+                    Verificando…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={12} />
+                    Verificar
+                  </>
+                )}
+              </button>
+            </Row>
           </Section>
         </div>
 
         {/* Footer */}
         <div
-          className="px-6 py-4 flex items-center justify-between"
+          className="px-5 py-3 flex items-center justify-between"
           style={{ borderTop: "1px solid var(--border-subtle)" }}
         >
           <button
             onClick={resetSettings}
-            className="inline-flex items-center gap-1.5 text-[0.78rem] transition-opacity hover:opacity-80"
+            className="inline-flex items-center gap-1.5 text-[0.72rem] transition-opacity hover:opacity-70"
             style={{ color: "var(--text-muted)" }}
           >
-            <RotateCcw size={12} />
+            <RotateCcw size={11} />
             Restaurar padrões
           </button>
+          <div
+            className="text-[0.65rem] tabular-nums"
+            style={{ color: "var(--text-placeholder)" }}
+          >
+            v{APP_VERSION}
+          </div>
           <button
             onClick={close}
-            className="px-4 py-1.5 rounded text-[0.82rem] font-medium transition-colors"
+            className="px-3 py-1 rounded text-[0.78rem] font-medium transition-colors"
             style={{
               background: "var(--accent)",
               color: "var(--text-inverse, #fff)",
@@ -284,9 +390,7 @@ export function SettingsDialog() {
 }
 
 /**
- * Versao do app, injetada em build-time via `vite.config.ts` (campo
- * `define.__APP_VERSION__`). Single source of truth = `package.json`.
- * Bumpa la' e ja' propaga pra Sobre no proximo build.
+ * Versao do app, injetada em build-time via `vite.config.ts`.
  */
 const APP_VERSION = __APP_VERSION__;
 
@@ -300,7 +404,7 @@ function Section({
   return (
     <section className="flex flex-col gap-4">
       <h3
-        className="text-[0.65rem] uppercase tracking-[0.2em] font-medium"
+        className="text-[0.6rem] uppercase tracking-[0.22em] font-semibold"
         style={{ color: "var(--text-muted)" }}
       >
         {title}
@@ -322,16 +426,19 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {icon && (
-            <span style={{ color: "var(--text-muted)" }} className="flex-shrink-0">
+            <span
+              style={{ color: "var(--text-muted)" }}
+              className="flex-shrink-0"
+            >
               {icon}
             </span>
           )}
           <span
-            className="font-serif text-[0.95rem]"
+            className="text-[0.82rem] font-medium"
             style={{ color: "var(--text-primary)" }}
           >
             {label}
@@ -341,8 +448,11 @@ function Row({
       </div>
       {hint && (
         <p
-          className="text-[0.75rem] italic leading-snug"
-          style={{ color: "var(--text-muted)", paddingLeft: icon ? "1.25rem" : 0 }}
+          className="text-[0.7rem] leading-snug"
+          style={{
+            color: "var(--text-muted)",
+            paddingLeft: icon ? "1.25rem" : 0,
+          }}
         >
           {hint}
         </p>
@@ -371,7 +481,7 @@ function SegmentedControl<T extends string>({
           <button
             key={opt.value}
             onClick={() => onChange(opt.value)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[0.78rem] transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.72rem] transition-colors"
             style={{
               background: active ? "var(--bg-panel)" : "transparent",
               color: active ? "var(--text-primary)" : "var(--text-muted)",
@@ -404,24 +514,26 @@ function Toggle({
       className="inline-flex items-center gap-2 transition-opacity"
     >
       <span
-        className="relative inline-block w-9 h-5 rounded-full transition-colors"
+        className="relative inline-block w-8 h-[18px] rounded-full transition-colors"
         style={{
           background: checked ? "var(--accent)" : "var(--border)",
         }}
       >
         <span
-          className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform"
+          className="absolute top-0.5 left-0.5 w-[14px] h-[14px] rounded-full transition-transform"
           style={{
             background: "var(--bg-panel)",
-            transform: checked ? "translateX(16px)" : "translateX(0)",
+            transform: checked ? "translateX(14px)" : "translateX(0)",
             boxShadow: "var(--shadow-sm)",
           }}
         />
       </span>
       {label && (
         <span
-          className="text-[0.78rem]"
-          style={{ color: checked ? "var(--text-primary)" : "var(--text-muted)" }}
+          className="text-[0.72rem]"
+          style={{
+            color: checked ? "var(--text-primary)" : "var(--text-muted)",
+          }}
         >
           {label}
         </span>
@@ -429,4 +541,3 @@ function Toggle({
     </button>
   );
 }
-

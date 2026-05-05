@@ -67,8 +67,8 @@ export function CanvasToolbar() {
     const zoom = Math.min(1.2, Math.min(screenW / w, screenH / h));
     setViewport({
       zoom,
-      x: -(minX - padding) * zoom + (screenW - (w - padding * 2) * zoom) / 2,
-      y: -(minY - padding) * zoom + (screenH - (h - padding * 2) * zoom) / 2,
+      x: -(minX - padding) * zoom + (screenW - w * zoom) / 2,
+      y: -(minY - padding) * zoom + (screenH - h * zoom) / 2,
     });
   };
 

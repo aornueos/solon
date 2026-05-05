@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import Document from "@tiptap/extension-document";
 import Paragraph from "@tiptap/extension-paragraph";
@@ -21,13 +21,18 @@ import Table from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
+import TextAlign from "@tiptap/extension-text-align";
+import Highlight from "@tiptap/extension-highlight";
 import { IndentExtension } from "./IndentExtension";
 import { ListExitExtension } from "./ListExitExtension";
+import { SmartDashesExtension } from "./SmartDashesExtension";
 import { useAppStore } from "../../store/useAppStore";
 import { EditorToolbar } from "./EditorToolbar";
 import { markdownToHtml, htmlToMarkdown } from "./markdownBridge";
 import { setCurrentEditor } from "../../lib/editorRef";
 import { ensureSpellchecker } from "../../lib/spellcheck";
+import { FindBar } from "./FindBar";
+import { SpellcheckExtension } from "./SpellcheckExtension";
 
 export function Editor() {
   // Seletores granulares: evita re-render do editor ao mudar sidebarWidth,
@@ -40,10 +45,17 @@ export function Editor() {
   const setWordCount = useAppStore((s) => s.setWordCount);
   const setFileBody = useAppStore((s) => s.setFileBody);
   const editorZoom = useAppStore((s) => s.editorZoom);
+  const setEditorZoom = useAppStore((s) => s.setEditorZoom);
+  const editorMaxWidth = useAppStore((s) => s.editorMaxWidth);
   const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
 
   const isLoadingRef = useRef(false);
   const lastLoadedPathRef = useRef<string | null>(null);
+  const [findOpen, setFindOpen] = useState(false);
+  // Ref do wrapper scrollavel — usado pra anexar wheel listener nativo
+  // (com {passive: false} pra poder preventDefault o scroll quando
+  // Ctrl ta pressionado e a gente quer transformar em zoom).
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -63,14 +75,35 @@ export function Editor() {
       History,
       Typography,
       CharacterCount,
+      SpellcheckExtension,
       IndentExtension,
       ListExitExtension,
+      SmartDashesExtension,
       Table.configure({ resizable: true, HTMLAttributes: { class: "solon-table" } }),
       TableRow,
       TableHeader,
       TableCell,
+      // Alinhamento de texto: paragrafos + headings. Default 'left' nao
+      // e' explicitamente settado (vira null/undefined no atributo) pra
+      // que markdown sem alinhamento permaneca markdown sem alinhamento.
+      TextAlign.configure({
+        types: ["heading", "paragraph"],
+        alignments: ["left", "center", "right", "justify"],
+        defaultAlignment: "left",
+      }),
+      // Highlight (grifo) com cores. `multicolor: true` permite marcar
+      // texto com cor especifica via setHighlight({ color: '#...' });
+      // `false` so' permite toggle on/off (cor padrao). Queremos cores.
+      Highlight.configure({
+        multicolor: true,
+        HTMLAttributes: { class: "solon-mark" },
+      }),
+      // Placeholder vazio — o user nao queria a frase "Comece a escrever
+      // sua historia..." aparecendo. Mantemos a Extension instalada
+      // (e' lightweight) caso queiramos placeholders dinamicos por nota
+      // no futuro (ex: do frontmatter), mas por agora fica em branco.
       Placeholder.configure({
-        placeholder: "Comece a escrever sua história...",
+        placeholder: "",
       }),
     ],
     content: "",
@@ -83,6 +116,7 @@ export function Editor() {
         spellcheck: useAppStore.getState().spellcheckEnabled
           ? "true"
           : "false",
+        lang: "pt-BR",
       },
     },
     onUpdate: ({ editor }) => {
@@ -139,7 +173,24 @@ export function Editor() {
     if (!editor) return;
     const dom = editor.view.dom as HTMLElement;
     dom.setAttribute("spellcheck", spellcheckEnabled ? "true" : "false");
+    dom.setAttribute("lang", "pt-BR");
   }, [editor, spellcheckEnabled]);
+
+  useEffect(() => {
+    setFindOpen(false);
+  }, [activeFilePath]);
+
+  useEffect(() => {
+    if (!editor || !activeFilePath) return;
+    const onFindShortcut = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "f") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setFindOpen(true);
+    };
+    document.addEventListener("keydown", onFindShortcut, true);
+    return () => document.removeEventListener("keydown", onFindShortcut, true);
+  }, [editor, activeFilePath]);
 
   // Registra/desregistra ref global pro editor. Usado pelo
   // ContextMenuProvider pra detectar palavra em right-click sem precisar
@@ -166,6 +217,45 @@ export function Editor() {
     }, 2000);
     return () => window.clearTimeout(t);
   }, [spellcheckEnabled]);
+
+  // Ctrl+Scroll = zoom do texto. So' afeta o editor (escopo do listener),
+  // nao a UI ao redor. Acumulador de deltaY pra suavizar trackpads que
+  // disparam dezenas de events com delta pequeno por gesto — sem
+  // acumulador, um swipe casual saltaria de 100% pra 200%. Cada 50px
+  // acumulados = 1 step de 5%, semelhante a 1 notch de mouse fisico.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    let accumulator = 0;
+    const STEP_THRESHOLD = 50; // pixels deltaY ate' disparar 1 step
+    const STEP_SIZE = 5; // % por step
+
+    const onWheel = (e: WheelEvent) => {
+      // ctrlKey pega Windows/Linux; metaKey pega Cmd no macOS.
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      accumulator += e.deltaY;
+      if (Math.abs(accumulator) < STEP_THRESHOLD) return;
+      // deltaY < 0 = scroll pra cima = zoom in (texto maior).
+      // deltaY > 0 = scroll pra baixo = zoom out (texto menor).
+      const direction = accumulator < 0 ? 1 : -1;
+      const current = useAppStore.getState().editorZoom;
+      setEditorZoom(current + direction * STEP_SIZE);
+      accumulator = 0;
+    };
+
+    // {passive: false} obriga browser a esperar o handler decidir antes
+    // de scrollar. Sem isso, preventDefault() e' ignorado e o scroll
+    // acontece junto do zoom — UX confusa.
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+    // `activeFilePath` na dep: o scrollRef so' "existe" quando ha
+    // arquivo aberto (early-return sem-arquivo nao renderiza o div com
+    // o ref). Sem essa dep, useEffect rodava no mount inicial com
+    // scrollRef.current=null (path de empty-state), e nunca re-rodava
+    // quando o user abria arquivo. Resultado: Ctrl+Scroll nao zoomava.
+  }, [setEditorZoom, activeFilePath]);
 
   // Scroll para heading via evento do Outline. Chain pra scrollar DE FATO
   // até a posição — `setTextSelection` sozinho só move o caret, não o
@@ -210,7 +300,10 @@ export function Editor() {
           />
         )}
         <div className="flex-1 overflow-y-auto" style={{ background: "var(--bg-app)" }}>
-          <div className="max-w-[680px] mx-auto px-8 py-12">
+          <div
+            className="mx-auto px-8 py-12"
+            style={{ maxWidth: editorMaxWidth }}
+          >
             <p
               className="font-serif italic text-[1.05rem]"
               style={{ color: "var(--text-placeholder)", lineHeight: 1.6 }}
@@ -224,18 +317,44 @@ export function Editor() {
     );
   }
 
-  // Click na area branca em volta do EditorContent foca o editor no fim
-  // do documento. Sem isso, clicar abaixo do ultimo paragrafo nao iniciava
-  // nada — o usuario precisava posicionar o caret manualmente. TipTap so
-  // captura clicks dentro do `EditorContent`; o padding ao redor era area
-  // morta. Listener no wrapper resolve pra qualquer click fora do conteudo.
+  // Click na area branca em volta do EditorContent posiciona o caret
+  // baseado na coordenada Y do click — clicar acima do primeiro
+  // paragrafo posiciona no INICIO do doc, abaixo do ultimo posiciona
+  // no FIM. Antes era sempre fim; "preciso clicar especificamente
+  // na primeira palavra pra ir pro inicio" era a queixa do user.
   const focusEnd = (e: React.MouseEvent) => {
     if (!editor) return;
-    // Se o click foi dentro do conteudo do TipTap, deixa o proprio TipTap
-    // posicionar o caret. So intervimos quando o target e o wrapper/padding.
     const target = e.target as HTMLElement;
     if (target.closest(".ProseMirror")) return;
-    editor.chain().focus("end").run();
+
+    // Se ha selecao ativa (user fez drag-select), deixa quieta —
+    // senao colapsavamos a selecao acidentalmente.
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.toString().length > 0) return;
+
+    // Tenta posicionar o caret na coordenada do click (ProseMirror
+    // resolve pra posicao mais proxima dentro do doc). Se nao achar
+    // nada (click muito longe), heuristica: acima do editor → inicio,
+    // abaixo → fim.
+    const coords = editor.view.posAtCoords({
+      left: e.clientX,
+      top: e.clientY,
+    });
+    if (coords) {
+      editor
+        .chain()
+        .focus()
+        .setTextSelection(coords.pos)
+        .run();
+      return;
+    }
+    const editorEl = editor.view.dom as HTMLElement;
+    const rect = editorEl.getBoundingClientRect();
+    if (e.clientY < rect.top + rect.height / 2) {
+      editor.chain().focus("start").run();
+    } else {
+      editor.chain().focus("end").run();
+    }
   };
 
   // Zoom do editor: aplicado como CSS var no container do EditorContent.
@@ -245,12 +364,23 @@ export function Editor() {
   const zoomVar = { ["--editor-zoom" as string]: String(editorZoom / 100) };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="relative flex flex-col h-full">
+      {editor && (
+        <FindBar
+          editor={editor}
+          open={findOpen}
+          onClose={() => setFindOpen(false)}
+        />
+      )}
       {editor && !focusMode && <EditorToolbar editor={editor} />}
-      <div className="flex-1 overflow-y-auto" onClick={focusEnd}>
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto"
+        onClick={focusEnd}
+      >
         <div
-          className="max-w-[680px] mx-auto px-8 py-12 min-h-full cursor-text"
-          style={zoomVar as React.CSSProperties}
+          className="mx-auto px-8 py-12 min-h-full cursor-text"
+          style={{ ...zoomVar, maxWidth: editorMaxWidth } as React.CSSProperties}
         >
           <EditorContent editor={editor} />
         </div>

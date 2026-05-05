@@ -17,6 +17,7 @@ import {
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAppStore } from "../../store/useAppStore";
 import { SCENE_STATUSES } from "../../types/scene";
+import { SolonLogo } from "../Brand/SolonLogo";
 import clsx from "clsx";
 
 /**
@@ -130,24 +131,33 @@ export function Titlebar() {
           onClick={() => setActiveView("home")}
           onMouseDown={(e) => e.stopPropagation()}
           title="Início"
-          className="font-serif font-bold text-sm tracking-wide transition-opacity hover:opacity-70"
+          className="transition-opacity hover:opacity-70"
           style={{
-            color: "var(--text-primary)",
             background: "transparent",
             opacity: activeView === "home" ? 0.6 : 1,
           }}
         >
-          Solon
+          <SolonLogo muted={activeView === "home"} />
         </button>
         {activeFileName && (
           <>
             <span style={{ color: "var(--border)" }}>/</span>
-            <span
-              className="text-[0.78rem] truncate max-w-[240px]"
-              style={{ color: "var(--text-secondary)" }}
+            {/* Clicavel: leva pro editor com o arquivo aberto. Util
+                quando o user esta no canvas/home e quer voltar pro
+                texto sem ter que achar o item no sidebar. */}
+            <button
+              onClick={() => setActiveView("editor")}
+              onMouseDown={(e) => e.stopPropagation()}
+              title="Ir para o editor"
+              className="text-[0.78rem] truncate max-w-[240px] transition-opacity hover:opacity-70"
+              style={{
+                color: "var(--text-secondary)",
+                background: "transparent",
+                opacity: activeView === "editor" ? 1 : 0.85,
+              }}
             >
               {activeFileName.replace(/\.(md|txt)$/, "")}
-            </span>
+            </button>
             {status && (
               <span
                 className="text-[0.62rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
