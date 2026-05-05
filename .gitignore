@@ -51,3 +51,8 @@ claude.md
 CLAUDE*.md
 Claude*.md
 claude*.md
+
+CHANGELOG.md
+CHANGES.md
+
+.gitignore
