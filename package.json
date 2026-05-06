@@ -10,6 +10,8 @@
     "tauri": "tauri",
     "postinstall": "node scripts/copy-spellcheck-dict.cjs",
     "version:set": "node scripts/bump-version.cjs",
+    "brand:icon": "node scripts/generate-brand-icon.cjs",
+    "brand:icons": "node scripts/generate-brand-icon.cjs && node scripts/generate-icons.cjs",
     "icons": "node scripts/generate-icons.cjs",
     "kill": "node scripts/kill-solon.cjs"
   },
