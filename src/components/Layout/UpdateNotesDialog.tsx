@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { Download, RotateCw, X } from "lucide-react";
@@ -8,6 +8,13 @@ import {
   restartApp,
   skipVersion,
 } from "../../lib/updater";
+
+const UPDATE_NOTES_SANITIZE_CONFIG = {
+  USE_PROFILES: { html: true },
+  FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input", "button"],
+  FORBID_ATTR: ["style", "srcdoc", "onerror", "onload", "onclick"],
+  ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+};
 
 /**
  * Dialog de release notes + acoes do update.
@@ -47,7 +54,7 @@ export function UpdateNotesDialog() {
     }
     try {
       const raw = marked.parse(info.notes, { async: false }) as string;
-      setNotesHtml(DOMPurify.sanitize(raw));
+      setNotesHtml(DOMPurify.sanitize(raw, UPDATE_NOTES_SANITIZE_CONFIG));
     } catch {
       // Fallback: texto cru escapado.
       const escaped = info.notes
@@ -169,6 +176,7 @@ export function UpdateNotesDialog() {
         <div
           className="px-6 py-5 overflow-y-auto flex-1 update-notes"
           style={{ color: "var(--text-primary)" }}
+          onClick={handleNotesClick}
         >
           {notesHtml ? (
             <div dangerouslySetInnerHTML={{ __html: notesHtml }} />
@@ -250,6 +258,26 @@ export function UpdateNotesDialog() {
       </div>
     </div>
   );
+}
+
+function handleNotesClick(e: MouseEvent<HTMLDivElement>) {
+  const target = e.target as HTMLElement | null;
+  const link = target?.closest("a[href]");
+  if (!(link instanceof HTMLAnchorElement)) return;
+
+  e.preventDefault();
+  const href = link.getAttribute("href") ?? "";
+  if (!isSafeExternalUrl(href)) return;
+  window.open(href, "_blank", "noopener,noreferrer");
+}
+
+function isSafeExternalUrl(value: string): boolean {
+  try {
+    const url = new URL(value, window.location.href);
+    return url.protocol === "https:" || url.protocol === "http:" || url.protocol === "mailto:";
+  } catch {
+    return false;
+  }
 }
 
 function FooterBtn({

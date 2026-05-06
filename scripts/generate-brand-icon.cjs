@@ -5,14 +5,14 @@
  * menos margem externa para aparecer maior na taskbar e no Explorer.
  */
 const path = require("node:path");
-const Jimp = require("jimp");
+const { Jimp, ResizeStrategy, rgbaToInt } = require("jimp");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEST = path.join(ROOT, "src-tauri", "app-icon.png");
 const SIZE = 1024;
 const SCALE = 4;
 
-const rgba = Jimp.rgbaToInt;
+const rgba = rgbaToInt;
 const transparent = rgba(0, 0, 0, 0);
 const paper = rgba(239, 233, 222, 255);
 const paperLight = rgba(248, 244, 236, 255);
@@ -126,9 +126,13 @@ function drawIcon(img) {
 }
 
 (async () => {
-  const large = new Jimp(SIZE * SCALE, SIZE * SCALE, transparent);
+  const large = new Jimp({
+    width: SIZE * SCALE,
+    height: SIZE * SCALE,
+    color: transparent,
+  });
   drawIcon(large);
-  large.resize(SIZE, SIZE, Jimp.RESIZE_BICUBIC);
-  await large.writeAsync(DEST);
+  large.resize({ w: SIZE, h: SIZE, mode: ResizeStrategy.BICUBIC });
+  await large.write(DEST);
   console.log(`[brand-icon] gerado: ${DEST}`);
 })();

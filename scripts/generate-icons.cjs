@@ -20,7 +20,7 @@
  */
 const path = require("node:path");
 const fs = require("node:fs");
-const Jimp = require("jimp");
+const { Jimp, ResizeStrategy } = require("jimp");
 const png2icons = require("png2icons");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -113,8 +113,8 @@ const PNG_TARGETS = [
     // BICUBIC e' o melhor balanco qualidade/tempo pra fotos ou
     // ilustracoes com bordas curvas (caso do nosso S em moldura).
     const clone = src.clone();
-    clone.resize(size, size, Jimp.RESIZE_BICUBIC);
-    await clone.writeAsync(dest);
+    clone.resize({ w: size, h: size, mode: ResizeStrategy.BICUBIC });
+    await clone.write(dest);
     const sizeKB = (fs.statSync(dest).size / 1024).toFixed(1);
     console.log(`  ✓ ${file} (${size}x${size}, ${sizeKB} KB)`);
   }

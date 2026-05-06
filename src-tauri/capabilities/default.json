@@ -4,24 +4,21 @@
   "description": "Permissões padrão do Solon",
   "windows": ["main"],
   "permissions": [
-    "core:default",
-    "core:window:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:window:allow-start-dragging",
     "core:window:allow-minimize",
-    "core:window:allow-maximize",
-    "core:window:allow-unmaximize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-is-maximized",
     "core:window:allow-close",
-    "core:window:allow-destroy",
     "dialog:default",
     "dialog:allow-open",
-    "shell:default",
     "updater:default",
     "process:default",
     "process:allow-restart",
     "process:allow-exit",
     "fs:default",
+    "fs:deny-default",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
     "fs:allow-read-file",
@@ -36,6 +33,23 @@
       "allow": [
         { "path": "**" },
         { "path": "**/*" }
+      ],
+      "deny": [
+        { "path": "$HOME/.ssh/**" },
+        { "path": "$HOME/.aws/**" },
+        { "path": "$HOME/.azure/**" },
+        { "path": "$HOME/.gnupg/**" },
+        { "path": "$HOME/.config/gh/**" },
+        { "path": "$HOME/.docker/**" },
+        { "path": "$HOME/.kube/**" },
+        { "path": "$HOME/.npmrc" },
+        { "path": "$HOME/.git-credentials" },
+        { "path": "$HOME/.gitconfig" },
+        { "path": "$HOME/.cargo/credentials" },
+        { "path": "$HOME/.cargo/credentials.toml" },
+        { "path": "$HOME/.netrc" },
+        { "path": "$HOME/AppData/Roaming/GitHub CLI/**" },
+        { "path": "$HOME/AppData/Roaming/Code/User/globalStorage/github.*/*" }
       ]
     }
   ]
