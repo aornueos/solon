@@ -129,6 +129,7 @@ function collectWordRanges(view: EditorView): {
     let match: RegExpExecArray | null;
     while ((match = WORD_RE.exec(node.text))) {
       const word = match[0];
+      if (/^\p{Lu}/u.test(word)) continue;
       if (/^\d+$/.test(word)) continue;
       const normalized = word.toLowerCase();
       if (isInPersonalDict(normalized)) continue;

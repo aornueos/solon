@@ -108,6 +108,7 @@ export function ContextMenuProvider() {
           // limpo (sem placeholder que ficaria pra sempre).
           if (
             wordInfo &&
+            !/^\p{Lu}/u.test(wordInfo.word) &&
             !/^\d+$/.test(wordInfo.word) &&
             !isInPersonalDict(wordInfo.word)
           ) {
