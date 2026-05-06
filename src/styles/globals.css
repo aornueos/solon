@@ -119,6 +119,7 @@
 .ProseMirror {
   outline: none;
   user-select: text;
+  -webkit-user-select: text;
   cursor: text;
   font-family: "Lora", Georgia, serif !important;
   /* `--editor-zoom` e settado pelo wrapper do EditorContent (Editor.tsx).
@@ -132,6 +133,11 @@
   line-height: 1.5;
   color: var(--text-primary);
   caret-color: var(--accent);
+}
+
+.ProseMirror * {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .ProseMirror p.is-editor-empty:first-child::before {

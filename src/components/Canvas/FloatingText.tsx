@@ -32,6 +32,8 @@ const HIGHLIGHT_COLORS: { label: string; value: string }[] = [
 ];
 
 const TEXT_SIZES = [12, 14, 18, 24, 32, 48] as const;
+const MIN_TEXT_SIZE = 8;
+const MAX_TEXT_SIZE = 160;
 
 type ResizeDir = "n" | "e" | "s" | "w" | "ne" | "nw" | "se" | "sw";
 
@@ -266,6 +268,7 @@ export function FloatingText({ text, autoEdit }: Props) {
       y: text.y,
       w: boxWidth,
       h: boxHeight,
+      size: text.size,
       storedW: text.width,
       storedH: text.height,
     };
@@ -306,17 +309,47 @@ export function FloatingText({ text, autoEdit }: Props) {
 
         w = Math.min(maxW, w);
         h = Math.min(maxH, h);
-        updateText(text.id, {
+
+        const next: Partial<CanvasText> = {
           x: Math.round(x),
           y: Math.round(y),
           width: Math.round(w),
           height: Math.round(h),
-        });
+        };
+
+        if (ev.ctrlKey || ev.metaKey) {
+          const scaleX = w / orig.w;
+          const scaleY = h / orig.h;
+          const scale =
+            dir === "e" || dir === "w"
+              ? scaleX
+              : dir === "n" || dir === "s"
+                ? scaleY
+                : Math.max(scaleX, scaleY);
+          const scaledW = clamp(Math.round(orig.w * scale), minW, maxW);
+          const scaledH = clamp(Math.round(orig.h * scale), minH, maxH);
+          next.x = dir.includes("w")
+            ? Math.round(orig.x + orig.w - scaledW)
+            : Math.round(orig.x);
+          next.y = dir.includes("n")
+            ? Math.round(orig.y + orig.h - scaledH)
+            : Math.round(orig.y);
+          next.width = scaledW;
+          next.height = scaledH;
+          next.size = clamp(
+            Math.round(orig.size * scale),
+            MIN_TEXT_SIZE,
+            MAX_TEXT_SIZE,
+          );
+        }
+
+        updateText(text.id, next);
       },
       onCancel: () => {
         updateText(text.id, {
           x: orig.x,
           y: orig.y,
+          size: orig.size,
           width: orig.storedW,
           height: orig.storedH,
         });
@@ -605,6 +638,10 @@ export function FloatingText({ text, autoEdit }: Props) {
       )}
     </div>
   );
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function ResizeHandle({

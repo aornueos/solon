@@ -4,7 +4,6 @@ import { useAppStore, FileNode } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { parseDocument } from "../../lib/frontmatter";
 import { UpdateBanner } from "./UpdateBanner";
-import { SolonLogo } from "../Brand/SolonLogo";
 
 /**
  * Landing minima — pagina de transicao, NAO um dashboard. Funcao unica:
@@ -125,12 +124,6 @@ export function HomePage() {
       <div className="min-h-full flex items-center justify-center px-8 py-16">
         <div className="w-full max-w-md flex flex-col items-center text-center">
           <UpdateBanner />
-
-          {/* Masthead minusculo — ancora a marca sem dominar. Mesma
-              tipografia da titlebar, ligeiramente maior. */}
-          <div className="mb-12">
-            <SolonLogo size="lg" muted />
-          </div>
 
           {rootFolder ? (
             <ProjectHero

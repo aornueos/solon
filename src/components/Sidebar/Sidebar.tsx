@@ -26,6 +26,20 @@ function isSameOrDescendantPath(targetPath: string, sourcePath: string): boolean
   return target === source || target.startsWith(`${source}/`);
 }
 
+function getSidebarDragPath(e: React.DragEvent): string | null {
+  try {
+    const raw = e.dataTransfer.getData(SIDEBAR_DND_MIME);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { path?: string };
+      if (typeof parsed.path === "string") return parsed.path;
+    }
+  } catch {
+    /* dataTransfer pode estar indisponivel durante dragover */
+  }
+  const text = e.dataTransfer.getData("text/plain");
+  return text || null;
+}
+
 interface ContextMenuState {
   x: number;
   y: number;
@@ -342,7 +356,7 @@ function FileTreeRow({
   onDragOverFolder: (path: string | null) => void;
   onDragEnd: () => void;
   onReorder: (targetPath: string) => void;
-  onMoveToFolder: (folderPath: string) => void;
+  onMoveToFolder: (draggedPath: string, folderPath: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -402,13 +416,22 @@ function FileTreeRow({
         onDragStart(node.path);
       }}
       onDragOver={(e) => {
+        const draggedPath = dragPath ?? getSidebarDragPath(e);
+        const isSidebarDrag =
+          !!dragPath || Array.from(e.dataTransfer.types).includes(SIDEBAR_DND_MIME);
+        const canDropOnFolder =
+          node.type === "folder" &&
+          isSidebarDrag &&
+          (!draggedPath || !isSameOrDescendantPath(node.path, draggedPath));
+
         // FOLDER alvo: sempre tenta move-into (regra simples,
         // independente de sibling). Tem prioridade absoluta sobre
         // reorder porque um folder nunca e' alvo valido de reorder.
-        if (canMoveIntoThisFolder) {
+        if (canDropOnFolder) {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
           if (dragOverFolder !== node.path) onDragOverFolder(node.path);
+          if (dragOverPath !== null) onDragOver(null);
           return;
         }
         // FILE alvo: so' aceita reorder se mesmo parent.
@@ -436,6 +459,7 @@ function FileTreeRow({
         if (dragOverFolder === node.path) onDragOverFolder(null);
       }}
       onDrop={(e) => {
+        const draggedPath = dragPath ?? getSidebarDragPath(e);
         // FOLDER → move-into. NAO checa `dragOverFolder === node.path`
         // porque ha race condition classica do HTML5 D&D: dragleave
         // pode disparar transitoriamente quando o cursor passa sobre
@@ -443,10 +467,14 @@ function FileTreeRow({
         // state. Como o drop so' chega aqui se passou pelo dragover
         // (que ja' validou via preventDefault), e canMoveIntoThisFolder
         // e' sync (depende so' do dragPath/node), basta confiar nele.
-        if (canMoveIntoThisFolder) {
+        if (
+          node.type === "folder" &&
+          draggedPath &&
+          !isSameOrDescendantPath(node.path, draggedPath)
+        ) {
           e.preventDefault();
           e.stopPropagation();
-          onMoveToFolder(node.path);
+          onMoveToFolder(draggedPath, node.path);
           return;
         }
         // FILE → reorder. Mesmo principio: nao depende de dragOverPath
@@ -599,10 +627,7 @@ function FileTree({
               if (!dragPath) return;
               onReorder(dragPath, targetPath, siblingNames);
             }}
-            onMoveToFolder={(folderPath) => {
-              if (!dragPath) return;
-              onMoveToFolder(dragPath, folderPath);
-            }}
+            onMoveToFolder={onMoveToFolder}
           />
 
           {node.type === "folder" && node.expanded && node.children && (
