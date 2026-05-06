@@ -44,7 +44,7 @@ export function CanvasView() {
     addSceneCard,
     updateSceneSnapshotByPath,
     removeSelected,
-    duplicateCard,
+    duplicateSelected,
     addStroke,
     addText,
     addImage,
@@ -138,14 +138,8 @@ export function CanvasView() {
         // Ctrl+D duplica cards; em multi-selecao, duplica todos os cards
         // do grupo (outros kinds sao ignorados — stroke/text/image/arrow
         // nao tem "duplicate" no modelo atual).
-        const state = useCanvasStore.getState();
-        const ids = state.selectedIds.size > 0
-          ? [...state.selectedIds]
-          : selectedId ? [selectedId] : [];
-        const cardIds = ids.filter((id) => state.findSelectionKind(id) === "card");
-        if (cardIds.length === 0) return;
         e.preventDefault();
-        for (const id of cardIds) duplicateCard(id);
+        duplicateSelected();
         return;
       }
       if (e.ctrlKey || e.metaKey) return; // ignora outros Ctrl+X
@@ -204,7 +198,7 @@ export function CanvasView() {
   }, [
     selectedId,
     removeSelected,
-    duplicateCard,
+    duplicateSelected,
     addCard,
     cancelLink,
     select,

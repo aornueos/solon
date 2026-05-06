@@ -113,6 +113,20 @@ export function isSpellcheckerReady(): boolean {
   return isReady;
 }
 
+export function normalizeSpellWord(word: string): string {
+  return word.trim().toLocaleLowerCase("pt-BR");
+}
+
+export function shouldSpellcheckWord(word: string): boolean {
+  const normalized = normalizeSpellWord(word);
+  if (normalized.length < 3) return false;
+  if (/^\d+$/.test(normalized)) return false;
+  if (!/^[\p{L}\p{M}]+$/u.test(word)) return false;
+  if (/^\p{Lu}/u.test(word)) return false;
+  if (personalDict.has(normalized)) return false;
+  return true;
+}
+
 /**
  * Verifica se a palavra e' correta. Curta-circuita pelo dict pessoal
  * pra evitar round-trip ao backend pra palavras conhecidas. No browser
@@ -121,9 +135,10 @@ export function isSpellcheckerReady(): boolean {
  */
 export async function isCorrect(word: string): Promise<boolean> {
   if (!isTauri()) return true;
-  if (personalDict.has(word.toLowerCase())) return true;
+  const normalized = normalizeSpellWord(word);
+  if (personalDict.has(normalized)) return true;
   try {
-    return await invoke<boolean>("spell_check", { word });
+    return await invoke<boolean>("spell_check", { word: normalized });
   } catch (err) {
     console.warn("[spellcheck] check falhou:", err);
     return true;
@@ -131,7 +146,7 @@ export async function isCorrect(word: string): Promise<boolean> {
 }
 
 export async function checkWords(words: string[]): Promise<Map<string, boolean>> {
-  const unique = Array.from(new Set(words.map((w) => w.toLowerCase())));
+  const unique = Array.from(new Set(words.map(normalizeSpellWord)));
   const result = new Map<string, boolean>();
   if (unique.length === 0) return result;
   if (!isTauri()) {
@@ -168,9 +183,10 @@ export async function checkWords(words: string[]): Promise<Map<string, boolean>>
  */
 export async function suggest(word: string): Promise<string[]> {
   if (!isTauri()) return [];
-  if (personalDict.has(word.toLowerCase())) return [];
+  const normalized = normalizeSpellWord(word);
+  if (personalDict.has(normalized)) return [];
   try {
-    return await invoke<string[]>("spell_suggest", { word });
+    return await invoke<string[]>("spell_suggest", { word: normalized });
   } catch (err) {
     console.warn("[spellcheck] suggest falhou:", err);
     return [];
@@ -178,9 +194,9 @@ export async function suggest(word: string): Promise<string[]> {
 }
 
 export function addToPersonalDict(word: string): void {
-  const normalized = word.trim();
+  const normalized = normalizeSpellWord(word);
   if (!normalized) return;
-  personalDict.add(normalized.toLowerCase());
+  personalDict.add(normalized);
   savePersonalDict();
   notifyPersonalDictChanged();
   // Notifica backend pra que checks subsequentes ja considerem essa
@@ -193,15 +209,34 @@ export function addToPersonalDict(word: string): void {
 }
 
 export function isInPersonalDict(word: string): boolean {
-  return personalDict.has(word.toLowerCase());
+  return personalDict.has(normalizeSpellWord(word));
 }
 
 export function getPersonalDictSize(): number {
   return personalDict.size;
 }
 
+export function getPersonalDictWords(): string[] {
+  return [...personalDict].sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
+export function clearPersonalDict(): void {
+  const words = getPersonalDictWords();
+  if (words.length === 0) return;
+  personalDict = new Set();
+  savePersonalDict();
+  notifyPersonalDictChanged();
+  if (isTauri()) {
+    for (const word of words) {
+      invoke("spell_remove", { word }).catch((err) => {
+        console.warn("[spellcheck] remove falhou:", err);
+      });
+    }
+  }
+}
+
 export function removeFromPersonalDict(word: string): void {
-  const lower = word.toLowerCase();
+  const lower = normalizeSpellWord(word);
   if (!personalDict.has(lower)) return;
   personalDict.delete(lower);
   savePersonalDict();

@@ -350,6 +350,17 @@
   text-underline-offset: 0.18em;
 }
 
+.ProseMirror .solon-find-match {
+  background: rgba(201, 160, 90, 0.28);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(201, 160, 90, 0.18);
+}
+
+.ProseMirror .solon-find-current {
+  background: rgba(160, 120, 80, 0.42);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 /* ─────────────────────────────────────────
    Tabelas (@tiptap/extension-table)
    Estilo Obsidian — grade sutil, header com fundo suave.

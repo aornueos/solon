@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CanvasText, DRAW_COLORS } from "../../types/canvas";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { startDrag } from "../../lib/drag";
@@ -68,6 +69,10 @@ export function FloatingText({ text, autoEdit }: Props) {
   const [openMenu, setOpenMenu] = useState<
     null | "color" | "highlight" | "size"
   >(null);
+  const [toolbarPos, setToolbarPos] = useState<{ left: number; top: number } | null>(
+    null,
+  );
+  const rootRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dragState = useRef<{
     startX: number;
@@ -110,6 +115,45 @@ export function FloatingText({ text, autoEdit }: Props) {
     );
     return () => window.clearTimeout(id);
   }, [openMenu]);
+
+  useLayoutEffect(() => {
+    if (!isSelected || editing) {
+      setToolbarPos(null);
+      return;
+    }
+
+    const update = () => {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setToolbarPos({
+        left: Math.max(8, rect.left),
+        top: Math.max(8, rect.top - 34),
+      });
+    };
+
+    update();
+    const observer =
+      typeof ResizeObserver !== "undefined" && rootRef.current
+        ? new ResizeObserver(update)
+        : null;
+    observer?.observe(rootRef.current!);
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [
+    isSelected,
+    editing,
+    text.x,
+    text.y,
+    text.width,
+    text.height,
+    text.size,
+    viewport.zoom,
+  ]);
 
   const onMouseDown = (e: React.MouseEvent) => {
     if (editing) return;
@@ -328,6 +372,7 @@ export function FloatingText({ text, autoEdit }: Props) {
 
   return (
     <div
+      ref={rootRef}
       onMouseDown={onMouseDown}
       onDoubleClick={onDoubleClick}
       className={clsx(
@@ -392,14 +437,13 @@ export function FloatingText({ text, autoEdit }: Props) {
         </>
       )}
 
-      {isSelected && !editing && (
+      {isSelected && !editing && toolbarPos && createPortal(
         <div
           data-text-action
-          className="absolute left-0 z-20 flex items-center gap-0.5 rounded px-1 py-0.5"
+          className="fixed z-[70] flex items-center gap-0.5 rounded px-1 py-0.5"
           style={{
-            top: -32 / viewport.zoom,
-            transform: `scale(${1 / viewport.zoom})`,
-            transformOrigin: "top left",
+            left: toolbarPos.left,
+            top: toolbarPos.top,
             background: "var(--bg-panel)",
             border: "1px solid var(--border)",
             boxShadow: "var(--shadow-sm)",
@@ -556,7 +600,8 @@ export function FloatingText({ text, autoEdit }: Props) {
           >
             <Trash2 size={11} />
           </TinyBtn>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

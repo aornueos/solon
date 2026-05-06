@@ -12,10 +12,23 @@ import {
   FileText,
   LayoutGrid,
   Loader2,
+  Trash2,
+  ExternalLink,
 } from "lucide-react";
 import { useAppStore, EDITOR_MAX_WIDTHS } from "../../store/useAppStore";
-import { getPersonalDictSize } from "../../lib/spellcheck";
-import { checkForUpdate } from "../../lib/updater";
+import {
+  clearPersonalDict,
+  getPersonalDictSize,
+  getPersonalDictWords,
+  removeFromPersonalDict,
+} from "../../lib/spellcheck";
+import {
+  checkForUpdate,
+  clearSkippedVersion,
+  getLastUpdateCheck,
+  getSkippedVersion,
+  RELEASES_URL,
+} from "../../lib/updater";
 
 /**
  * Dialog de Preferencias.
@@ -53,8 +66,22 @@ export function SettingsDialog() {
   // Re-le o tamanho do dicionario pessoal toda vez que o dialog abre.
   // Snapshot na abertura — store nao tracka isso reativamente.
   const [personalDictSize, setPersonalDictSize] = useState(0);
+  const [personalDictWords, setPersonalDictWords] = useState<string[]>([]);
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [lastUpdateCheck, setLastUpdateCheck] = useState<number | null>(null);
+  const [skippedVersion, setSkippedVersion] = useState<string | null>(null);
   useEffect(() => {
-    if (show) setPersonalDictSize(getPersonalDictSize());
+    if (!show) return;
+    const refresh = () => {
+      setPersonalDictSize(getPersonalDictSize());
+      setPersonalDictWords(getPersonalDictWords());
+      setLastUpdateCheck(getLastUpdateCheck());
+      setSkippedVersion(getSkippedVersion());
+    };
+    refresh();
+    window.addEventListener("solon:spellcheck-dict-changed", refresh);
+    return () =>
+      window.removeEventListener("solon:spellcheck-dict-changed", refresh);
   }, [show]);
 
   // Estado local pro botao "Verificar atualizacoes" (loading + cooldown).
@@ -77,29 +104,40 @@ export function SettingsDialog() {
 
   const onCheckUpdates = async () => {
     setCheckingUpdate(true);
+    setUpdateMessage(null);
     setUpdateStatus({ kind: "checking" });
     try {
       const result = await checkForUpdate({ force: true });
       if (result.kind === "available") {
         setUpdateStatus({ kind: "available", info: result.info });
+        setUpdateMessage(`Solon ${result.info.version} disponivel para instalar.`);
+        setLastUpdateCheck(getLastUpdateCheck());
         pushToast(
           "info",
           `Solon ${result.info.version} disponível — confira no banner.`,
         );
       } else if (result.kind === "skipped") {
         setUpdateStatus({ kind: "idle" });
+        setUpdateMessage(`Solon ${result.version} esta ignorado por enquanto.`);
+        setLastUpdateCheck(getLastUpdateCheck());
         pushToast(
           "info",
           `Versão ${result.version} foi ignorada anteriormente.`,
         );
       } else if (result.kind === "error") {
         setUpdateStatus({ kind: "idle" });
+        setUpdateMessage(result.message);
+        setLastUpdateCheck(getLastUpdateCheck());
         pushToast("error", "Erro ao verificar atualizações.");
       } else if (result.kind === "unconfigured") {
         setUpdateStatus({ kind: "idle" });
+        setUpdateMessage(result.message);
+        setLastUpdateCheck(getLastUpdateCheck());
         pushToast("info", result.message);
       } else if (result.kind === "unsupported") {
         setUpdateStatus({ kind: "idle" });
+        setUpdateMessage("Disponivel apenas no app desktop instalado.");
+        setLastUpdateCheck(getLastUpdateCheck());
         pushToast(
           "info",
           "Atualizações estão disponíveis apenas no app desktop.",
@@ -107,11 +145,32 @@ export function SettingsDialog() {
       } else {
         // 'none' — esta na ultima versao
         setUpdateStatus({ kind: "idle" });
+        setUpdateMessage("Voce esta na versao mais recente.");
+        setLastUpdateCheck(getLastUpdateCheck());
         pushToast("success", "Você está na versão mais recente.");
       }
     } finally {
       setCheckingUpdate(false);
     }
+  };
+
+  const onClearPersonalDict = () => {
+    clearPersonalDict();
+    setPersonalDictSize(getPersonalDictSize());
+    setPersonalDictWords(getPersonalDictWords());
+    pushToast("success", "Dicionario pessoal limpo.");
+  };
+
+  const onRemovePersonalWord = (word: string) => {
+    removeFromPersonalDict(word);
+    setPersonalDictSize(getPersonalDictSize());
+    setPersonalDictWords(getPersonalDictWords());
+  };
+
+  const onClearSkippedVersion = () => {
+    clearSkippedVersion();
+    setSkippedVersion(null);
+    pushToast("success", "Versao ignorada liberada.");
   };
 
   return (
@@ -285,6 +344,62 @@ export function SettingsDialog() {
                 label={spellcheckEnabled ? "Ativada" : "Desativada"}
               />
             </Row>
+            {personalDictSize > 0 && (
+              <div
+                className="rounded-md p-2 flex flex-col gap-2"
+                style={{
+                  border: "1px solid var(--border-subtle)",
+                  background: "var(--bg-panel-2)",
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div
+                      className="text-[0.78rem] font-medium"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      Dicionario pessoal
+                    </div>
+                    <div
+                      className="text-[0.68rem]"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {personalDictSize} {personalDictSize === 1 ? "palavra" : "palavras"} adicionadas.
+                    </div>
+                  </div>
+                  <button
+                    onClick={onClearPersonalDict}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[0.72rem] transition-colors"
+                    style={{
+                      border: "1px solid var(--border)",
+                      color: "var(--text-secondary)",
+                      background: "var(--bg-panel)",
+                    }}
+                  >
+                    <Trash2 size={11} />
+                    Limpar
+                  </button>
+                </div>
+                <div className="max-h-28 overflow-y-auto flex flex-wrap gap-1">
+                  {personalDictWords.map((word) => (
+                    <button
+                      key={word}
+                      title="Remover palavra"
+                      onClick={() => onRemovePersonalWord(word)}
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.68rem]"
+                      style={{
+                        background: "var(--bg-panel)",
+                        border: "1px solid var(--border-subtle)",
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      {word}
+                      <X size={10} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </Section>
 
           {/* Inicialização */}
@@ -308,6 +423,21 @@ export function SettingsDialog() {
           {/* Atualizações */}
           <Section title="Atualizações">
             <Row
+              label="Versão atual"
+              hint={
+                lastUpdateCheck
+                  ? `Última verificação: ${formatDateTime(lastUpdateCheck)}.`
+                  : "Ainda sem verificação registrada nesta instalação."
+              }
+            >
+              <span
+                className="text-[0.72rem] tabular-nums"
+                style={{ color: "var(--text-muted)" }}
+              >
+                v{APP_VERSION}
+              </span>
+            </Row>
+            <Row
               label="Verificar no boot"
               hint="Falhas de rede são silenciosas. Só ativo no app desktop."
               icon={<Sparkles size={11} />}
@@ -320,7 +450,10 @@ export function SettingsDialog() {
             </Row>
             <Row
               label="Verificar agora"
-              hint="Bypassa o throttle de 6h e busca a versão mais recente imediatamente."
+              hint={
+                updateMessage ??
+                "Bypassa o throttle de 6h e busca a versão mais recente imediatamente."
+              }
             >
               <button
                 onClick={onCheckUpdates}
@@ -342,6 +475,39 @@ export function SettingsDialog() {
                     Verificar
                   </>
                 )}
+              </button>
+            </Row>
+            {skippedVersion && (
+              <Row
+                label="Versão ignorada"
+                hint={`Solon ${skippedVersion} não será oferecido até você liberar ou sair uma versão nova.`}
+              >
+                <button
+                  onClick={onClearSkippedVersion}
+                  className="px-2.5 py-1 rounded text-[0.72rem]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  Liberar
+                </button>
+              </Row>
+            )}
+            <Row
+              label="Canal de release"
+              hint="Abre a página de releases publicada no GitHub."
+            >
+              <button
+                onClick={() => window.open(RELEASES_URL, "_blank", "noopener,noreferrer")}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[0.72rem]"
+                style={{
+                  border: "1px solid var(--border)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <ExternalLink size={11} />
+                GitHub
               </button>
             </Row>
           </Section>
@@ -393,6 +559,19 @@ export function SettingsDialog() {
  * Versao do app, injetada em build-time via `vite.config.ts`.
  */
 const APP_VERSION = __APP_VERSION__;
+
+function formatDateTime(timestamp: number): string {
+  try {
+    return new Date(timestamp).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "data indisponivel";
+  }
+}
 
 function Section({
   title,

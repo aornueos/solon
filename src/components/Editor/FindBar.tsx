@@ -1,96 +1,104 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import type { Editor } from "@tiptap/react";
-import { ChevronUp, ChevronDown, X, Search } from "lucide-react";
+import {
+  CaseSensitive,
+  ChevronDown,
+  ChevronUp,
+  Replace,
+  Search,
+  X,
+} from "lucide-react";
+import {
+  clearFindHighlights,
+  setFindHighlights,
+  type FindMatchRange,
+} from "./FindHighlightExtension";
 
-/**
- * Barra de busca no editor. Substitui o find nativo do WebView2
- * (que tem CSS do Edge nada a ver com o tom do app).
- *
- * UX:
- *  - Ctrl+F abre + foca o input
- *  - Digite: highlights ao vivo, contador "1 de 4"
- *  - Enter = proximo, Shift+Enter = anterior
- *  - Esc = fecha
- *  - Click outside fecha tambem
- *
- * Implementacao: percorre `editor.state.doc.textContent` (texto cru
- * sem marcacao) procurando matches case-insensitive. Converte indices
- * de string pra positions ProseMirror via walk dos textBlocks.
- */
 interface Props {
   editor: Editor;
   open: boolean;
   onClose: () => void;
 }
 
-interface Match {
-  from: number;
-  to: number;
-}
-
 export function FindBar({ editor, open, onClose }: Props) {
   const [query, setQuery] = useState("");
+  const [replaceWith, setReplaceWith] = useState("");
+  const [caseSensitive, setCaseSensitive] = useState(false);
   const [currentIdx, setCurrentIdx] = useState(0);
+  const [docVersion, bumpDocVersion] = useReducer((v) => v + 1, 0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Foca o input quando a barra abre
   useEffect(() => {
-    if (open) {
-      // requestAnimationFrame pra esperar o render+layout — sem isso
-      // o foco as vezes nao "pega" porque o input ainda nao esta no DOM.
-      const raf = requestAnimationFrame(() => {
-        inputRef.current?.focus();
-        inputRef.current?.select();
-      });
-      return () => cancelAnimationFrame(raf);
-    }
+    if (!open) return;
+    const raf = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+    return () => cancelAnimationFrame(raf);
   }, [open]);
 
-  // Calcula matches quando query muda. Walk do doc inteiro coletando
-  // posicoes ProseMirror onde a query bate. Case-insensitive.
-  const matches = useMemo<Match[]>(() => {
-    if (!query.trim() || !editor) return [];
-    const result: Match[] = [];
-    const lower = query.toLowerCase();
+  useEffect(() => {
+    if (!open) {
+      clearFindHighlights(editor.view);
+      return;
+    }
+    const onUpdate = () => bumpDocVersion();
+    editor.on("update", onUpdate);
+    return () => {
+      editor.off("update", onUpdate);
+      clearFindHighlights(editor.view);
+    };
+  }, [editor, open]);
+
+  const matches = useMemo<FindMatchRange[]>(() => {
+    const needleRaw = query.trim();
+    if (!needleRaw) return [];
+    const needle = caseSensitive
+      ? needleRaw
+      : needleRaw.toLocaleLowerCase("pt-BR");
+    const result: FindMatchRange[] = [];
+
     editor.state.doc.descendants((node, pos) => {
       if (!node.isText || !node.text) return;
-      const text = node.text.toLowerCase();
+      const text = caseSensitive
+        ? node.text
+        : node.text.toLocaleLowerCase("pt-BR");
       let idx = 0;
       while (true) {
-        const found = text.indexOf(lower, idx);
+        const found = text.indexOf(needle, idx);
         if (found < 0) break;
-        // ProseMirror posicao do inicio do text node + offset
-        result.push({
-          from: pos + found,
-          to: pos + found + query.length,
-        });
-        idx = found + Math.max(1, query.length);
+        result.push({ from: pos + found, to: pos + found + needleRaw.length });
+        idx = found + Math.max(1, needleRaw.length);
       }
     });
-    return result;
-    // editor.state.doc dependencia: re-computa quando o doc muda. Mas
-    // o React nao re-renderiza so' por mudanca interna do editor — por
-    // isso a barra nao "atualiza ao vivo" se voce edita enquanto ela
-    // ta aberta. Tradeoff aceitavel: editar normalmente fecha o foco
-    // do input. Pra UX ainda melhor, daria pra subscribar via
-    // editor.on("update", forceUpdate). Por agora, simplicidade.
-  }, [query, editor, editor.state.doc]);
 
-  // Reset do indice quando matches mudam
+    return result;
+  }, [query, editor, docVersion, caseSensitive]);
+
   useEffect(() => {
     setCurrentIdx(0);
   }, [matches]);
 
-  // Navega pra um match: seleciona via ProseMirror command. O scroll
-  // automatico do TipTap traz a selecao pra viewport.
+  useEffect(() => {
+    if (!open) return;
+    setFindHighlights(editor.view, matches, currentIdx);
+  }, [editor, matches, currentIdx, open]);
+
   const goTo = useCallback(
     (idx: number) => {
       if (matches.length === 0) return;
       const i = ((idx % matches.length) + matches.length) % matches.length;
-      const m = matches[i];
+      const match = matches[i];
       editor
         .chain()
-        .setTextSelection({ from: m.from, to: m.to })
+        .setTextSelection({ from: match.from, to: match.to })
         .scrollIntoView()
         .run();
       setCurrentIdx(i);
@@ -98,18 +106,14 @@ export function FindBar({ editor, open, onClose }: Props) {
     [editor, matches],
   );
 
-  // Atualiza selecao quando indice muda (ex: usuario digita, contador
-  // automatico vai pro primeiro match)
   useEffect(() => {
     if (matches.length === 0 || currentIdx >= matches.length) return;
-    const m = matches[currentIdx];
+    const match = matches[currentIdx];
     editor
       .chain()
-      .setTextSelection({ from: m.from, to: m.to })
+      .setTextSelection({ from: match.from, to: match.to })
       .scrollIntoView()
       .run();
-    // Importante: NAO chamamos focus() — focus iria pro editor e tira
-    // do input, quebrando o "user esta digitando o query".
   }, [currentIdx, matches, editor]);
 
   if (!open) return null;
@@ -118,14 +122,36 @@ export function FindBar({ editor, open, onClose }: Props) {
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
+      clearFindHighlights(editor.view);
       onClose();
       return;
     }
     if (e.key === "Enter") {
       e.preventDefault();
       goTo(e.shiftKey ? currentIdx - 1 : currentIdx + 1);
-      return;
     }
+  };
+
+  const replaceCurrent = () => {
+    if (matches.length === 0) return;
+    const match = matches[currentIdx] ?? matches[0];
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from: match.from, to: match.to })
+      .insertContent(replaceWith)
+      .run();
+    bumpDocVersion();
+  };
+
+  const replaceAll = () => {
+    if (matches.length === 0) return;
+    const tr = editor.state.tr;
+    for (const match of [...matches].reverse()) {
+      tr.insertText(replaceWith, match.from, match.to);
+    }
+    editor.view.dispatch(tr.scrollIntoView());
+    bumpDocVersion();
   };
 
   const counter =
@@ -137,7 +163,7 @@ export function FindBar({ editor, open, onClose }: Props) {
 
   return (
     <div
-      className="absolute top-2 right-3 z-30 flex items-center gap-1 px-2 py-1 rounded shadow-md"
+      className="absolute top-2 right-3 z-30 flex flex-col gap-1.5 px-2 py-1.5 rounded shadow-md"
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       style={{
@@ -146,75 +172,118 @@ export function FindBar({ editor, open, onClose }: Props) {
         color: "var(--text-primary)",
       }}
     >
-      <Search
-        size={12}
-        className="flex-shrink-0"
-        style={{ color: "var(--text-muted)" }}
-      />
-      <input
-        ref={inputRef}
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={handleKey}
-        placeholder="Buscar…"
-        className="bg-transparent outline-none text-[0.78rem] w-[180px]"
-        style={{ color: "var(--text-primary)" }}
-      />
-      <span
-        className="text-[0.7rem] tabular-nums px-1 min-w-[60px] text-right"
-        style={{ color: "var(--text-muted)" }}
-      >
-        {counter}
-      </span>
-      <button
-        title="Anterior (Shift+Enter)"
-        onClick={() => goTo(currentIdx - 1)}
-        disabled={matches.length === 0}
-        className="p-0.5 rounded transition-colors disabled:opacity-30"
-        style={{ color: "var(--text-secondary)" }}
-        onMouseEnter={(e) => {
-          if (matches.length === 0) return;
-          (e.currentTarget as HTMLElement).style.background =
-            "var(--bg-hover)";
-        }}
-        onMouseLeave={(e) =>
-          ((e.currentTarget as HTMLElement).style.background = "transparent")
-        }
-      >
-        <ChevronUp size={12} />
-      </button>
-      <button
-        title="Próximo (Enter)"
-        onClick={() => goTo(currentIdx + 1)}
-        disabled={matches.length === 0}
-        className="p-0.5 rounded transition-colors disabled:opacity-30"
-        style={{ color: "var(--text-secondary)" }}
-        onMouseEnter={(e) => {
-          if (matches.length === 0) return;
-          (e.currentTarget as HTMLElement).style.background =
-            "var(--bg-hover)";
-        }}
-        onMouseLeave={(e) =>
-          ((e.currentTarget as HTMLElement).style.background = "transparent")
-        }
-      >
-        <ChevronDown size={12} />
-      </button>
-      <button
-        title="Fechar (Esc)"
-        onClick={onClose}
-        className="p-0.5 rounded transition-colors"
-        style={{ color: "var(--text-muted)" }}
-        onMouseEnter={(e) =>
-          ((e.currentTarget as HTMLElement).style.background = "var(--bg-hover)")
-        }
-        onMouseLeave={(e) =>
-          ((e.currentTarget as HTMLElement).style.background = "transparent")
-        }
-      >
-        <X size={12} />
-      </button>
+      <div className="flex items-center gap-1">
+        <Search size={12} style={{ color: "var(--text-muted)" }} />
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="Buscar..."
+          className="bg-transparent outline-none text-[0.78rem] w-[180px]"
+          style={{ color: "var(--text-primary)" }}
+        />
+        <span
+          className="text-[0.7rem] tabular-nums px-1 min-w-[64px] text-right"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {counter}
+        </span>
+        <IconButton
+          title="Anterior (Shift+Enter)"
+          disabled={matches.length === 0}
+          onClick={() => goTo(currentIdx - 1)}
+        >
+          <ChevronUp size={12} />
+        </IconButton>
+        <IconButton
+          title="Proximo (Enter)"
+          disabled={matches.length === 0}
+          onClick={() => goTo(currentIdx + 1)}
+        >
+          <ChevronDown size={12} />
+        </IconButton>
+        <IconButton
+          title="Diferenciar maiusculas"
+          active={caseSensitive}
+          onClick={() => setCaseSensitive((v) => !v)}
+        >
+          <CaseSensitive size={12} />
+        </IconButton>
+        <IconButton title="Fechar (Esc)" onClick={onClose}>
+          <X size={12} />
+        </IconButton>
+      </div>
+      <div className="flex items-center gap-1">
+        <Replace size={12} style={{ color: "var(--text-muted)" }} />
+        <input
+          value={replaceWith}
+          onChange={(e) => setReplaceWith(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="Substituir..."
+          className="bg-transparent outline-none text-[0.78rem] w-[180px]"
+          style={{ color: "var(--text-primary)" }}
+        />
+        <TextButton disabled={matches.length === 0} onClick={replaceCurrent}>
+          Um
+        </TextButton>
+        <TextButton disabled={matches.length === 0} onClick={replaceAll}>
+          Todos
+        </TextButton>
+      </div>
     </div>
+  );
+}
+
+function IconButton({
+  title,
+  disabled,
+  active,
+  onClick,
+  children,
+}: {
+  title: string;
+  disabled?: boolean;
+  active?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      disabled={disabled}
+      className="p-0.5 rounded transition-colors disabled:opacity-30"
+      style={{
+        background: active ? "var(--bg-hover)" : "transparent",
+        color: active ? "var(--text-primary)" : "var(--text-secondary)",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TextButton({
+  disabled,
+  onClick,
+  children,
+}: {
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="px-2 py-0.5 rounded text-[0.68rem] disabled:opacity-35"
+      style={{
+        border: "1px solid var(--border)",
+        color: "var(--text-secondary)",
+      }}
+    >
+      {children}
+    </button>
   );
 }

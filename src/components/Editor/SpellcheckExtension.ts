@@ -5,7 +5,8 @@ import { useAppStore } from "../../store/useAppStore";
 import {
   checkWords,
   ensureSpellchecker,
-  isInPersonalDict,
+  normalizeSpellWord,
+  shouldSpellcheckWord,
 } from "../../lib/spellcheck";
 
 type SpellMeta = { decorations: Decoration[] };
@@ -122,6 +123,8 @@ function collectWordRanges(view: EditorView): {
 }[] {
   const ranges: { from: number; to: number; normalized: string }[] = [];
   const unique = new Set<string>();
+  const selectionFrom = view.state.selection.from;
+  const selectionTo = view.state.selection.to;
 
   view.state.doc.descendants((node, pos) => {
     if (!node.isText || !node.text) return;
@@ -129,17 +132,18 @@ function collectWordRanges(view: EditorView): {
     let match: RegExpExecArray | null;
     while ((match = WORD_RE.exec(node.text))) {
       const word = match[0];
-      if (/^\p{Lu}/u.test(word)) continue;
-      if (/^\d+$/.test(word)) continue;
-      const normalized = word.toLowerCase();
-      if (isInPersonalDict(normalized)) continue;
+      const from = pos + match.index;
+      const to = from + word.length;
+      if (selectionFrom <= to && selectionTo >= from) continue;
+      if (!shouldSpellcheckWord(word)) continue;
+      const normalized = normalizeSpellWord(word);
       if (!unique.has(normalized)) {
         if (unique.size >= MAX_UNIQUE_WORDS) continue;
         unique.add(normalized);
       }
       ranges.push({
-        from: pos + match.index,
-        to: pos + match.index + word.length,
+        from,
+        to,
         normalized,
       });
     }

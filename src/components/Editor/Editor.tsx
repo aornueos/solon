@@ -33,6 +33,7 @@ import { setCurrentEditor } from "../../lib/editorRef";
 import { ensureSpellchecker } from "../../lib/spellcheck";
 import { FindBar } from "./FindBar";
 import { SpellcheckExtension } from "./SpellcheckExtension";
+import { FindHighlightExtension } from "./FindHighlightExtension";
 
 export function Editor() {
   // Seletores granulares: evita re-render do editor ao mudar sidebarWidth,
@@ -76,6 +77,7 @@ export function Editor() {
       Typography,
       CharacterCount,
       SpellcheckExtension,
+      FindHighlightExtension,
       IndentExtension,
       ListExitExtension,
       SmartDashesExtension,
@@ -107,15 +109,9 @@ export function Editor() {
       }),
     ],
     content: "",
-    // `spellcheck=true/false` ativa o spellchecker nativo do WebView2/
-    // WebKit/WebKitGTK — risca em vermelho palavras nao-reconhecidas.
-    // O valor inicial vem da pref persistida; mudancas em runtime sao
-    // aplicadas imperativamente no DOM (vide useEffect abaixo).
     editorProps: {
       attributes: {
-        spellcheck: useAppStore.getState().spellcheckEnabled
-          ? "true"
-          : "false",
+        spellcheck: "false",
         lang: "pt-BR",
       },
     },
@@ -166,13 +162,13 @@ export function Editor() {
     return () => cancelAnimationFrame(raf);
   }, [activeFilePath, editor, setHeadings, setWordCount]);
 
-  // Spellcheck toggle reativo: editorProps.attributes so e' lido na init,
-  // entao se o user mudar a pref via context menu / settings em runtime,
-  // a gente seta o atributo no DOM imperativamente.
+  // Mantemos o spellcheck nativo do WebView desligado. Ele costuma seguir
+  // o idioma do sistema/Edge e marcar portugues correto como erro; o Solon
+  // usa o backend pt-BR proprio para sublinhados e sugestoes.
   useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom as HTMLElement;
-    dom.setAttribute("spellcheck", spellcheckEnabled ? "true" : "false");
+    dom.setAttribute("spellcheck", "false");
     dom.setAttribute("lang", "pt-BR");
   }, [editor, spellcheckEnabled]);
 

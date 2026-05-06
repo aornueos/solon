@@ -19,6 +19,7 @@ import type { Update } from "@tauri-apps/plugin-updater";
 const LAST_CHECK_KEY = "solon:lastUpdateCheck";
 const SKIPPED_VERSION_KEY = "solon:skippedUpdate";
 const LAST_CHECK_TTL_MS = 6 * 60 * 60 * 1000; // 6h
+export const RELEASES_URL = "https://github.com/aornueos/solon/releases";
 
 let cachedUpdate: Update | null = null;
 
@@ -49,6 +50,11 @@ function readLastCheck(): number {
   } catch {
     return 0;
   }
+}
+
+export function getLastUpdateCheck(): number | null {
+  const value = readLastCheck();
+  return value > 0 ? value : null;
 }
 
 function writeLastCheck(): void {
@@ -129,6 +135,20 @@ export async function checkForUpdate(
           "Canal de atualizacoes ainda nao publicado (latest.json ausente).",
       };
     }
+    if (isSignatureOrManifestIssue(message)) {
+      return {
+        kind: "error",
+        message:
+          "Manifesto de atualizacao invalido ou assinatura do bundle nao confere. Confira o latest.json gerado pela release.",
+      };
+    }
+    if (isNetworkIssue(message)) {
+      return {
+        kind: "error",
+        message:
+          "Nao foi possivel acessar o canal de atualizacoes. Verifique a conexao e tente novamente.",
+      };
+    }
     return { kind: "error", message };
   }
 }
@@ -139,6 +159,28 @@ function isMissingUpdateFeed(message: string): boolean {
     text.includes("404") ||
     text.includes("not found") ||
     (text.includes("latest.json") && text.includes("failed"))
+  );
+}
+
+function isNetworkIssue(message: string): boolean {
+  const text = message.toLowerCase();
+  return (
+    text.includes("network") ||
+    text.includes("dns") ||
+    text.includes("timed out") ||
+    text.includes("timeout") ||
+    text.includes("connection") ||
+    text.includes("failed to fetch")
+  );
+}
+
+function isSignatureOrManifestIssue(message: string): boolean {
+  const text = message.toLowerCase();
+  return (
+    text.includes("signature") ||
+    text.includes("invalid json") ||
+    text.includes("manifest") ||
+    text.includes("pubkey")
   );
 }
 

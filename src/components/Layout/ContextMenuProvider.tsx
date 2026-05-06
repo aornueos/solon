@@ -16,8 +16,8 @@ import {
   addToPersonalDict,
   ensureSpellchecker,
   isCorrect,
-  isInPersonalDict,
   isSpellcheckerReady,
+  shouldSpellcheckWord,
   suggest,
 } from "../../lib/spellcheck";
 import type { Editor } from "@tiptap/react";
@@ -106,12 +106,7 @@ export function ContextMenuProvider() {
           // So' mostra placeholder se for uma palavra "checavel" — nao
           // numero, nao no dict pessoal. Senao deixa o menu abrir
           // limpo (sem placeholder que ficaria pra sempre).
-          if (
-            wordInfo &&
-            !/^\p{Lu}/u.test(wordInfo.word) &&
-            !/^\d+$/.test(wordInfo.word) &&
-            !isInPersonalDict(wordInfo.word)
-          ) {
+          if (wordInfo && shouldSpellcheckWord(wordInfo.word)) {
             wordToCheck = wordInfo;
             menuItems = [
               {
@@ -188,10 +183,6 @@ async function attachSuggestionsAsync({
     message: string,
   ) => void;
 }): Promise<void> {
-  console.log(
-    `[spellcheck] check "${wordInfo.word}" (worker ready: ${isSpellcheckerReady()})`,
-  );
-
   // Se engine nao esta pronta, kicka o init em background. A propria
   // chamada de isCorrect abaixo vai esperar (no worker) ate ficar
   // pronta, entao o menu so' atualiza apos o load completar — mas SEM
@@ -204,13 +195,12 @@ async function attachSuggestionsAsync({
   try {
     correct = await isCorrect(wordInfo.word);
   } catch (err) {
-    console.error("[spellcheck] isCorrect threw:", err);
+    console.warn("[spellcheck] isCorrect failed:", err);
     // Remove placeholder restaurando baseItems pra nao deixar
     // "Verificando ortografia…" la' pra sempre.
     updateContextMenuItems(menuId, baseItems);
     return;
   }
-  console.log(`[spellcheck] "${wordInfo.word}" correct=${correct}`);
   if (correct) {
     // Palavra correta — remove placeholder restaurando o menu normal.
     updateContextMenuItems(menuId, baseItems);
@@ -221,14 +211,9 @@ async function attachSuggestionsAsync({
   try {
     suggestions = await suggest(wordInfo.word);
   } catch (err) {
-    console.error("[spellcheck] suggest threw:", err);
+    console.warn("[spellcheck] suggest failed:", err);
     suggestions = [];
   }
-  console.log(
-    `[spellcheck] "${wordInfo.word}" → ${suggestions.length} suggestions:`,
-    suggestions,
-  );
-
   // Build do prefix com sugestoes
   const prefix: ContextMenuItem[] = [];
 
@@ -353,10 +338,6 @@ function editorItems({
       onClick: () => {
         const next = !spellcheckEnabled;
         setSpellcheckEnabled(next);
-        const pm = document.querySelector(
-          ".ProseMirror",
-        ) as HTMLElement | null;
-        if (pm) pm.setAttribute("spellcheck", String(next));
       },
     },
     { kind: "separator" },

@@ -124,6 +124,9 @@ interface CanvasState {
   /** Duplica o card selecionado, offsetado um pouco. */
   duplicateCard: (id: string) => string | null;
   bringToFront: (id: string) => void;
+  duplicateSelected: () => void;
+  bringSelectionToFront: () => void;
+  sendSelectionToBack: () => void;
 
   addArrow: (
     from: string,
@@ -449,6 +452,97 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       if (!card) return s;
       return { cards: [...s.cards.filter((c) => c.id !== id), card] };
     }),
+
+  duplicateSelected: () => {
+    const s = get();
+    const ids = s.selectedIds.size > 0
+      ? [...s.selectedIds]
+      : s.selectedId ? [s.selectedId] : [];
+    if (ids.length === 0) return;
+    s.pushHistory();
+    const idSet = new Set(ids);
+    const idMap = new Map<string, string>();
+
+    const cards = [...s.cards];
+    const texts = [...s.texts];
+    const images = [...s.images];
+    const strokes = [...s.strokes];
+
+    for (const card of s.cards) {
+      if (!idSet.has(card.id) || card.kind === "scene") continue;
+      const id = nanoid();
+      idMap.set(card.id, id);
+      cards.push({ ...card, id, x: card.x + 28, y: card.y + 28 });
+    }
+    for (const text of s.texts) {
+      if (!idSet.has(text.id)) continue;
+      const id = nanoid();
+      idMap.set(text.id, id);
+      texts.push({ ...text, id, x: text.x + 28, y: text.y + 28 });
+    }
+    for (const image of s.images) {
+      if (!idSet.has(image.id)) continue;
+      const id = nanoid();
+      idMap.set(image.id, id);
+      images.push({ ...image, id, x: image.x + 28, y: image.y + 28 });
+    }
+    for (const stroke of s.strokes) {
+      if (!idSet.has(stroke.id)) continue;
+      const id = nanoid();
+      idMap.set(stroke.id, id);
+      const points = stroke.points.map((p, idx) => p + (idx % 2 === 0 ? 28 : 28));
+      strokes.push({ ...stroke, id, points });
+    }
+
+    const nextIds = new Set(idMap.values());
+    if (nextIds.size === 0) return;
+    set({
+      cards,
+      texts,
+      images,
+      strokes,
+      selectedId: nextIds.size === 1 ? [...nextIds][0] : null,
+      selectedIds: nextIds,
+    });
+  },
+
+  bringSelectionToFront: () => {
+    const s = get();
+    const ids = s.selectedIds.size > 0
+      ? s.selectedIds
+      : s.selectedId ? new Set([s.selectedId]) : new Set<string>();
+    if (ids.size === 0) return;
+    s.pushHistory();
+    const moveLast = <T extends { id: string }>(items: T[]) => [
+      ...items.filter((item) => !ids.has(item.id)),
+      ...items.filter((item) => ids.has(item.id)),
+    ];
+    set({
+      cards: moveLast(s.cards),
+      texts: moveLast(s.texts),
+      images: moveLast(s.images),
+      strokes: moveLast(s.strokes),
+    });
+  },
+
+  sendSelectionToBack: () => {
+    const s = get();
+    const ids = s.selectedIds.size > 0
+      ? s.selectedIds
+      : s.selectedId ? new Set([s.selectedId]) : new Set<string>();
+    if (ids.size === 0) return;
+    s.pushHistory();
+    const moveFirst = <T extends { id: string }>(items: T[]) => [
+      ...items.filter((item) => ids.has(item.id)),
+      ...items.filter((item) => !ids.has(item.id)),
+    ];
+    set({
+      cards: moveFirst(s.cards),
+      texts: moveFirst(s.texts),
+      images: moveFirst(s.images),
+      strokes: moveFirst(s.strokes),
+    });
+  },
 
   addArrow: (from, to, sides) => {
     if (from === to) return;

@@ -9,6 +9,10 @@ import {
   Type,
   MoveUpRight,
   Eraser,
+  CopyPlus,
+  BringToFront,
+  SendToBack,
+  Trash2,
 } from "lucide-react";
 import { useRef } from "react";
 import clsx from "clsx";
@@ -30,7 +34,14 @@ export function CanvasToolbar() {
     setDrawColor,
     drawWidth,
     setDrawWidth,
+    selectedId,
+    selectedIds,
+    duplicateSelected,
+    bringSelectionToFront,
+    sendSelectionToBack,
+    removeSelected,
   } = useCanvasStore();
+  const selectionCount = selectedIds.size || (selectedId ? 1 : 0);
 
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -130,6 +141,23 @@ export function CanvasToolbar() {
         <Plus size={14} />
         <span className="text-[0.72rem]">Card</span>
       </Btn>
+      {selectionCount > 0 && (
+        <>
+          <Divider />
+          <Btn title="Duplicar seleção (Ctrl+D)" onClick={duplicateSelected}>
+            <CopyPlus size={14} />
+          </Btn>
+          <Btn title="Trazer para frente" onClick={bringSelectionToFront}>
+            <BringToFront size={14} />
+          </Btn>
+          <Btn title="Enviar para trás" onClick={sendSelectionToBack}>
+            <SendToBack size={14} />
+          </Btn>
+          <Btn title="Excluir seleção (Del)" onClick={removeSelected}>
+            <Trash2 size={14} />
+          </Btn>
+        </>
+      )}
       <Divider />
 
       {(tool === "draw" || tool === "text") && (

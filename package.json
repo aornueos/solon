@@ -13,6 +13,7 @@
     "brand:icon": "node scripts/generate-brand-icon.cjs",
     "brand:icons": "node scripts/generate-brand-icon.cjs && node scripts/generate-icons.cjs",
     "icons": "node scripts/generate-icons.cjs",
+    "release:prepare": "node scripts/release-prepare.cjs",
     "kill": "node scripts/kill-solon.cjs"
   },
   "dependencies": {

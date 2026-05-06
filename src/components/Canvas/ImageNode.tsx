@@ -11,6 +11,15 @@ interface Props {
   image: CanvasImage;
 }
 
+type ResizeDir = "nw" | "ne" | "se" | "sw";
+
+const RESIZE_HANDLES: { dir: ResizeDir; cursor: string }[] = [
+  { dir: "nw", cursor: "nwse-resize" },
+  { dir: "ne", cursor: "nesw-resize" },
+  { dir: "se", cursor: "nwse-resize" },
+  { dir: "sw", cursor: "nesw-resize" },
+];
+
 export function ImageNode({ image }: Props) {
   const {
     updateImage,
@@ -149,26 +158,38 @@ export function ImageNode({ image }: Props) {
     });
   };
 
-  const onResizeDown = (e: React.MouseEvent) => {
+  const onResizeDown = (dir: ResizeDir, e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     pushHistory();
     const startX = e.clientX;
+    const startY = e.clientY;
+    const origX = image.x;
+    const origY = image.y;
     const origW = image.w;
     const origH = image.h;
     const aspect = origW / origH;
     startDrag({
       onMove: (ev) => {
-        const dw = (ev.clientX - startX) / viewport.zoom;
+        const dx = (ev.clientX - startX) / viewport.zoom;
+        const dy = (ev.clientY - startY) / viewport.zoom;
+        const signX = dir.includes("e") ? 1 : -1;
+        const signY = dir.includes("s") ? 1 : -1;
         // Mantém aspect ratio
-        const dh = dw / aspect;
+        const delta = Math.abs(dx) > Math.abs(dy) * aspect
+          ? signX * dx
+          : signY * dy * aspect;
+        const w = Math.max(40, origW + delta);
+        const h = Math.max(40, w / aspect);
         updateImage(image.id, {
-          w: Math.max(40, origW + dw),
-          h: Math.max(40, origH + dh),
+          x: dir.includes("w") ? origX + origW - w : origX,
+          y: dir.includes("n") ? origY + origH - h : origY,
+          w,
+          h,
         });
       },
       onCancel: () => {
-        updateImage(image.id, { w: origW, h: origH });
+        updateImage(image.id, { x: origX, y: origY, w: origW, h: origH });
       },
     });
   };
@@ -264,7 +285,7 @@ export function ImageNode({ image }: Props) {
       {isSelected && (
         <div
           data-image-action
-          onMouseDown={onResizeDown}
+          onMouseDown={(e) => onResizeDown("se", e)}
           className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize"
           style={{
             // Hachura diagonal usando a cor accent — stripes alternados
@@ -275,6 +296,46 @@ export function ImageNode({ image }: Props) {
           }}
         />
       )}
+      {isSelected &&
+        RESIZE_HANDLES.filter((handle) => handle.dir !== "se").map((handle) => (
+          <ImageResizeHandle
+            key={handle.dir}
+            dir={handle.dir}
+            cursor={handle.cursor}
+            zoom={viewport.zoom}
+            onMouseDown={(e) => onResizeDown(handle.dir, e)}
+          />
+        ))}
     </div>
   );
+}
+
+function ImageResizeHandle({
+  dir,
+  cursor,
+  zoom,
+  onMouseDown,
+}: {
+  dir: ResizeDir;
+  cursor: string;
+  zoom: number;
+  onMouseDown: (e: React.MouseEvent) => void;
+}) {
+  const size = 9 / zoom;
+  const half = size / 2;
+  const style: React.CSSProperties = {
+    position: "absolute",
+    width: size,
+    height: size,
+    borderRadius: 999,
+    background: "var(--accent)",
+    border: `${1 / zoom}px solid var(--bg-panel)`,
+    boxShadow: "var(--shadow-sm)",
+    cursor,
+  };
+  if (dir.includes("n")) style.top = -half;
+  if (dir.includes("s")) style.bottom = -half;
+  if (dir.includes("w")) style.left = -half;
+  if (dir.includes("e")) style.right = -half;
+  return <div data-image-action onMouseDown={onMouseDown} style={style} />;
 }
