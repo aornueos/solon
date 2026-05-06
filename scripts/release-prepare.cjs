@@ -1,4 +1,4 @@
-const { execFileSync } = require("node:child_process");
+const { execFileSync, execSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -13,6 +13,15 @@ function run(cmd, args, opts = {}) {
     stdio: "inherit",
     shell: false,
     ...opts,
+  });
+}
+
+function runShell(command) {
+  console.log(`\n[release:prepare] ${command}`);
+  execSync(command, {
+    cwd: ROOT,
+    stdio: "inherit",
+    shell: true,
   });
 }
 
@@ -33,6 +42,11 @@ const pkg = readJson("package.json");
 const tauri = readJson(path.join("src-tauri", "tauri.conf.json"));
 const tag = `v${pkg.version}`;
 
+const branch = output("git", ["branch", "--show-current"]);
+if (branch !== "main") {
+  throw new Error(`Release deve sair da branch main. Branch atual: ${branch || "(desconhecida)"}.`);
+}
+
 if (pkg.version !== tauri.version) {
   throw new Error(
     `Versoes desalinhadas: package.json=${pkg.version}, tauri.conf.json=${tauri.version}`,
@@ -49,9 +63,44 @@ if (tags) {
   throw new Error(`Tag ${tag} ja existe. Rode npm run version:set patch antes.`);
 }
 
+const remoteTag = output("git", ["ls-remote", "--tags", "origin", tag]);
+if (remoteTag) {
+  throw new Error(`Tag ${tag} ja existe no origin. Bumpe a versao antes de publicar.`);
+}
+
+const updater = tauri.plugins?.updater;
+if (!updater?.active) {
+  throw new Error("Updater esta inativo em src-tauri/tauri.conf.json.");
+}
+if (!Array.isArray(updater.endpoints) || updater.endpoints.length === 0) {
+  throw new Error("Updater sem endpoint em src-tauri/tauri.conf.json.");
+}
+if (!updater.endpoints.some((endpoint) => endpoint.endsWith("/latest/download/latest.json"))) {
+  throw new Error("Endpoint do updater nao aponta para releases/latest/download/latest.json.");
+}
+if (!updater.pubkey || updater.pubkey.length < 40) {
+  throw new Error("Updater pubkey ausente ou curta demais em src-tauri/tauri.conf.json.");
+}
+
+const releaseWorkflowPath = path.join(ROOT, ".github", "workflows", "release.yml");
+if (!fs.existsSync(releaseWorkflowPath)) {
+  throw new Error("Workflow .github/workflows/release.yml nao existe.");
+}
+const releaseWorkflow = fs.readFileSync(releaseWorkflowPath, "utf8");
+if (!releaseWorkflow.includes("includeUpdaterJson: true")) {
+  throw new Error("Workflow de release precisa conter includeUpdaterJson: true.");
+}
+if (!releaseWorkflow.includes("TAURI_SIGNING_PRIVATE_KEY")) {
+  throw new Error("Workflow de release nao referencia TAURI_SIGNING_PRIVATE_KEY.");
+}
+
 run("node", [path.join("scripts", "generate-brand-icon.cjs")]);
 run("node", [path.join("scripts", "generate-icons.cjs")]);
-run(NPM, ["run", "build"], process.platform === "win32" ? { shell: true } : {});
+if (process.platform === "win32") {
+  runShell(`${NPM} run build`);
+} else {
+  run(NPM, ["run", "build"]);
+}
 
 const status = output("git", ["status", "--short"]);
 const forbidden = status

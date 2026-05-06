@@ -14,6 +14,7 @@ type SpellMeta = { decorations: Decoration[] };
 const spellcheckKey = new PluginKey<DecorationSet>("solon-spellcheck");
 const WORD_RE = /[\p{L}\p{M}]{2,}/gu;
 const MAX_UNIQUE_WORDS = 2500;
+const MAX_WORD_RANGES = 6000;
 
 export const SpellcheckExtension = Extension.create({
   name: "solonSpellcheck",
@@ -43,6 +44,7 @@ export const SpellcheckExtension = Extension.create({
           let destroyed = false;
           let sequence = 0;
           let lastEnabled = useAppStore.getState().spellcheckEnabled;
+          const wordCache = new Map<string, boolean>();
 
           const dispatchDecorations = (decorations: Decoration[]) => {
             if (destroyed) return;
@@ -62,11 +64,15 @@ export const SpellcheckExtension = Extension.create({
             ensureSpellchecker();
             const ranges = collectWordRanges(editorView);
             const words = Array.from(new Set(ranges.map((r) => r.normalized)));
-            const checks = await checkWords(words);
+            const uncheckedWords = words.filter((word) => !wordCache.has(word));
+            if (uncheckedWords.length > 0) {
+              const checks = await checkWords(uncheckedWords);
+              for (const [word, ok] of checks) wordCache.set(word, ok);
+            }
             if (destroyed || currentSequence !== sequence) return;
 
             const decorations = ranges
-              .filter((range) => checks.get(range.normalized) === false)
+              .filter((range) => wordCache.get(range.normalized) === false)
               .map((range) =>
                 Decoration.inline(range.from, range.to, {
                   class: "solon-spell-error",
@@ -80,7 +86,7 @@ export const SpellcheckExtension = Extension.create({
             timeout = window.setTimeout(() => {
               timeout = null;
               void run(editorView);
-            }, 450);
+            }, 600);
           };
 
           const unsubscribe = useAppStore.subscribe((state) => {
@@ -88,7 +94,10 @@ export const SpellcheckExtension = Extension.create({
             lastEnabled = state.spellcheckEnabled;
             schedule(view);
           });
-          const onPersonalDictChanged = () => schedule(view);
+          const onPersonalDictChanged = () => {
+            wordCache.clear();
+            schedule(view);
+          };
           window.addEventListener(
             "solon:spellcheck-dict-changed",
             onPersonalDictChanged,
@@ -127,10 +136,12 @@ function collectWordRanges(view: EditorView): {
   const selectionTo = view.state.selection.to;
 
   view.state.doc.descendants((node, pos) => {
+    if (ranges.length >= MAX_WORD_RANGES) return false;
     if (!node.isText || !node.text) return;
     WORD_RE.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = WORD_RE.exec(node.text))) {
+      if (ranges.length >= MAX_WORD_RANGES) break;
       const word = match[0];
       const from = pos + match.index;
       const to = from + word.length;

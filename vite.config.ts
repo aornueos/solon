@@ -16,6 +16,33 @@ const pkg = JSON.parse(
 export default defineConfig(async () => ({
   plugins: [react()],
   clearScreen: false,
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/@tiptap") || id.includes("node_modules/prosemirror")) {
+            return "editor";
+          }
+          if (
+            id.includes("node_modules/marked") ||
+            id.includes("node_modules/dompurify") ||
+            id.includes("node_modules/turndown")
+          ) {
+            return "markdown";
+          }
+          if (id.includes("node_modules/@tauri-apps")) {
+            return "tauri";
+          }
+          if (id.includes("node_modules/lucide-react")) {
+            return "icons";
+          }
+          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom")) {
+            return "react";
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 4100,
     strictPort: false,
