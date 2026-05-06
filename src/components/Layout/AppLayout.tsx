@@ -1,20 +1,30 @@
-import { useCallback } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { Sidebar } from "../Sidebar/Sidebar";
-import { Editor } from "../Editor/Editor";
 import { Outline } from "../Outline/Outline";
 import { Inspector } from "../Inspector/Inspector";
-import { CanvasView } from "../Canvas/CanvasView";
-import { HomePage } from "../HomePage/HomePage";
 import { Titlebar } from "./Titlebar";
 import { StatusBar } from "./StatusBar";
 import { ToastLayer } from "./ToastLayer";
 import { DialogLayer } from "./DialogLayer";
 import { UpdateNotesDialog } from "./UpdateNotesDialog";
 import { SettingsDialog } from "./SettingsDialog";
+import { CommandPalette } from "./CommandPalette";
+import { GlobalSearchDialog } from "./GlobalSearchDialog";
+import { LocalHistoryDialog } from "./LocalHistoryDialog";
 import { ContextMenuLayer } from "./ContextMenuLayer";
 import { ContextMenuProvider } from "./ContextMenuProvider";
 import { startDrag } from "../../lib/drag";
+
+const Editor = lazy(() =>
+  import("../Editor/Editor").then((m) => ({ default: m.Editor })),
+);
+const CanvasView = lazy(() =>
+  import("../Canvas/CanvasView").then((m) => ({ default: m.CanvasView })),
+);
+const HomePage = lazy(() =>
+  import("../HomePage/HomePage").then((m) => ({ default: m.HomePage })),
+);
 
 export function AppLayout() {
   // Seletores granulares evitam re-render do AppLayout a cada keystroke
@@ -95,7 +105,9 @@ export function AppLayout() {
           className="flex-1 min-w-0 overflow-hidden"
           style={{ background: "var(--bg-app)" }}
         >
-          {inHome ? <HomePage /> : inCanvas ? <CanvasView /> : <Editor />}
+          <Suspense fallback={<ViewLoading />}>
+            {inHome ? <HomePage /> : inCanvas ? <CanvasView /> : <Editor />}
+          </Suspense>
         </div>
 
         {/* Painel direito: Inspector e/ou Outline */}
@@ -135,10 +147,24 @@ export function AppLayout() {
       <StatusBar />
       <ToastLayer />
       <DialogLayer />
+      <CommandPalette />
+      <GlobalSearchDialog />
+      <LocalHistoryDialog />
       <UpdateNotesDialog />
       <SettingsDialog />
       <ContextMenuLayer />
       <ContextMenuProvider />
+    </div>
+  );
+}
+
+function ViewLoading() {
+  return (
+    <div
+      className="h-full w-full flex items-center justify-center text-[0.78rem]"
+      style={{ color: "var(--text-muted)", background: "var(--bg-app)" }}
+    >
+      Carregando...
     </div>
   );
 }

@@ -17,7 +17,18 @@ import {
 import { useRef } from "react";
 import clsx from "clsx";
 import { useCanvasStore } from "../../store/useCanvasStore";
-import { DRAW_COLORS } from "../../types/canvas";
+import { CANVAS_TOOL_ORDER, CanvasTool, DRAW_COLORS } from "../../types/canvas";
+
+const TOOL_META: Record<
+  CanvasTool,
+  { title: string; icon: React.ReactNode }
+> = {
+  select: { title: "Selecionar", icon: <MousePointer2 size={13} /> },
+  arrow: { title: "Seta", icon: <MoveUpRight size={13} /> },
+  draw: { title: "Desenhar", icon: <Pencil size={13} /> },
+  text: { title: "Texto", icon: <Type size={13} /> },
+  eraser: { title: "Borracha", icon: <Eraser size={13} /> },
+};
 
 export function CanvasToolbar() {
   const {
@@ -101,41 +112,25 @@ export function CanvasToolbar() {
         border: "1px solid var(--border)",
       }}
     >
-      <ToolBtn
-        title="Selecionar (V)"
-        active={tool === "select"}
-        onClick={() => setTool("select")}
-      >
-        <MousePointer2 size={13} />
-      </ToolBtn>
-      <ToolBtn
-        title="Desenhar (P)"
-        active={tool === "draw"}
-        onClick={() => setTool("draw")}
-      >
-        <Pencil size={13} />
-      </ToolBtn>
-      <ToolBtn
-        title="Texto (T)"
-        active={tool === "text"}
-        onClick={() => setTool("text")}
-      >
-        <Type size={13} />
-      </ToolBtn>
-      <ToolBtn
-        title="Seta (A) — clique em 2 cards para conectar"
-        active={tool === "arrow"}
-        onClick={() => setTool("arrow")}
-      >
-        <MoveUpRight size={13} />
-      </ToolBtn>
-      <ToolBtn
-        title="Borracha (E) — clique em qualquer item para apagar"
-        active={tool === "eraser"}
-        onClick={() => setTool("eraser")}
-      >
-        <Eraser size={13} />
-      </ToolBtn>
+      {CANVAS_TOOL_ORDER.map((canvasTool, index) => {
+        const meta = TOOL_META[canvasTool];
+        const extra =
+          canvasTool === "arrow"
+            ? " - clique em 2 itens para conectar"
+            : canvasTool === "eraser"
+              ? " - clique em qualquer item para apagar"
+              : "";
+        return (
+          <ToolBtn
+            key={canvasTool}
+            title={`${index + 1}. ${meta.title}${extra}`}
+            active={tool === canvasTool}
+            onClick={() => setTool(canvasTool)}
+          >
+            {meta.icon}
+          </ToolBtn>
+        );
+      })}
       <Divider />
       <Btn title="Novo card (N)" onClick={() => addCard()}>
         <Plus size={14} />
@@ -172,6 +167,7 @@ export function CanvasToolbar() {
                 <button
                   key={c.value || "auto"}
                   title={c.label}
+                  aria-label={`Cor ${c.label}`}
                   onClick={() => setDrawColor(c.value)}
                   style={{
                     background:
@@ -197,6 +193,7 @@ export function CanvasToolbar() {
                   <button
                     key={w}
                     title={`Espessura ${w}px`}
+                    aria-label={`Espessura ${w}px`}
                     onClick={() => setDrawWidth(w)}
                     className={clsx(
                       "rounded-full transition-opacity",
@@ -255,6 +252,7 @@ function Btn({
     <button
       onClick={onClick}
       title={title}
+      aria-label={title}
       className="flex items-center gap-1 px-2 py-1 rounded-full transition-colors"
       style={{ color: "var(--text-secondary)" }}
       onMouseEnter={(e) => {
@@ -284,6 +282,8 @@ function ToolBtn({
     <button
       onClick={onClick}
       title={title}
+      aria-label={title}
+      aria-pressed={active}
       className="flex items-center gap-1 px-2 py-1 rounded-full transition-colors"
       style={{
         background: active ? "var(--bg-inverse)" : "transparent",

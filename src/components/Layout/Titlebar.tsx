@@ -17,7 +17,6 @@ import {
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAppStore } from "../../store/useAppStore";
 import { SCENE_STATUSES } from "../../types/scene";
-import { SolonLogo } from "../Brand/SolonLogo";
 import clsx from "clsx";
 
 /**
@@ -131,13 +130,15 @@ export function Titlebar() {
           onClick={() => setActiveView("home")}
           onMouseDown={(e) => e.stopPropagation()}
           title="Início"
-          className="transition-opacity hover:opacity-70"
+          aria-label="Inicio"
+          className="font-serif font-bold text-[0.95rem] transition-opacity hover:opacity-70"
           style={{
             background: "transparent",
+            color: "var(--text-primary)",
             opacity: activeView === "home" ? 0.6 : 1,
           }}
         >
-          <SolonLogo muted={activeView === "home"} />
+          Solon
         </button>
         {activeFileName && (
           <>
@@ -149,6 +150,7 @@ export function Titlebar() {
               onClick={() => setActiveView("editor")}
               onMouseDown={(e) => e.stopPropagation()}
               title="Ir para o editor"
+              aria-label="Ir para o editor"
               className="text-[0.78rem] truncate max-w-[240px] transition-opacity hover:opacity-70"
               style={{
                 color: "var(--text-secondary)",
@@ -217,7 +219,7 @@ export function Titlebar() {
         <IconBtn
           onClick={toggleInspector}
           active={isInspectorOpen}
-          title="Inspector — Cena (Ctrl+K)"
+          title="Inspector - Cena (Ctrl+Alt+I)"
         >
           <Info size={14} />
         </IconBtn>
@@ -309,6 +311,7 @@ function WindowBtn({
     <button
       onClick={onClick}
       title={title}
+      aria-label={title}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="flex items-center justify-center transition-colors"
@@ -338,6 +341,8 @@ function ViewTab({
     <button
       onClick={onClick}
       title={title}
+      aria-label={title}
+      aria-pressed={active}
       className={clsx(
         "flex items-center gap-1 px-2 py-1 rounded transition-colors",
       )}
@@ -371,6 +376,8 @@ function IconBtn({
     <button
       onClick={onClick}
       title={title}
+      aria-label={title}
+      aria-pressed={active}
       className="p-1.5 rounded transition-colors"
       style={{
         color: active ? "var(--text-secondary)" : "var(--text-placeholder)",

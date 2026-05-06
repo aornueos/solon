@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { SceneMeta } from "../types/scene";
+import type { CanvasTool } from "../types/canvas";
 import type { SidebarOrder } from "../lib/sidebarOrder";
 
 export interface FileNode {
@@ -163,6 +164,10 @@ interface AppState {
   updateStatus: UpdateStatus;
   /** Dialog de release notes — quando true, AppLayout monta UpdateNotesDialog. */
   showUpdateDialog: boolean;
+  /** Dialog de busca global no projeto. */
+  showGlobalSearch: boolean;
+  /** Dialog de historico local do arquivo ativo. */
+  showLocalHistory: boolean;
   /** Estado do auto-save — usado pela StatusBar pra dar feedback discreto.
    *  `dirty`: ha alteracoes no buffer que ainda nao foram persistidas.
    *  `saving`: write em andamento.
@@ -188,6 +193,8 @@ interface AppState {
   autoCheckUpdates: boolean;
   /** Visibilidade do dialog de preferencias. */
   showSettings: boolean;
+  /** Paleta de comandos rapida (Ctrl+K). */
+  showCommandPalette: boolean;
   /** Context menu ativo (custom, substitui o nativo do WebView). */
   activeContextMenu: ActiveContextMenu | null;
   /** Liga/desliga spellcheck visual (red underlines) no editor. */
@@ -196,6 +203,31 @@ interface AppState {
    *  da linha — escritor pode preferir mais estreito (560-680, classico
    *  livro) ou mais ar (820-1000). Default 680 e' o sweet spot pt-BR. */
   editorMaxWidth: number;
+  /** Espacamento vertical do texto do editor. Mantem o layout editorial,
+   *  mas deixa o escritor escolher entre denso e confortavel. */
+  editorLineHeight: "compact" | "normal" | "relaxed";
+  /** Espaco entre paragrafos do texto. Separado de line-height para
+   *  permitir texto denso sem perder respiro entre blocos. */
+  editorParagraphSpacing: "tight" | "normal" | "airy";
+  /** Tamanho do recuo aplicado por Tab em paragrafos. */
+  editorIndentSize: "small" | "normal" | "large";
+  /** Mostra contadores e formato na StatusBar. */
+  showStatusStats: boolean;
+  /** Mostra caminho completo do arquivo na StatusBar. */
+  showStatusPath: boolean;
+  /** Preferencias do canvas. */
+  canvasGridEnabled: boolean;
+  canvasSnapToGrid: boolean;
+  canvasGridSize: number;
+  canvasDefaultTool: CanvasTool;
+  canvasDefaultTextSize: number;
+  canvasDefaultDrawWidth: number;
+  canvasDefaultColor: string;
+  /** Snapshots locais antes de sobrescrever notas. */
+  localHistoryEnabled: boolean;
+  /** Comportamentos de conveniencia. */
+  openLastFileOnStartup: boolean;
+  autoExpandMovedFolders: boolean;
   /** View pra qual o app abre no boot. Default 'home' (landing). User
    *  que abre o app varias vezes ao dia pode preferir 'editor' direto. */
   startView: "home" | "editor" | "canvas";
@@ -230,15 +262,36 @@ interface AppState {
   setUpdateProgress: (progress: number) => void;
   openUpdateDialog: () => void;
   closeUpdateDialog: () => void;
+  openGlobalSearch: () => void;
+  closeGlobalSearch: () => void;
+  openLocalHistory: () => void;
+  closeLocalHistory: () => void;
   setSaveStatus: (s: AppState["saveStatus"]) => void;
   setProjectStats: (s: { wordCount: number; fileCount: number } | null) => void;
   setEditorZoom: (zoom: number) => void;
   setAutoSaveEnabled: (v: boolean) => void;
   setAutoCheckUpdates: (v: boolean) => void;
   setEditorMaxWidth: (w: number) => void;
+  setEditorLineHeight: (v: "compact" | "normal" | "relaxed") => void;
+  setEditorParagraphSpacing: (v: "tight" | "normal" | "airy") => void;
+  setEditorIndentSize: (v: "small" | "normal" | "large") => void;
+  setShowStatusStats: (v: boolean) => void;
+  setShowStatusPath: (v: boolean) => void;
+  setCanvasGridEnabled: (v: boolean) => void;
+  setCanvasSnapToGrid: (v: boolean) => void;
+  setCanvasGridSize: (v: number) => void;
+  setCanvasDefaultTool: (v: CanvasTool) => void;
+  setCanvasDefaultTextSize: (v: number) => void;
+  setCanvasDefaultDrawWidth: (v: number) => void;
+  setCanvasDefaultColor: (v: string) => void;
+  setLocalHistoryEnabled: (v: boolean) => void;
+  setOpenLastFileOnStartup: (v: boolean) => void;
+  setAutoExpandMovedFolders: (v: boolean) => void;
   setStartView: (v: "home" | "editor" | "canvas") => void;
   openSettings: () => void;
   closeSettings: () => void;
+  openCommandPalette: () => void;
+  closeCommandPalette: () => void;
   /** Reset de todas as preferencias pro default (zoom 100%, theme light,
    *  auto-save on, etc). Usado pelo botao "Restaurar padroes". */
   resetSettings: () => void;
@@ -269,16 +322,138 @@ const DEFAULT_AUTO_SAVE = true;
 const DEFAULT_AUTO_CHECK_UPDATES = true;
 const DEFAULT_SPELLCHECK = true;
 const DEFAULT_EDITOR_MAX_WIDTH = 680;
+const DEFAULT_EDITOR_LINE_HEIGHT: "compact" | "normal" | "relaxed" = "normal";
+const DEFAULT_EDITOR_PARAGRAPH_SPACING: "tight" | "normal" | "airy" = "normal";
+const DEFAULT_EDITOR_INDENT_SIZE: "small" | "normal" | "large" = "normal";
+const DEFAULT_SHOW_STATUS_STATS = true;
+const DEFAULT_SHOW_STATUS_PATH = true;
+const DEFAULT_CANVAS_GRID_ENABLED = true;
+const DEFAULT_CANVAS_SNAP_TO_GRID = false;
+const DEFAULT_CANVAS_GRID_SIZE = 24;
+const DEFAULT_CANVAS_TOOL: CanvasTool = "select";
+const DEFAULT_CANVAS_TEXT_SIZE = 18;
+const DEFAULT_CANVAS_DRAW_WIDTH = 2;
+const DEFAULT_CANVAS_COLOR = "";
+const DEFAULT_LOCAL_HISTORY_ENABLED = true;
+const DEFAULT_OPEN_LAST_FILE_ON_STARTUP = true;
+const DEFAULT_AUTO_EXPAND_MOVED_FOLDERS = true;
 const DEFAULT_START_VIEW: "home" | "editor" | "canvas" = "home";
 const EDITOR_ZOOM_KEY = "solon:editorZoom";
 const AUTO_SAVE_KEY = "solon:autoSave";
 const AUTO_CHECK_UPDATES_KEY = "solon:autoCheckUpdates";
 const SPELLCHECK_KEY = "solon:spellcheck";
 const EDITOR_MAX_WIDTH_KEY = "solon:editorMaxWidth";
+const EDITOR_LINE_HEIGHT_KEY = "solon:editorLineHeight";
+const EDITOR_PARAGRAPH_SPACING_KEY = "solon:editorParagraphSpacing";
+const EDITOR_INDENT_SIZE_KEY = "solon:editorIndentSize";
+const SHOW_STATUS_STATS_KEY = "solon:showStatusStats";
+const SHOW_STATUS_PATH_KEY = "solon:showStatusPath";
+const CANVAS_GRID_ENABLED_KEY = "solon:canvasGridEnabled";
+const CANVAS_SNAP_TO_GRID_KEY = "solon:canvasSnapToGrid";
+const CANVAS_GRID_SIZE_KEY = "solon:canvasGridSize";
+const CANVAS_DEFAULT_TOOL_KEY = "solon:canvasDefaultTool";
+const CANVAS_DEFAULT_TEXT_SIZE_KEY = "solon:canvasDefaultTextSize";
+const CANVAS_DEFAULT_DRAW_WIDTH_KEY = "solon:canvasDefaultDrawWidth";
+const CANVAS_DEFAULT_COLOR_KEY = "solon:canvasDefaultColor";
+const LOCAL_HISTORY_ENABLED_KEY = "solon:localHistoryEnabled";
+const OPEN_LAST_FILE_ON_STARTUP_KEY = "solon:openLastFileOnStartup";
+const AUTO_EXPAND_MOVED_FOLDERS_KEY = "solon:autoExpandMovedFolders";
 const START_VIEW_KEY = "solon:startView";
 
 /** Larguras suportadas pra coluna do editor (em px). */
 export const EDITOR_MAX_WIDTHS = [560, 680, 820, 1000] as const;
+export const EDITOR_LINE_HEIGHTS = [
+  { value: "compact", label: "Compacto", css: 1.38 },
+  { value: "normal", label: "Normal", css: 1.5 },
+  { value: "relaxed", label: "Conforto", css: 1.65 },
+] as const;
+
+export type EditorLineHeight = (typeof EDITOR_LINE_HEIGHTS)[number]["value"];
+
+export const EDITOR_PARAGRAPH_SPACING = [
+  { value: "tight", label: "Justo", css: "0.22em" },
+  { value: "normal", label: "Normal", css: "0.4em" },
+  { value: "airy", label: "Aberto", css: "0.72em" },
+] as const;
+
+export type EditorParagraphSpacing =
+  (typeof EDITOR_PARAGRAPH_SPACING)[number]["value"];
+
+export const EDITOR_INDENT_SIZES = [
+  { value: "small", label: "Discreto", css: "1.25em" },
+  { value: "normal", label: "Padrão", css: "2em" },
+  { value: "large", label: "Amplo", css: "2.75em" },
+] as const;
+
+export type EditorIndentSize = (typeof EDITOR_INDENT_SIZES)[number]["value"];
+
+export const CANVAS_GRID_SIZES = [16, 24, 32, 48] as const;
+export const CANVAS_TEXT_SIZES = [14, 18, 24, 32] as const;
+export const CANVAS_DRAW_WIDTHS = [1.5, 2, 3, 6] as const;
+export const CANVAS_DEFAULT_TOOLS: CanvasTool[] = [
+  "select",
+  "arrow",
+  "draw",
+  "text",
+  "eraser",
+];
+
+function loadEditorLineHeight(): EditorLineHeight {
+  try {
+    const v = localStorage.getItem(EDITOR_LINE_HEIGHT_KEY);
+    if (v === "compact" || v === "normal" || v === "relaxed") return v;
+  } catch {}
+  return DEFAULT_EDITOR_LINE_HEIGHT;
+}
+
+function loadEditorParagraphSpacing(): EditorParagraphSpacing {
+  try {
+    const v = localStorage.getItem(EDITOR_PARAGRAPH_SPACING_KEY);
+    if (v === "tight" || v === "normal" || v === "airy") return v;
+  } catch {}
+  return DEFAULT_EDITOR_PARAGRAPH_SPACING;
+}
+
+function loadEditorIndentSize(): EditorIndentSize {
+  try {
+    const v = localStorage.getItem(EDITOR_INDENT_SIZE_KEY);
+    if (v === "small" || v === "normal" || v === "large") return v;
+  } catch {}
+  return DEFAULT_EDITOR_INDENT_SIZE;
+}
+
+function loadNumberOption<T extends readonly number[]>(
+  key: string,
+  values: T,
+  fallback: T[number],
+): T[number] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const n = Number(raw);
+    return (values as readonly number[]).includes(n) ? (n as T[number]) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function loadCanvasTool(): CanvasTool {
+  try {
+    const v = localStorage.getItem(CANVAS_DEFAULT_TOOL_KEY) as CanvasTool | null;
+    if (v && CANVAS_DEFAULT_TOOLS.includes(v)) return v;
+  } catch {}
+  return DEFAULT_CANVAS_TOOL;
+}
+
+function loadStringPref(key: string, fallback: string): string {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v;
+  } catch {
+    return fallback;
+  }
+}
+
 function loadEditorMaxWidth(): number {
   try {
     const v = localStorage.getItem(EDITOR_MAX_WIDTH_KEY);
@@ -352,6 +527,8 @@ export const useAppStore = create<AppState>((set) => ({
   activeDialog: null,
   updateStatus: { kind: "idle" },
   showUpdateDialog: false,
+  showGlobalSearch: false,
+  showLocalHistory: false,
   saveStatus: "idle",
   lastSavedAt: null,
   projectStats: null,
@@ -359,9 +536,46 @@ export const useAppStore = create<AppState>((set) => ({
   autoSaveEnabled: loadBoolPref(AUTO_SAVE_KEY, DEFAULT_AUTO_SAVE),
   autoCheckUpdates: loadBoolPref(AUTO_CHECK_UPDATES_KEY, DEFAULT_AUTO_CHECK_UPDATES),
   showSettings: false,
+  showCommandPalette: false,
   activeContextMenu: null,
   spellcheckEnabled: loadBoolPref(SPELLCHECK_KEY, DEFAULT_SPELLCHECK),
   editorMaxWidth: loadEditorMaxWidth(),
+  editorLineHeight: loadEditorLineHeight(),
+  editorParagraphSpacing: loadEditorParagraphSpacing(),
+  editorIndentSize: loadEditorIndentSize(),
+  showStatusStats: loadBoolPref(SHOW_STATUS_STATS_KEY, DEFAULT_SHOW_STATUS_STATS),
+  showStatusPath: loadBoolPref(SHOW_STATUS_PATH_KEY, DEFAULT_SHOW_STATUS_PATH),
+  canvasGridEnabled: loadBoolPref(CANVAS_GRID_ENABLED_KEY, DEFAULT_CANVAS_GRID_ENABLED),
+  canvasSnapToGrid: loadBoolPref(CANVAS_SNAP_TO_GRID_KEY, DEFAULT_CANVAS_SNAP_TO_GRID),
+  canvasGridSize: loadNumberOption(
+    CANVAS_GRID_SIZE_KEY,
+    CANVAS_GRID_SIZES,
+    DEFAULT_CANVAS_GRID_SIZE,
+  ),
+  canvasDefaultTool: loadCanvasTool(),
+  canvasDefaultTextSize: loadNumberOption(
+    CANVAS_DEFAULT_TEXT_SIZE_KEY,
+    CANVAS_TEXT_SIZES,
+    DEFAULT_CANVAS_TEXT_SIZE,
+  ),
+  canvasDefaultDrawWidth: loadNumberOption(
+    CANVAS_DEFAULT_DRAW_WIDTH_KEY,
+    CANVAS_DRAW_WIDTHS,
+    DEFAULT_CANVAS_DRAW_WIDTH,
+  ),
+  canvasDefaultColor: loadStringPref(CANVAS_DEFAULT_COLOR_KEY, DEFAULT_CANVAS_COLOR),
+  localHistoryEnabled: loadBoolPref(
+    LOCAL_HISTORY_ENABLED_KEY,
+    DEFAULT_LOCAL_HISTORY_ENABLED,
+  ),
+  openLastFileOnStartup: loadBoolPref(
+    OPEN_LAST_FILE_ON_STARTUP_KEY,
+    DEFAULT_OPEN_LAST_FILE_ON_STARTUP,
+  ),
+  autoExpandMovedFolders: loadBoolPref(
+    AUTO_EXPAND_MOVED_FOLDERS_KEY,
+    DEFAULT_AUTO_EXPAND_MOVED_FOLDERS,
+  ),
   startView: loadStartView(),
 
   setActiveFile: (path, name, body, meta) => {
@@ -505,6 +719,10 @@ export const useAppStore = create<AppState>((set) => ({
 
   openUpdateDialog: () => set({ showUpdateDialog: true }),
   closeUpdateDialog: () => set({ showUpdateDialog: false }),
+  openGlobalSearch: () => set({ showGlobalSearch: true }),
+  closeGlobalSearch: () => set({ showGlobalSearch: false }),
+  openLocalHistory: () => set({ showLocalHistory: true }),
+  closeLocalHistory: () => set({ showLocalHistory: false }),
 
   setSaveStatus: (s) =>
     set((curr) => ({
@@ -546,7 +764,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   openSettings: () => set({ showSettings: true }),
   closeSettings: () => set({ showSettings: false }),
-
+  openCommandPalette: () => set({ showCommandPalette: true }),
+  closeCommandPalette: () => set({ showCommandPalette: false }),
   resetSettings: () => {
     // Apaga todas as chaves de pref do localStorage e reseta o state pros
     // defaults. Theme nao entra aqui — e' uma pref "vivendo" no proprio
@@ -557,6 +776,21 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.removeItem(AUTO_CHECK_UPDATES_KEY);
       localStorage.removeItem(SPELLCHECK_KEY);
       localStorage.removeItem(EDITOR_MAX_WIDTH_KEY);
+      localStorage.removeItem(EDITOR_LINE_HEIGHT_KEY);
+      localStorage.removeItem(EDITOR_PARAGRAPH_SPACING_KEY);
+      localStorage.removeItem(EDITOR_INDENT_SIZE_KEY);
+      localStorage.removeItem(SHOW_STATUS_STATS_KEY);
+      localStorage.removeItem(SHOW_STATUS_PATH_KEY);
+      localStorage.removeItem(CANVAS_GRID_ENABLED_KEY);
+      localStorage.removeItem(CANVAS_SNAP_TO_GRID_KEY);
+      localStorage.removeItem(CANVAS_GRID_SIZE_KEY);
+      localStorage.removeItem(CANVAS_DEFAULT_TOOL_KEY);
+      localStorage.removeItem(CANVAS_DEFAULT_TEXT_SIZE_KEY);
+      localStorage.removeItem(CANVAS_DEFAULT_DRAW_WIDTH_KEY);
+      localStorage.removeItem(CANVAS_DEFAULT_COLOR_KEY);
+      localStorage.removeItem(LOCAL_HISTORY_ENABLED_KEY);
+      localStorage.removeItem(OPEN_LAST_FILE_ON_STARTUP_KEY);
+      localStorage.removeItem(AUTO_EXPAND_MOVED_FOLDERS_KEY);
       localStorage.removeItem(START_VIEW_KEY);
     } catch {
       /* ignora */
@@ -567,6 +801,21 @@ export const useAppStore = create<AppState>((set) => ({
       autoCheckUpdates: DEFAULT_AUTO_CHECK_UPDATES,
       spellcheckEnabled: DEFAULT_SPELLCHECK,
       editorMaxWidth: DEFAULT_EDITOR_MAX_WIDTH,
+      editorLineHeight: DEFAULT_EDITOR_LINE_HEIGHT,
+      editorParagraphSpacing: DEFAULT_EDITOR_PARAGRAPH_SPACING,
+      editorIndentSize: DEFAULT_EDITOR_INDENT_SIZE,
+      showStatusStats: DEFAULT_SHOW_STATUS_STATS,
+      showStatusPath: DEFAULT_SHOW_STATUS_PATH,
+      canvasGridEnabled: DEFAULT_CANVAS_GRID_ENABLED,
+      canvasSnapToGrid: DEFAULT_CANVAS_SNAP_TO_GRID,
+      canvasGridSize: DEFAULT_CANVAS_GRID_SIZE,
+      canvasDefaultTool: DEFAULT_CANVAS_TOOL,
+      canvasDefaultTextSize: DEFAULT_CANVAS_TEXT_SIZE,
+      canvasDefaultDrawWidth: DEFAULT_CANVAS_DRAW_WIDTH,
+      canvasDefaultColor: DEFAULT_CANVAS_COLOR,
+      localHistoryEnabled: DEFAULT_LOCAL_HISTORY_ENABLED,
+      openLastFileOnStartup: DEFAULT_OPEN_LAST_FILE_ON_STARTUP,
+      autoExpandMovedFolders: DEFAULT_AUTO_EXPAND_MOVED_FOLDERS,
       startView: DEFAULT_START_VIEW,
     });
   },
@@ -611,6 +860,148 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ editorMaxWidth: w });
+  },
+
+  setEditorLineHeight: (v) => {
+    if (!EDITOR_LINE_HEIGHTS.some((option) => option.value === v)) return;
+    try {
+      localStorage.setItem(EDITOR_LINE_HEIGHT_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ editorLineHeight: v });
+  },
+
+  setEditorParagraphSpacing: (v) => {
+    if (!EDITOR_PARAGRAPH_SPACING.some((option) => option.value === v)) return;
+    try {
+      localStorage.setItem(EDITOR_PARAGRAPH_SPACING_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ editorParagraphSpacing: v });
+  },
+
+  setEditorIndentSize: (v) => {
+    if (!EDITOR_INDENT_SIZES.some((option) => option.value === v)) return;
+    try {
+      localStorage.setItem(EDITOR_INDENT_SIZE_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ editorIndentSize: v });
+  },
+
+  setShowStatusStats: (v) => {
+    try {
+      localStorage.setItem(SHOW_STATUS_STATS_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ showStatusStats: v });
+  },
+
+  setShowStatusPath: (v) => {
+    try {
+      localStorage.setItem(SHOW_STATUS_PATH_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ showStatusPath: v });
+  },
+
+  setCanvasGridEnabled: (v) => {
+    try {
+      localStorage.setItem(CANVAS_GRID_ENABLED_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ canvasGridEnabled: v });
+  },
+
+  setCanvasSnapToGrid: (v) => {
+    try {
+      localStorage.setItem(CANVAS_SNAP_TO_GRID_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ canvasSnapToGrid: v });
+  },
+
+  setCanvasGridSize: (v) => {
+    if (!(CANVAS_GRID_SIZES as readonly number[]).includes(v)) return;
+    try {
+      localStorage.setItem(CANVAS_GRID_SIZE_KEY, String(v));
+    } catch {
+      /* ignora */
+    }
+    set({ canvasGridSize: v });
+  },
+
+  setCanvasDefaultTool: (v) => {
+    if (!CANVAS_DEFAULT_TOOLS.includes(v)) return;
+    try {
+      localStorage.setItem(CANVAS_DEFAULT_TOOL_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ canvasDefaultTool: v });
+  },
+
+  setCanvasDefaultTextSize: (v) => {
+    if (!(CANVAS_TEXT_SIZES as readonly number[]).includes(v)) return;
+    try {
+      localStorage.setItem(CANVAS_DEFAULT_TEXT_SIZE_KEY, String(v));
+    } catch {
+      /* ignora */
+    }
+    set({ canvasDefaultTextSize: v });
+  },
+
+  setCanvasDefaultDrawWidth: (v) => {
+    if (!(CANVAS_DRAW_WIDTHS as readonly number[]).includes(v)) return;
+    try {
+      localStorage.setItem(CANVAS_DEFAULT_DRAW_WIDTH_KEY, String(v));
+    } catch {
+      /* ignora */
+    }
+    set({ canvasDefaultDrawWidth: v });
+  },
+
+  setCanvasDefaultColor: (v) => {
+    try {
+      localStorage.setItem(CANVAS_DEFAULT_COLOR_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ canvasDefaultColor: v });
+  },
+
+  setLocalHistoryEnabled: (v) => {
+    try {
+      localStorage.setItem(LOCAL_HISTORY_ENABLED_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ localHistoryEnabled: v });
+  },
+
+  setOpenLastFileOnStartup: (v) => {
+    try {
+      localStorage.setItem(OPEN_LAST_FILE_ON_STARTUP_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ openLastFileOnStartup: v });
+  },
+
+  setAutoExpandMovedFolders: (v) => {
+    try {
+      localStorage.setItem(AUTO_EXPAND_MOVED_FOLDERS_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ autoExpandMovedFolders: v });
   },
 
   setStartView: (v) => {

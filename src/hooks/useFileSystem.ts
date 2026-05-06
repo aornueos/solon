@@ -3,6 +3,7 @@ import { useAppStore, FileNode } from "../store/useAppStore";
 import { useCanvasStore } from "../store/useCanvasStore";
 import { parseDocument, serializeDocument } from "../lib/frontmatter";
 import { renameCanvasSidecar, deleteCanvasSidecar } from "../lib/canvas";
+import { createSnapshotBeforeWrite } from "../lib/localHistory";
 import {
   applyOrder,
   loadOrder,
@@ -65,8 +66,9 @@ function joinRelative(root: string, relative: string): string {
 }
 
 function findNodeType(nodes: FileNode[], path: string): FileNode["type"] | null {
+  const target = normalizedPath(path);
   for (const node of nodes) {
-    if (node.path === path) return node.type;
+    if (normalizedPath(node.path) === target) return node.type;
     if (node.children) {
       const found = findNodeType(node.children, path);
       if (found) return found;
@@ -212,6 +214,14 @@ O Conselho dos Seis governa a cidade há três gerações. Cada membro represent
       if (isTauri) {
         try {
           const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+          const { rootFolder, localHistoryEnabled } = useAppStore.getState();
+          if (localHistoryEnabled) {
+            await createSnapshotBeforeWrite({
+              rootFolder,
+              filePath: path,
+              nextContent: content,
+            });
+          }
           await writeTextFile(path, content);
         } catch (err) {
           console.error("Erro ao salvar arquivo:", err);
@@ -269,7 +279,10 @@ O Conselho dos Seis governa a cidade há três gerações. Cada membro represent
       // mas com `activeFilePath` ja settado o botao "Continuar" tem alvo.
       // Silent: erro de leitura limpa a chave pra evitar pop-up vermelho
       // toda vez que o app abre apos um arquivo ter sido movido/apagado.
-      const lastFile = localStorage.getItem("solon:lastFile");
+      const { openLastFileOnStartup } = useAppStore.getState();
+      const lastFile = openLastFileOnStartup
+        ? localStorage.getItem("solon:lastFile")
+        : null;
       if (lastFile) {
         try {
           if (await exists(lastFile)) {
@@ -554,13 +567,13 @@ O Conselho dos Seis governa a cidade há três gerações. Cada membro represent
       }
 
       // Guards de sanidade
-      if (sourcePath === targetFolderPath) {
+      if (normalizedPath(sourcePath) === normalizedPath(targetFolderPath)) {
         return;
       }
       const parentOfSource = parentOf(sourcePath);
       const sourceType = findNodeType(useAppStore.getState().fileTree, sourcePath);
       const sourceIsFolder = sourceType === "folder";
-      if (parentOfSource === targetFolderPath) {
+      if (normalizedPath(parentOfSource) === normalizedPath(targetFolderPath)) {
         return;
       }
       // Nao mover pasta pra dentro de si mesma ou descendente
@@ -626,10 +639,11 @@ O Conselho dos Seis governa a cidade há três gerações. Cada membro represent
           setSidebarOrder(updated);
           saveOrder(rootFolder, updated);
         }
-        // Force expand da pasta destino pra user ver o item movido
-        useAppStore.setState((s) => ({
-          fileTree: forceExpandPath(s.fileTree, targetFolderPath),
-        }));
+        if (useAppStore.getState().autoExpandMovedFolders) {
+          useAppStore.setState((s) => ({
+            fileTree: forceExpandPath(s.fileTree, targetFolderPath),
+          }));
+        }
         await refresh();
         // Re-aponta activeFile se foi o item movido ou estava dentro dele.
         if (activeSnapshot) {

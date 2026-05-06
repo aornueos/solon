@@ -26,9 +26,10 @@ interface Props {
   editor: Editor;
   open: boolean;
   onClose: () => void;
+  initialQuery?: string;
 }
 
-export function FindBar({ editor, open, onClose }: Props) {
+export function FindBar({ editor, open, onClose, initialQuery }: Props) {
   const [query, setQuery] = useState("");
   const [replaceWith, setReplaceWith] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
@@ -41,12 +42,13 @@ export function FindBar({ editor, open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    if (initialQuery) setQuery(initialQuery);
     const raf = requestAnimationFrame(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
     });
     return () => cancelAnimationFrame(raf);
-  }, [open]);
+  }, [initialQuery, open]);
 
   useEffect(() => {
     if (!open) {

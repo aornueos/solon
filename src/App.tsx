@@ -25,6 +25,9 @@ export default function App() {
   const toggleTheme = useAppStore((s) => s.toggleTheme);
   const setUpdateStatus = useAppStore((s) => s.setUpdateStatus);
   const openSettings = useAppStore((s) => s.openSettings);
+  const openCommandPalette = useAppStore((s) => s.openCommandPalette);
+  const openGlobalSearch = useAppStore((s) => s.openGlobalSearch);
+  const openLocalHistory = useAppStore((s) => s.openLocalHistory);
   const { restoreLastFolder, refresh } = useFileSystem();
 
   // Aplica tema no <html data-theme="...">
@@ -104,7 +107,19 @@ export default function App() {
         e.preventDefault();
         toggleOutline();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        openCommandPalette();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        openGlobalSearch();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "h") {
+        e.preventDefault();
+        openLocalHistory();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "i") {
         e.preventDefault();
         toggleInspector();
       }
@@ -140,6 +155,9 @@ export default function App() {
     setActiveView,
     toggleTheme,
     openSettings,
+    openCommandPalette,
+    openGlobalSearch,
+    openLocalHistory,
   ]);
 
   return <AppLayout />;

@@ -37,6 +37,8 @@ export function ImageNode({ image }: Props) {
     pushHistory,
   } = useCanvasStore();
   const rootFolder = useAppStore((s) => s.rootFolder);
+  const canvasSnapToGrid = useAppStore((s) => s.canvasSnapToGrid);
+  const canvasGridSize = useAppStore((s) => s.canvasGridSize);
   const [url, setUrl] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
 
@@ -49,6 +51,10 @@ export function ImageNode({ image }: Props) {
     origX: number;
     origY: number;
   } | null>(null);
+  const snap = (value: number) =>
+    canvasSnapToGrid
+      ? Math.round(value / canvasGridSize) * canvasGridSize
+      : value;
 
   useEffect(() => {
     let alive = true;
@@ -146,7 +152,10 @@ export function ImageNode({ image }: Props) {
         if (!dragState.current) return;
         const dx = (ev.clientX - orig.startX) / viewport.zoom;
         const dy = (ev.clientY - orig.startY) / viewport.zoom;
-        updateImage(image.id, { x: orig.origX + dx, y: orig.origY + dy });
+        updateImage(image.id, {
+          x: snap(orig.origX + dx),
+          y: snap(orig.origY + dy),
+        });
       },
       onEnd: () => {
         dragState.current = null;

@@ -8,6 +8,7 @@ import { FloatingText } from "./FloatingText";
 import { ImageNode } from "./ImageNode";
 import { CanvasToolbar } from "./CanvasToolbar";
 import {
+  CANVAS_TOOL_ORDER,
   CanvasStroke,
   DEFAULT_TEXT_SIZE,
   SCENE_DND_MIME,
@@ -25,7 +26,8 @@ import { textRect } from "../../lib/canvasGeom";
  *  - draw: mousedown no bg inicia um stroke; arrasta e solta pra commitar
  *  - text: click no bg cria um texto flutuante pronto pra editar
  *
- * Atalhos: V/P/T (tools), N (novo card), F (fit), Ctrl+D (duplicar card),
+ * Atalhos: 1..5 (tools pela ordem da toolbar), V/P/T/A/E (tools),
+ * N (novo card), F (fit), Ctrl+D (duplicar card),
  * Delete/Backspace (remove selecionado), Esc (volta pra select).
  */
 export function CanvasView() {
@@ -51,12 +53,21 @@ export function CanvasView() {
     tool,
     setTool,
     drawColor,
+    setDrawColor,
     drawWidth,
+    setDrawWidth,
     selectMany,
   } = useCanvasStore();
   const rootFolder = useAppStore((s) => s.rootFolder);
   const activeFilePath = useAppStore((s) => s.activeFilePath);
   const activeView = useAppStore((s) => s.activeView);
+  const canvasGridEnabled = useAppStore((s) => s.canvasGridEnabled);
+  const canvasSnapToGrid = useAppStore((s) => s.canvasSnapToGrid);
+  const canvasGridSize = useAppStore((s) => s.canvasGridSize);
+  const canvasDefaultTool = useAppStore((s) => s.canvasDefaultTool);
+  const canvasDefaultTextSize = useAppStore((s) => s.canvasDefaultTextSize);
+  const canvasDefaultDrawWidth = useAppStore((s) => s.canvasDefaultDrawWidth);
+  const canvasDefaultColor = useAppStore((s) => s.canvasDefaultColor);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const spaceDown = useRef(false);
@@ -75,6 +86,27 @@ export function CanvasView() {
     w: number;
     h: number;
   } | null>(null);
+
+  const snap = (value: number) =>
+    canvasSnapToGrid
+      ? Math.round(value / canvasGridSize) * canvasGridSize
+      : value;
+
+  useEffect(() => {
+    if (activeView !== "canvas") return;
+    setTool(canvasDefaultTool);
+    setDrawWidth(canvasDefaultDrawWidth);
+    setDrawColor(canvasDefaultColor);
+  }, [
+    activeFilePath,
+    activeView,
+    canvasDefaultColor,
+    canvasDefaultDrawWidth,
+    canvasDefaultTool,
+    setDrawColor,
+    setDrawWidth,
+    setTool,
+  ]);
 
   // Wheel = zoom (com ctrl) ou pan trackpad
   useEffect(() => {
@@ -143,6 +175,13 @@ export function CanvasView() {
         return;
       }
       if (e.ctrlKey || e.metaKey) return; // ignora outros Ctrl+X
+
+      const numericTool = CANVAS_TOOL_ORDER[Number(e.key) - 1];
+      if (numericTool) {
+        e.preventDefault();
+        setTool(numericTool);
+        return;
+      }
 
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
@@ -304,14 +343,14 @@ export function CanvasView() {
     const rect = el.getBoundingClientRect();
     const worldX = (e.clientX - rect.left - viewport.x) / viewport.zoom;
     const worldY = (e.clientY - rect.top - viewport.y) / viewport.zoom;
-    const snap = await readSceneSnapshot(payload.path, payload.name);
-    if (!snap) return;
+    const sceneSnapshot = await readSceneSnapshot(payload.path, payload.name);
+    if (!sceneSnapshot) return;
     addSceneCard({
       scenePath: payload.path,
       sceneName: payload.name,
-      snapshot: snap,
-      x: worldX - 130,
-      y: worldY - 75,
+      snapshot: sceneSnapshot,
+      x: snap(worldX - 130),
+      y: snap(worldY - 75),
     });
   };
 
@@ -526,10 +565,10 @@ export function CanvasView() {
       // escolhido pelo usuario na toolbar). O FloatingText resolve "" →
       // var(--text-primary) na hora de renderizar.
       const id = addText({
-        x,
-        y,
+        x: snap(x),
+        y: snap(y),
         text: "",
-        size: DEFAULT_TEXT_SIZE,
+        size: canvasDefaultTextSize || DEFAULT_TEXT_SIZE,
         color: drawColor,
       });
       setJustCreatedTextId(id);
@@ -563,7 +602,7 @@ export function CanvasView() {
   const onBgDoubleClick = (e: React.MouseEvent) => {
     if (tool !== "select") return;
     const { x, y } = screenToWorld(e.clientX, e.clientY);
-    addCard({ x: x - 110, y: y - 60 });
+    addCard({ x: snap(x - 110), y: snap(y - 60) });
   };
 
   const bgCursor =
@@ -584,10 +623,15 @@ export function CanvasView() {
       onDoubleClick={onBgDoubleClick}
       onDragOver={onDragOver}
       onDrop={onDrop}
+      role="application"
+      aria-label="Canvas do Solon"
       className="canvas-surface relative w-full h-full overflow-hidden select-none"
       style={{
         cursor: bgCursor,
-        backgroundSize: `${24 * viewport.zoom}px ${24 * viewport.zoom}px`,
+        backgroundImage: canvasGridEnabled
+          ? "radial-gradient(circle, var(--border-subtle) 1px, transparent 1px)"
+          : "none",
+        backgroundSize: `${canvasGridSize * viewport.zoom}px ${canvasGridSize * viewport.zoom}px`,
         backgroundPosition: `${viewport.x}px ${viewport.y}px`,
       }}
     >

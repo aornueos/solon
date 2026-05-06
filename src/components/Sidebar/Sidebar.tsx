@@ -36,8 +36,12 @@ function getSidebarDragPath(e: React.DragEvent): string | null {
   } catch {
     /* dataTransfer pode estar indisponivel durante dragover */
   }
-  const text = e.dataTransfer.getData("text/plain");
-  return text || null;
+  try {
+    const text = e.dataTransfer.getData("text/plain");
+    return text || null;
+  } catch {
+    return null;
+  }
 }
 
 interface ContextMenuState {

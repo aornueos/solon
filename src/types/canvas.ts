@@ -115,6 +115,15 @@ export interface CanvasImage {
 /** Modo da ferramenta ativa no canvas. */
 export type CanvasTool = "select" | "draw" | "text" | "arrow" | "eraser";
 
+/** Ordem canonica da toolbar do canvas. Os atalhos numericos seguem isto. */
+export const CANVAS_TOOL_ORDER: CanvasTool[] = [
+  "select",
+  "arrow",
+  "draw",
+  "text",
+  "eraser",
+];
+
 /**
  * Paleta de cores pro free-draw / textos flutuantes — simples e editorial,
  * sem saturação pura.

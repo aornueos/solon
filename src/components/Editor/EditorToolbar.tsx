@@ -234,6 +234,8 @@ function ToolBtn({
         onClick();
       }}
       title={title}
+      aria-label={title}
+      aria-pressed={active}
       className={clsx("p-1.5 rounded transition-colors")}
       style={{
         background: active ? "var(--bg-active)" : "transparent",
@@ -452,6 +454,7 @@ function MenuItem({
   return (
     <button
       disabled={disabled}
+      aria-label={label}
       onMouseDown={(e) => {
         e.preventDefault();
         if (!disabled) onClick();

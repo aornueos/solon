@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CanvasText, DRAW_COLORS } from "../../types/canvas";
 import { useCanvasStore } from "../../store/useCanvasStore";
+import { useAppStore } from "../../store/useAppStore";
 import { startDrag } from "../../lib/drag";
 import { textRect } from "../../lib/canvasGeom";
 import {
@@ -38,13 +39,13 @@ const MAX_TEXT_SIZE = 160;
 type ResizeDir = "n" | "e" | "s" | "w" | "ne" | "nw" | "se" | "sw";
 
 const RESIZE_HANDLES: { dir: ResizeDir; cursor: string; title: string }[] = [
-  { dir: "nw", cursor: "nwse-resize", title: "Redimensionar" },
+  { dir: "nw", cursor: "nwse-resize", title: "Redimensionar (Ctrl escala fonte)" },
   { dir: "n", cursor: "ns-resize", title: "Redimensionar altura" },
-  { dir: "ne", cursor: "nesw-resize", title: "Redimensionar" },
+  { dir: "ne", cursor: "nesw-resize", title: "Redimensionar (Ctrl escala fonte)" },
   { dir: "e", cursor: "ew-resize", title: "Redimensionar largura" },
-  { dir: "se", cursor: "nwse-resize", title: "Redimensionar" },
+  { dir: "se", cursor: "nwse-resize", title: "Redimensionar (Ctrl escala fonte)" },
   { dir: "s", cursor: "ns-resize", title: "Redimensionar altura" },
-  { dir: "sw", cursor: "nesw-resize", title: "Redimensionar" },
+  { dir: "sw", cursor: "nesw-resize", title: "Redimensionar (Ctrl escala fonte)" },
   { dir: "w", cursor: "ew-resize", title: "Redimensionar largura" },
 ];
 
@@ -64,6 +65,8 @@ export function FloatingText({ text, autoEdit }: Props) {
     completeLink,
     pushHistory,
   } = useCanvasStore();
+  const canvasSnapToGrid = useAppStore((s) => s.canvasSnapToGrid);
+  const canvasGridSize = useAppStore((s) => s.canvasGridSize);
 
   const isSelected = selectedId === text.id;
   const isInGroup = selectedId !== text.id && selectedIds.has(text.id);
@@ -83,6 +86,10 @@ export function FloatingText({ text, autoEdit }: Props) {
     origY: number;
     moved: boolean;
   } | null>(null);
+  const snap = (value: number) =>
+    canvasSnapToGrid
+      ? Math.round(value / canvasGridSize) * canvasGridSize
+      : value;
 
   const naturalRect = textRect({
     ...text,
@@ -238,7 +245,10 @@ export function FloatingText({ text, autoEdit }: Props) {
         const dx = (ev.clientX - orig.startX) / viewport.zoom;
         const dy = (ev.clientY - orig.startY) / viewport.zoom;
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) dragState.current.moved = true;
-        updateText(text.id, { x: orig.origX + dx, y: orig.origY + dy });
+        updateText(text.id, {
+          x: snap(orig.origX + dx),
+          y: snap(orig.origY + dy),
+        });
       },
       onEnd: () => {
         dragState.current = null;

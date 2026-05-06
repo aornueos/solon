@@ -13,6 +13,8 @@ export function StatusBar() {
   const openUpdateDialog = useAppStore((s) => s.openUpdateDialog);
   const saveStatus = useAppStore((s) => s.saveStatus);
   const lastSavedAt = useAppStore((s) => s.lastSavedAt);
+  const showStatusStats = useAppStore((s) => s.showStatusStats);
+  const showStatusPath = useAppStore((s) => s.showStatusPath);
   const { openFolder } = useFileSystem();
   const target = sceneMeta.wordTarget ?? 0;
   const progress = target > 0 ? Math.min(100, (wordCount / target) * 100) : 0;
@@ -21,6 +23,8 @@ export function StatusBar() {
   return (
     <div
       className="flex items-center justify-between h-6 px-4 text-[0.68rem]"
+      role="status"
+      aria-live="polite"
       style={{
         background: "var(--bg-panel-2)",
         borderTop: "1px solid var(--border-subtle)",
@@ -30,23 +34,23 @@ export function StatusBar() {
       <div className="truncate max-w-[40%] flex items-center gap-3">
         {activeFilePath ? (
           <>
-            {/* Path do arquivo clicavel: chama openFolder pra trocar
-                a pasta de trabalho. Atalho rapido pra "estou aqui mas
-                quero mudar de projeto" sem ter que ir no sidebar.
-                Underline-on-hover sinaliza clicabilidade discretamente. */}
-            <button
-              onClick={openFolder}
-              title="Trocar pasta de trabalho"
-              className="truncate font-mono opacity-60 hover:opacity-100 hover:underline underline-offset-2 transition-opacity"
-              style={{ background: "transparent", color: "inherit" }}
-            >
-              {activeFilePath}
-            </button>
+            {showStatusPath && (
+              <button
+                onClick={openFolder}
+                title="Trocar pasta de trabalho"
+                aria-label="Trocar pasta de trabalho"
+                className="truncate font-mono opacity-60 hover:opacity-100 hover:underline underline-offset-2 transition-opacity"
+                style={{ background: "transparent", color: "inherit" }}
+              >
+                {activeFilePath}
+              </button>
+            )}
             <SaveIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
           </>
         ) : (
           <button
             onClick={openFolder}
+            aria-label="Abrir pasta"
             className="hover:underline underline-offset-2 transition-opacity"
             style={{ background: "transparent", color: "inherit" }}
           >
@@ -59,36 +63,40 @@ export function StatusBar() {
           status={updateStatus}
           onClick={openUpdateDialog}
         />
-        {target > 0 ? (
-          <div className="flex items-center gap-2">
-            <span
-              className={clsx("tabular-nums", onTarget && "font-medium")}
-              style={onTarget ? { color: "var(--success)" } : undefined}
-            >
-              {wordCount.toLocaleString("pt-BR")} / {target.toLocaleString("pt-BR")} palavras
+        {showStatusStats && (
+          <>
+            {target > 0 ? (
+              <div className="flex items-center gap-2">
+                <span
+                  className={clsx("tabular-nums", onTarget && "font-medium")}
+                  style={onTarget ? { color: "var(--success)" } : undefined}
+                >
+                  {wordCount.toLocaleString("pt-BR")} / {target.toLocaleString("pt-BR")} palavras
+                </span>
+                <div
+                  className="w-20 h-1 rounded-full overflow-hidden"
+                  style={{ background: "var(--bg-hover)" }}
+                >
+                  <div
+                    className="h-full transition-all"
+                    style={{
+                      width: `${progress}%`,
+                      background: onTarget ? "var(--success)" : "var(--accent-2)",
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <span className="tabular-nums">
+                {wordCount.toLocaleString("pt-BR")} palavras
+              </span>
+            )}
+            <span className="tabular-nums">
+              {charCount.toLocaleString("pt-BR")} caracteres
             </span>
-            <div
-              className="w-20 h-1 rounded-full overflow-hidden"
-              style={{ background: "var(--bg-hover)" }}
-            >
-              <div
-                className="h-full transition-all"
-                style={{
-                  width: `${progress}%`,
-                  background: onTarget ? "var(--success)" : "var(--accent-2)",
-                }}
-              />
-            </div>
-          </div>
-        ) : (
-          <span className="tabular-nums">
-            {wordCount.toLocaleString("pt-BR")} palavras
-          </span>
+            <span style={{ color: "var(--accent)" }}>Markdown</span>
+          </>
         )}
-        <span className="tabular-nums">
-          {charCount.toLocaleString("pt-BR")} caracteres
-        </span>
-        <span style={{ color: "var(--accent)" }}>Markdown</span>
       </div>
     </div>
   );
@@ -212,6 +220,7 @@ function UpdateIndicator({
     <button
       onClick={onClick}
       title={label}
+      aria-label={label}
       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors hover:underline underline-offset-4"
       style={{ color: "var(--accent)" }}
     >

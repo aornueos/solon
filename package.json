@@ -1,11 +1,12 @@
 {
   "name": "solon",
   "private": true,
-  "version": "0.5.9",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test:robustness": "node scripts/run-robustness-tests.cjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "postinstall": "node scripts/copy-spellcheck-dict.cjs",

@@ -26,7 +26,12 @@ import Highlight from "@tiptap/extension-highlight";
 import { IndentExtension } from "./IndentExtension";
 import { ListExitExtension } from "./ListExitExtension";
 import { SmartDashesExtension } from "./SmartDashesExtension";
-import { useAppStore } from "../../store/useAppStore";
+import {
+  EDITOR_INDENT_SIZES,
+  EDITOR_LINE_HEIGHTS,
+  EDITOR_PARAGRAPH_SPACING,
+  useAppStore,
+} from "../../store/useAppStore";
 import { EditorToolbar } from "./EditorToolbar";
 import { markdownToHtml, htmlToMarkdown } from "./markdownBridge";
 import { setCurrentEditor } from "../../lib/editorRef";
@@ -48,11 +53,15 @@ export function Editor() {
   const editorZoom = useAppStore((s) => s.editorZoom);
   const setEditorZoom = useAppStore((s) => s.setEditorZoom);
   const editorMaxWidth = useAppStore((s) => s.editorMaxWidth);
+  const editorLineHeight = useAppStore((s) => s.editorLineHeight);
+  const editorParagraphSpacing = useAppStore((s) => s.editorParagraphSpacing);
+  const editorIndentSize = useAppStore((s) => s.editorIndentSize);
   const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
 
   const isLoadingRef = useRef(false);
   const lastLoadedPathRef = useRef<string | null>(null);
   const [findOpen, setFindOpen] = useState(false);
+  const [findInitialQuery, setFindInitialQuery] = useState("");
   // Ref do wrapper scrollavel — usado pra anexar wheel listener nativo
   // (com {passive: false} pra poder preventDefault o scroll quando
   // Ctrl ta pressionado e a gente quer transformar em zoom).
@@ -187,6 +196,16 @@ export function Editor() {
     document.addEventListener("keydown", onFindShortcut, true);
     return () => document.removeEventListener("keydown", onFindShortcut, true);
   }, [editor, activeFilePath]);
+
+  useEffect(() => {
+    const onOpenFind = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { query?: string } | undefined;
+      setFindInitialQuery(detail?.query ?? "");
+      setFindOpen(true);
+    };
+    document.addEventListener("solon:find-open", onOpenFind);
+    return () => document.removeEventListener("solon:find-open", onOpenFind);
+  }, []);
 
   // Registra/desregistra ref global pro editor. Usado pelo
   // ContextMenuProvider pra detectar palavra em right-click sem precisar
@@ -357,7 +376,22 @@ export function Editor() {
   // Os seletores em globals.css multiplicam font-size por essa var, entao
   // o usuario pode aumentar/diminuir o tamanho do texto sem afetar a UI
   // (sidebar, titlebar, statusbar continuam fixos).
-  const zoomVar = { ["--editor-zoom" as string]: String(editorZoom / 100) };
+  const lineHeightValue =
+    EDITOR_LINE_HEIGHTS.find((option) => option.value === editorLineHeight)
+      ?.css ?? 1.5;
+  const paragraphSpacingValue =
+    EDITOR_PARAGRAPH_SPACING.find(
+      (option) => option.value === editorParagraphSpacing,
+    )?.css ?? "0.4em";
+  const indentSizeValue =
+    EDITOR_INDENT_SIZES.find((option) => option.value === editorIndentSize)
+      ?.css ?? "2em";
+  const editorVars = {
+    ["--editor-zoom" as string]: String(editorZoom / 100),
+    ["--editor-line-height" as string]: String(lineHeightValue),
+    ["--editor-paragraph-spacing" as string]: paragraphSpacingValue,
+    ["--editor-indent-size" as string]: indentSizeValue,
+  };
 
   return (
     <div className="relative flex flex-col h-full">
@@ -365,6 +399,7 @@ export function Editor() {
         <FindBar
           editor={editor}
           open={findOpen}
+          initialQuery={findInitialQuery}
           onClose={() => setFindOpen(false)}
         />
       )}
@@ -376,7 +411,7 @@ export function Editor() {
       >
         <div
           className="mx-auto px-8 py-12 min-h-full cursor-text"
-          style={{ ...zoomVar, maxWidth: editorMaxWidth } as React.CSSProperties}
+          style={{ ...editorVars, maxWidth: editorMaxWidth } as React.CSSProperties}
         >
           <EditorContent editor={editor} />
         </div>

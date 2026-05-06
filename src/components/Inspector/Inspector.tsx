@@ -217,7 +217,8 @@ function Header({ onClose }: { onClose: () => void }) {
       </span>
       <button
         onClick={onClose}
-        title="Fechar Inspector (Ctrl+K)"
+        title="Fechar Inspector (Ctrl+Alt+I)"
+        aria-label="Fechar Inspector"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className="p-1 rounded transition-colors"

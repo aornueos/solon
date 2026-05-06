@@ -14,8 +14,19 @@ import {
   Loader2,
   Trash2,
   ExternalLink,
+  Grid3X3,
 } from "lucide-react";
-import { useAppStore, EDITOR_MAX_WIDTHS } from "../../store/useAppStore";
+import {
+  CANVAS_DEFAULT_TOOLS,
+  CANVAS_DRAW_WIDTHS,
+  CANVAS_GRID_SIZES,
+  CANVAS_TEXT_SIZES,
+  EDITOR_INDENT_SIZES,
+  EDITOR_LINE_HEIGHTS,
+  EDITOR_MAX_WIDTHS,
+  EDITOR_PARAGRAPH_SPACING,
+  useAppStore,
+} from "../../store/useAppStore";
 import {
   clearPersonalDict,
   getPersonalDictSize,
@@ -51,6 +62,14 @@ export function SettingsDialog() {
   const setEditorZoom = useAppStore((s) => s.setEditorZoom);
   const editorMaxWidth = useAppStore((s) => s.editorMaxWidth);
   const setEditorMaxWidth = useAppStore((s) => s.setEditorMaxWidth);
+  const editorLineHeight = useAppStore((s) => s.editorLineHeight);
+  const setEditorLineHeight = useAppStore((s) => s.setEditorLineHeight);
+  const editorParagraphSpacing = useAppStore((s) => s.editorParagraphSpacing);
+  const setEditorParagraphSpacing = useAppStore(
+    (s) => s.setEditorParagraphSpacing,
+  );
+  const editorIndentSize = useAppStore((s) => s.editorIndentSize);
+  const setEditorIndentSize = useAppStore((s) => s.setEditorIndentSize);
   const startView = useAppStore((s) => s.startView);
   const setStartView = useAppStore((s) => s.setStartView);
   const autoSaveEnabled = useAppStore((s) => s.autoSaveEnabled);
@@ -59,6 +78,28 @@ export function SettingsDialog() {
   const setAutoCheckUpdates = useAppStore((s) => s.setAutoCheckUpdates);
   const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
   const setSpellcheckEnabled = useAppStore((s) => s.setSpellcheckEnabled);
+  const showStatusStats = useAppStore((s) => s.showStatusStats);
+  const setShowStatusStats = useAppStore((s) => s.setShowStatusStats);
+  const showStatusPath = useAppStore((s) => s.showStatusPath);
+  const setShowStatusPath = useAppStore((s) => s.setShowStatusPath);
+  const canvasGridEnabled = useAppStore((s) => s.canvasGridEnabled);
+  const setCanvasGridEnabled = useAppStore((s) => s.setCanvasGridEnabled);
+  const canvasSnapToGrid = useAppStore((s) => s.canvasSnapToGrid);
+  const setCanvasSnapToGrid = useAppStore((s) => s.setCanvasSnapToGrid);
+  const canvasGridSize = useAppStore((s) => s.canvasGridSize);
+  const setCanvasGridSize = useAppStore((s) => s.setCanvasGridSize);
+  const canvasDefaultTool = useAppStore((s) => s.canvasDefaultTool);
+  const setCanvasDefaultTool = useAppStore((s) => s.setCanvasDefaultTool);
+  const canvasDefaultTextSize = useAppStore((s) => s.canvasDefaultTextSize);
+  const setCanvasDefaultTextSize = useAppStore((s) => s.setCanvasDefaultTextSize);
+  const canvasDefaultDrawWidth = useAppStore((s) => s.canvasDefaultDrawWidth);
+  const setCanvasDefaultDrawWidth = useAppStore((s) => s.setCanvasDefaultDrawWidth);
+  const localHistoryEnabled = useAppStore((s) => s.localHistoryEnabled);
+  const setLocalHistoryEnabled = useAppStore((s) => s.setLocalHistoryEnabled);
+  const openLastFileOnStartup = useAppStore((s) => s.openLastFileOnStartup);
+  const setOpenLastFileOnStartup = useAppStore((s) => s.setOpenLastFileOnStartup);
+  const autoExpandMovedFolders = useAppStore((s) => s.autoExpandMovedFolders);
+  const setAutoExpandMovedFolders = useAppStore((s) => s.setAutoExpandMovedFolders);
   const setUpdateStatus = useAppStore((s) => s.setUpdateStatus);
   const pushToast = useAppStore((s) => s.pushToast);
   const resetSettings = useAppStore((s) => s.resetSettings);
@@ -185,7 +226,7 @@ export function SettingsDialog() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="w-full max-w-lg rounded-lg shadow-xl flex flex-col max-h-[85vh]"
+        className="w-full max-w-xl rounded-lg shadow-xl flex flex-col max-h-[85vh]"
         style={{
           background: "var(--bg-panel)",
           border: "1px solid var(--border)",
@@ -227,7 +268,7 @@ export function SettingsDialog() {
         <div className="overflow-y-auto px-5 py-5 flex flex-col gap-6">
           {/* Aparencia */}
           <Section title="Aparência">
-            <Row label="Tema" hint="Sépia claro ou escuro — o tom da paleta editorial.">
+            <Row label="Tema">
               <SegmentedControl
                 value={theme}
                 options={[
@@ -240,7 +281,7 @@ export function SettingsDialog() {
 
             <Row
               label="Zoom do texto"
-              hint={`${editorZoom}% — afeta só o conteúdo do editor; UI fica fixa.`}
+              hint={`${editorZoom}%`}
               icon={<Type size={11} />}
             >
               <div className="flex items-center gap-2 w-full">
@@ -292,18 +333,7 @@ export function SettingsDialog() {
               </div>
             </Row>
 
-            <Row
-              label="Largura do editor"
-              hint={
-                editorMaxWidth <= 600
-                  ? "Estreito — colunas mais curtas, leitura intensa."
-                  : editorMaxWidth <= 720
-                    ? "Médio — proporção clássica de livro impresso."
-                    : editorMaxWidth <= 870
-                      ? "Amplo — mais ar, menos quebras de linha."
-                      : "Largo — quase página inteira."
-              }
-            >
+            <Row label="Largura do editor" hint={`${editorMaxWidth}px`}>
               <SegmentedControl
                 value={String(editorMaxWidth)}
                 options={EDITOR_MAX_WIDTHS.map((w) => ({
@@ -313,13 +343,116 @@ export function SettingsDialog() {
                 onChange={(v) => setEditorMaxWidth(parseInt(v, 10))}
               />
             </Row>
+
+            <Row label="Espaçamento" hint={getLineHeightLabel(editorLineHeight)}>
+              <SegmentedControl
+                value={editorLineHeight}
+                options={EDITOR_LINE_HEIGHTS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                onChange={(v) => setEditorLineHeight(v)}
+              />
+            </Row>
+          </Section>
+
+          <Section title="Escrita">
+            <Row
+              label="Entre parágrafos"
+              hint={getParagraphSpacingLabel(editorParagraphSpacing)}
+            >
+              <SegmentedControl
+                value={editorParagraphSpacing}
+                options={EDITOR_PARAGRAPH_SPACING.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                onChange={(v) => setEditorParagraphSpacing(v)}
+              />
+            </Row>
+
+            <Row
+              label="Recuo do Tab"
+              hint={getIndentSizeLabel(editorIndentSize)}
+            >
+              <SegmentedControl
+                value={editorIndentSize}
+                options={EDITOR_INDENT_SIZES.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                onChange={(v) => setEditorIndentSize(v)}
+              />
+            </Row>
+          </Section>
+
+          <Section title="Canvas">
+            <Row label="Grade" icon={<Grid3X3 size={11} />}>
+              <Toggle
+                checked={canvasGridEnabled}
+                onChange={setCanvasGridEnabled}
+                label={canvasGridEnabled ? "Visível" : "Oculta"}
+              />
+            </Row>
+
+            <Row label="Snap na grade">
+              <Toggle
+                checked={canvasSnapToGrid}
+                onChange={setCanvasSnapToGrid}
+                label={canvasSnapToGrid ? "Ativo" : "Livre"}
+              />
+            </Row>
+
+            <Row label="Tamanho da grade" hint={`${canvasGridSize}px`}>
+              <SegmentedControl
+                value={String(canvasGridSize)}
+                options={CANVAS_GRID_SIZES.map((size) => ({
+                  value: String(size),
+                  label: String(size),
+                }))}
+                onChange={(v) => setCanvasGridSize(parseInt(v, 10))}
+              />
+            </Row>
+
+            <Row label="Ferramenta inicial">
+              <SegmentedControl
+                value={canvasDefaultTool}
+                options={CANVAS_DEFAULT_TOOLS.map((tool) => ({
+                  value: tool,
+                  label: getCanvasToolLabel(tool),
+                }))}
+                onChange={(v) => setCanvasDefaultTool(v)}
+              />
+            </Row>
+
+            <Row label="Texto novo" hint={`${canvasDefaultTextSize}px`}>
+              <SegmentedControl
+                value={String(canvasDefaultTextSize)}
+                options={CANVAS_TEXT_SIZES.map((size) => ({
+                  value: String(size),
+                  label: String(size),
+                }))}
+                onChange={(v) => setCanvasDefaultTextSize(parseInt(v, 10))}
+              />
+            </Row>
+
+            <Row label="Traço novo" hint={`${canvasDefaultDrawWidth}px`}>
+              <SegmentedControl
+                value={String(canvasDefaultDrawWidth)}
+                options={CANVAS_DRAW_WIDTHS.map((width) => ({
+                  value: String(width),
+                  label: String(width),
+                }))}
+                onChange={(v) => setCanvasDefaultDrawWidth(Number(v))}
+              />
+            </Row>
           </Section>
 
           {/* Editor */}
           <Section title="Editor">
             <Row
               label="Auto-save"
-              hint="Grava 1.2s após você parar de digitar. Ctrl+S sempre salva."
+              hint="Ctrl+S sempre salva."
               icon={<Save size={11} />}
             >
               <Toggle
@@ -330,11 +463,11 @@ export function SettingsDialog() {
             </Row>
 
             <Row
-              label="Verificação ortográfica (pt-BR)"
+              label="Ortografia (pt-BR)"
               hint={
                 personalDictSize > 0
-                  ? `Sublinhado vermelho + sugestões no clique direito. ${personalDictSize} ${personalDictSize === 1 ? "palavra" : "palavras"} no dicionário pessoal.`
-                  : "Sublinhado vermelho + sugestões via clique direito."
+                  ? `${personalDictSize} ${personalDictSize === 1 ? "palavra" : "palavras"} no dicionário.`
+                  : undefined
               }
               icon={<SpellCheck size={11} />}
             >
@@ -404,10 +537,7 @@ export function SettingsDialog() {
 
           {/* Inicialização */}
           <Section title="Inicialização">
-            <Row
-              label="Ao abrir o app, mostrar"
-              hint="Onde você quer cair quando o Solon inicia."
-            >
+            <Row label="Ao abrir">
               <SegmentedControl
                 value={startView}
                 options={[
@@ -420,14 +550,58 @@ export function SettingsDialog() {
             </Row>
           </Section>
 
+          <Section title="Interface">
+            <Row label="Estatísticas na barra inferior">
+              <Toggle
+                checked={showStatusStats}
+                onChange={setShowStatusStats}
+                label={showStatusStats ? "Visíveis" : "Ocultas"}
+              />
+            </Row>
+
+            <Row label="Caminho do arquivo na barra inferior">
+              <Toggle
+                checked={showStatusPath}
+                onChange={setShowStatusPath}
+                label={showStatusPath ? "Visível" : "Oculto"}
+              />
+            </Row>
+          </Section>
+
+          <Section title="Comportamento">
+            <Row label="Abrir último arquivo">
+              <Toggle
+                checked={openLastFileOnStartup}
+                onChange={setOpenLastFileOnStartup}
+                label={openLastFileOnStartup ? "Ativo" : "Desativado"}
+              />
+            </Row>
+
+            <Row label="Expandir pasta após mover">
+              <Toggle
+                checked={autoExpandMovedFolders}
+                onChange={setAutoExpandMovedFolders}
+                label={autoExpandMovedFolders ? "Ativo" : "Manual"}
+              />
+            </Row>
+
+            <Row label="Histórico local">
+              <Toggle
+                checked={localHistoryEnabled}
+                onChange={setLocalHistoryEnabled}
+                label={localHistoryEnabled ? "Ativo" : "Desativado"}
+              />
+            </Row>
+          </Section>
+
           {/* Atualizações */}
           <Section title="Atualizações">
             <Row
               label="Versão atual"
               hint={
                 lastUpdateCheck
-                  ? `Última verificação: ${formatDateTime(lastUpdateCheck)}.`
-                  : "Ainda sem verificação registrada nesta instalação."
+                  ? `Checado ${formatDateTime(lastUpdateCheck)}`
+                  : undefined
               }
             >
               <span
@@ -439,7 +613,6 @@ export function SettingsDialog() {
             </Row>
             <Row
               label="Verificar no boot"
-              hint="Falhas de rede são silenciosas. Só ativo no app desktop."
               icon={<Sparkles size={11} />}
             >
               <Toggle
@@ -450,10 +623,7 @@ export function SettingsDialog() {
             </Row>
             <Row
               label="Verificar agora"
-              hint={
-                updateMessage ??
-                "Bypassa o throttle de 6h e busca a versão mais recente imediatamente."
-              }
+              hint={updateMessage ?? undefined}
             >
               <button
                 onClick={onCheckUpdates}
@@ -480,7 +650,7 @@ export function SettingsDialog() {
             {skippedVersion && (
               <Row
                 label="Versão ignorada"
-                hint={`Solon ${skippedVersion} não será oferecido até você liberar ou sair uma versão nova.`}
+                hint={`Solon ${skippedVersion}`}
               >
                 <button
                   onClick={onClearSkippedVersion}
@@ -494,10 +664,7 @@ export function SettingsDialog() {
                 </button>
               </Row>
             )}
-            <Row
-              label="Canal de release"
-              hint="Abre a página de releases publicada no GitHub."
-            >
+            <Row label="Canal de release">
               <button
                 onClick={() => window.open(RELEASES_URL, "_blank", "noopener,noreferrer")}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[0.72rem]"
@@ -571,6 +738,32 @@ function formatDateTime(timestamp: number): string {
   } catch {
     return "data indisponivel";
   }
+}
+
+function getLineHeightLabel(value: string): string {
+  if (value === "compact") return "Mais denso";
+  if (value === "relaxed") return "Mais aberto";
+  return "Equilibrado";
+}
+
+function getParagraphSpacingLabel(value: string): string {
+  if (value === "tight") return "Blocos mais próximos";
+  if (value === "airy") return "Mais respiro";
+  return "Equilibrado";
+}
+
+function getIndentSizeLabel(value: string): string {
+  if (value === "small") return "Recuo curto";
+  if (value === "large") return "Recuo amplo";
+  return "Recuo clássico";
+}
+
+function getCanvasToolLabel(value: string): string {
+  if (value === "arrow") return "Seta";
+  if (value === "draw") return "Desenho";
+  if (value === "text") return "Texto";
+  if (value === "eraser") return "Borracha";
+  return "Selecionar";
 }
 
 function Section({
@@ -660,6 +853,8 @@ function SegmentedControl<T extends string>({
           <button
             key={opt.value}
             onClick={() => onChange(opt.value)}
+            aria-label={opt.label}
+            aria-pressed={active}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.72rem] transition-colors"
             style={{
               background: active ? "var(--bg-panel)" : "transparent",
@@ -689,6 +884,7 @@ function Toggle({
     <button
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       onClick={() => onChange(!checked)}
       className="inline-flex items-center gap-2 transition-opacity"
     >

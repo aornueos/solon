@@ -33,7 +33,13 @@ export function Card({ card }: Props) {
   } = useCanvasStore();
 
   const setActiveView = useAppStore((s) => s.setActiveView);
+  const canvasSnapToGrid = useAppStore((s) => s.canvasSnapToGrid);
+  const canvasGridSize = useAppStore((s) => s.canvasGridSize);
   const { openFile } = useFileSystem();
+  const snap = (value: number) =>
+    canvasSnapToGrid
+      ? Math.round(value / canvasGridSize) * canvasGridSize
+      : value;
 
   const isScene = card.kind === "scene";
   const isSelected = selectedId === card.id;
@@ -158,7 +164,10 @@ export function Card({ card }: Props) {
         if (!dragState.current) return;
         const dx = (ev.clientX - orig.startX) / viewport.zoom;
         const dy = (ev.clientY - orig.startY) / viewport.zoom;
-        updateCard(card.id, { x: orig.origX + dx, y: orig.origY + dy });
+        updateCard(card.id, {
+          x: snap(orig.origX + dx),
+          y: snap(orig.origY + dy),
+        });
       },
       onEnd: () => {
         dragState.current = null;
