@@ -1,5 +1,8 @@
+import { memo } from "react";
 import { useCanvasStore } from "../../store/useCanvasStore";
-import { CanvasStroke } from "../../types/canvas";
+import { CanvasStroke, CardSide } from "../../types/canvas";
+import { strokeRect } from "../../lib/canvasGeom";
+import { startCanvasLinkDrag } from "../../lib/canvasLinkDrag";
 
 /**
  * SVG com os traços de free-draw. Renderizado dentro do world container
@@ -8,7 +11,7 @@ import { CanvasStroke } from "../../types/canvas";
  * Recebe `liveStroke` opcional: o traço que está sendo desenhado *agora*
  * (antes de ser commitado na store). Evita re-commit a cada pixel.
  */
-export function StrokeLayer({
+export const StrokeLayer = memo(function StrokeLayer({
   worldWidth,
   worldHeight,
   liveStroke,
@@ -17,8 +20,18 @@ export function StrokeLayer({
   worldHeight: number;
   liveStroke?: CanvasStroke | null;
 }) {
-  const { strokes, selectedId, selectedIds, select, tool, eraseById } =
-    useCanvasStore();
+  const strokes = useCanvasStore((s) => s.strokes);
+  const selectedId = useCanvasStore((s) => s.selectedId);
+  const selectedIds = useCanvasStore((s) => s.selectedIds);
+  const select = useCanvasStore((s) => s.select);
+  const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
+  const tool = useCanvasStore((s) => s.tool);
+  const eraseById = useCanvasStore((s) => s.eraseById);
+  const linkingFromId = useCanvasStore((s) => s.linkingFromId);
+  const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
+  const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
+  const beginLink = useCanvasStore((s) => s.beginLink);
+  const completeLink = useCanvasStore((s) => s.completeLink);
 
   return (
     <svg
@@ -38,6 +51,9 @@ export function StrokeLayer({
         // Desenhamos um halo mais fino e com a cor de selection-ring pra
         // diferenciar visualmente do primary.
         const isInGroup = !isSel && selectedIds.has(s.id);
+        const isLinkSource = linkingFromId === s.id;
+        const isLinkCandidate = linkingFromId !== null && linkingFromId !== s.id;
+        const bounds = strokeRect(s);
         const d = pointsToPath(s.points);
         if (!d) return null;
         // Cor de render theme-aware: vazio ("Auto") ou o legado "#2a2420"
@@ -52,6 +68,8 @@ export function StrokeLayer({
         return (
           <g
             key={s.id}
+            className="group"
+            data-canvas-entity-id={s.id}
             style={{
               pointerEvents:
                 tool === "select" || tool === "eraser" ? "auto" : "none",
@@ -74,6 +92,10 @@ export function StrokeLayer({
                 }
                 if (tool !== "select") return;
                 e.stopPropagation();
+                if (e.ctrlKey || e.metaKey) {
+                  toggleInSelection(s.id);
+                  return;
+                }
                 select(s.id);
               }}
             />
@@ -112,6 +134,24 @@ export function StrokeLayer({
                 style={{ pointerEvents: "none" }}
               />
             )}
+            {bounds && tool !== "eraser" && (
+              <StrokeConnectionDots
+                entityId={s.id}
+                rect={bounds}
+                isLinkSource={isLinkSource}
+                isLinkCandidate={isLinkCandidate}
+                linkingFromSide={linkingFromSide}
+                zoom={zoom}
+                isSelected={isSel}
+                onPick={(side) => {
+                  if (linkingFromId && linkingFromId !== s.id) {
+                    completeLink(s.id, side);
+                  } else {
+                    beginLink(s.id, side);
+                  }
+                }}
+              />
+            )}
           </g>
         );
       })}
@@ -133,7 +173,7 @@ export function StrokeLayer({
       )}
     </svg>
   );
-}
+});
 
 function pointsToPath(pts: number[]): string | null {
   if (pts.length < 2) return null;
@@ -142,4 +182,68 @@ function pointsToPath(pts: number[]): string | null {
     d += ` L ${pts[i]} ${pts[i + 1]}`;
   }
   return d;
+}
+
+function StrokeConnectionDots({
+  entityId,
+  rect,
+  isLinkSource,
+  isLinkCandidate,
+  linkingFromSide,
+  zoom,
+  isSelected,
+  onPick,
+}: {
+  entityId: string;
+  rect: { x: number; y: number; w: number; h: number };
+  isLinkSource: boolean;
+  isLinkCandidate: boolean;
+  linkingFromSide: CardSide | null;
+  zoom: number;
+  isSelected: boolean;
+  onPick: (side: CardSide) => void;
+}) {
+  const alwaysShow = isLinkSource || isLinkCandidate || isSelected;
+  const radius = 6 / zoom;
+  const strokeWidth = 2 / zoom;
+  const sides: { side: CardSide; x: number; y: number; title: string }[] = [
+    { side: "top", x: rect.x + rect.w / 2, y: rect.y, title: "Conectar pelo topo" },
+    { side: "right", x: rect.x + rect.w, y: rect.y + rect.h / 2, title: "Conectar pela direita" },
+    { side: "bottom", x: rect.x + rect.w / 2, y: rect.y + rect.h, title: "Conectar pela base" },
+    { side: "left", x: rect.x, y: rect.y + rect.h / 2, title: "Conectar pela esquerda" },
+  ];
+
+  return (
+    <>
+      {sides.map(({ side, x, y, title }) => {
+        const activeSource = isLinkSource && linkingFromSide === side;
+        return (
+          <circle
+            key={side}
+            cx={x}
+            cy={y}
+            r={radius}
+            data-connection-side={side}
+            className={alwaysShow ? "opacity-100" : "opacity-0 group-hover:opacity-100"}
+            style={{
+              cursor: "crosshair",
+              fill: activeSource ? "var(--accent)" : "var(--bg-panel)",
+              stroke: "var(--accent)",
+              strokeWidth,
+              pointerEvents: "auto",
+              transition: "opacity 120ms ease",
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onPick(side);
+              startCanvasLinkDrag(entityId, e);
+            }}
+          >
+            <title>{title}</title>
+          </circle>
+        );
+      })}
+    </>
+  );
 }

@@ -28,6 +28,7 @@ import { ListExitExtension } from "./ListExitExtension";
 import { SmartDashesExtension } from "./SmartDashesExtension";
 import {
   EDITOR_INDENT_SIZES,
+  EDITOR_FONT_FAMILIES,
   EDITOR_LINE_HEIGHTS,
   EDITOR_PARAGRAPH_SPACING,
   useAppStore,
@@ -56,6 +57,7 @@ export function Editor() {
   const editorLineHeight = useAppStore((s) => s.editorLineHeight);
   const editorParagraphSpacing = useAppStore((s) => s.editorParagraphSpacing);
   const editorIndentSize = useAppStore((s) => s.editorIndentSize);
+  const editorFontFamily = useAppStore((s) => s.editorFontFamily);
   const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
 
   const isLoadingRef = useRef(false);
@@ -386,11 +388,15 @@ export function Editor() {
   const indentSizeValue =
     EDITOR_INDENT_SIZES.find((option) => option.value === editorIndentSize)
       ?.css ?? "2em";
+  const editorFontFamilyValue =
+    EDITOR_FONT_FAMILIES.find((option) => option.value === editorFontFamily)
+      ?.css ?? EDITOR_FONT_FAMILIES[0].css;
   const editorVars = {
     ["--editor-zoom" as string]: String(editorZoom / 100),
     ["--editor-line-height" as string]: String(lineHeightValue),
     ["--editor-paragraph-spacing" as string]: paragraphSpacingValue,
     ["--editor-indent-size" as string]: indentSizeValue,
+    ["--editor-font-family" as string]: editorFontFamilyValue,
   };
 
   return (

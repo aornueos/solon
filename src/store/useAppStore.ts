@@ -25,6 +25,8 @@ export interface Toast {
   expiresAt: number;
 }
 
+export type EditorFontFamily = "serif" | "sans" | "mono";
+
 /**
  * Dialog modal ativo — usado em vez de `window.prompt/confirm` (que
  * renderizam fora do tema do app e quebram o feeling editorial).
@@ -211,6 +213,8 @@ interface AppState {
   editorParagraphSpacing: "tight" | "normal" | "airy";
   /** Tamanho do recuo aplicado por Tab em paragrafos. */
   editorIndentSize: "small" | "normal" | "large";
+  /** Familia tipografica padrao do editor. */
+  editorFontFamily: EditorFontFamily;
   /** Mostra contadores e formato na StatusBar. */
   showStatusStats: boolean;
   /** Mostra caminho completo do arquivo na StatusBar. */
@@ -275,6 +279,7 @@ interface AppState {
   setEditorLineHeight: (v: "compact" | "normal" | "relaxed") => void;
   setEditorParagraphSpacing: (v: "tight" | "normal" | "airy") => void;
   setEditorIndentSize: (v: "small" | "normal" | "large") => void;
+  setEditorFontFamily: (v: EditorFontFamily) => void;
   setShowStatusStats: (v: boolean) => void;
   setShowStatusPath: (v: boolean) => void;
   setCanvasGridEnabled: (v: boolean) => void;
@@ -325,13 +330,14 @@ const DEFAULT_EDITOR_MAX_WIDTH = 680;
 const DEFAULT_EDITOR_LINE_HEIGHT: "compact" | "normal" | "relaxed" = "normal";
 const DEFAULT_EDITOR_PARAGRAPH_SPACING: "tight" | "normal" | "airy" = "normal";
 const DEFAULT_EDITOR_INDENT_SIZE: "small" | "normal" | "large" = "normal";
+const DEFAULT_EDITOR_FONT_FAMILY: EditorFontFamily = "serif";
 const DEFAULT_SHOW_STATUS_STATS = true;
 const DEFAULT_SHOW_STATUS_PATH = true;
 const DEFAULT_CANVAS_GRID_ENABLED = true;
 const DEFAULT_CANVAS_SNAP_TO_GRID = false;
 const DEFAULT_CANVAS_GRID_SIZE = 24;
 const DEFAULT_CANVAS_TOOL: CanvasTool = "select";
-const DEFAULT_CANVAS_TEXT_SIZE = 18;
+const DEFAULT_CANVAS_TEXT_SIZE = 24;
 const DEFAULT_CANVAS_DRAW_WIDTH = 2;
 const DEFAULT_CANVAS_COLOR = "";
 const DEFAULT_LOCAL_HISTORY_ENABLED = true;
@@ -346,6 +352,7 @@ const EDITOR_MAX_WIDTH_KEY = "solon:editorMaxWidth";
 const EDITOR_LINE_HEIGHT_KEY = "solon:editorLineHeight";
 const EDITOR_PARAGRAPH_SPACING_KEY = "solon:editorParagraphSpacing";
 const EDITOR_INDENT_SIZE_KEY = "solon:editorIndentSize";
+const EDITOR_FONT_FAMILY_KEY = "solon:editorFontFamily";
 const SHOW_STATUS_STATS_KEY = "solon:showStatusStats";
 const SHOW_STATUS_PATH_KEY = "solon:showStatusPath";
 const CANVAS_GRID_ENABLED_KEY = "solon:canvasGridEnabled";
@@ -387,8 +394,26 @@ export const EDITOR_INDENT_SIZES = [
 
 export type EditorIndentSize = (typeof EDITOR_INDENT_SIZES)[number]["value"];
 
+export const EDITOR_FONT_FAMILIES = [
+  {
+    value: "serif",
+    label: "Serifada",
+    css: '"Lora", "EB Garamond", Georgia, serif',
+  },
+  {
+    value: "sans",
+    label: "Sem serifa",
+    css: '"Inter", system-ui, sans-serif',
+  },
+  {
+    value: "mono",
+    label: "Courier",
+    css: '"Courier New", "JetBrains Mono", monospace',
+  },
+] as const;
+
 export const CANVAS_GRID_SIZES = [16, 24, 32, 48] as const;
-export const CANVAS_TEXT_SIZES = [14, 18, 24, 32] as const;
+export const CANVAS_TEXT_SIZES = [18, 24, 32, 48] as const;
 export const CANVAS_DRAW_WIDTHS = [1.5, 2, 3, 6] as const;
 export const CANVAS_DEFAULT_TOOLS: CanvasTool[] = [
   "select",
@@ -420,6 +445,14 @@ function loadEditorIndentSize(): EditorIndentSize {
     if (v === "small" || v === "normal" || v === "large") return v;
   } catch {}
   return DEFAULT_EDITOR_INDENT_SIZE;
+}
+
+function loadEditorFontFamily(): EditorFontFamily {
+  try {
+    const v = localStorage.getItem(EDITOR_FONT_FAMILY_KEY);
+    if (v === "serif" || v === "sans" || v === "mono") return v;
+  } catch {}
+  return DEFAULT_EDITOR_FONT_FAMILY;
 }
 
 function loadNumberOption<T extends readonly number[]>(
@@ -543,6 +576,7 @@ export const useAppStore = create<AppState>((set) => ({
   editorLineHeight: loadEditorLineHeight(),
   editorParagraphSpacing: loadEditorParagraphSpacing(),
   editorIndentSize: loadEditorIndentSize(),
+  editorFontFamily: loadEditorFontFamily(),
   showStatusStats: loadBoolPref(SHOW_STATUS_STATS_KEY, DEFAULT_SHOW_STATUS_STATS),
   showStatusPath: loadBoolPref(SHOW_STATUS_PATH_KEY, DEFAULT_SHOW_STATUS_PATH),
   canvasGridEnabled: loadBoolPref(CANVAS_GRID_ENABLED_KEY, DEFAULT_CANVAS_GRID_ENABLED),
@@ -779,6 +813,7 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.removeItem(EDITOR_LINE_HEIGHT_KEY);
       localStorage.removeItem(EDITOR_PARAGRAPH_SPACING_KEY);
       localStorage.removeItem(EDITOR_INDENT_SIZE_KEY);
+      localStorage.removeItem(EDITOR_FONT_FAMILY_KEY);
       localStorage.removeItem(SHOW_STATUS_STATS_KEY);
       localStorage.removeItem(SHOW_STATUS_PATH_KEY);
       localStorage.removeItem(CANVAS_GRID_ENABLED_KEY);
@@ -804,6 +839,7 @@ export const useAppStore = create<AppState>((set) => ({
       editorLineHeight: DEFAULT_EDITOR_LINE_HEIGHT,
       editorParagraphSpacing: DEFAULT_EDITOR_PARAGRAPH_SPACING,
       editorIndentSize: DEFAULT_EDITOR_INDENT_SIZE,
+      editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
       showStatusStats: DEFAULT_SHOW_STATUS_STATS,
       showStatusPath: DEFAULT_SHOW_STATUS_PATH,
       canvasGridEnabled: DEFAULT_CANVAS_GRID_ENABLED,
@@ -890,6 +926,16 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ editorIndentSize: v });
+  },
+
+  setEditorFontFamily: (v) => {
+    if (!EDITOR_FONT_FAMILIES.some((option) => option.value === v)) return;
+    try {
+      localStorage.setItem(EDITOR_FONT_FAMILY_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ editorFontFamily: v });
   },
 
   setShowStatusStats: (v) => {

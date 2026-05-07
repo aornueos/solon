@@ -5,6 +5,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         // O plugin `process` expõe `relaunch()`/`exit()` — necessário pra
         // reiniciar o app depois que o updater termina de instalar.
         .plugin(tauri_plugin_process::init())

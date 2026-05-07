@@ -114,6 +114,13 @@ export function Titlebar() {
   const { available, isMaximized, minimize, toggleMaximize, close } =
     useWindowControls();
 
+  const onTitlebarDoubleClick = (e: React.MouseEvent) => {
+    if (!available) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    e.preventDefault();
+    toggleMaximize();
+  };
+
   return (
     <div
       className="flex items-center h-9 select-none"
@@ -122,6 +129,7 @@ export function Titlebar() {
         borderBottom: "1px solid var(--border-subtle)",
       }}
       data-tauri-drag-region
+      onDoubleClick={onTitlebarDoubleClick}
     >
       {/* Logo / Nome — clicavel, leva pra home page. Stop drag pra que o
           clique nao seja interceptado pelo `data-tauri-drag-region` do pai. */}

@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { startDrag } from "../../lib/drag";
 import { CanvasText, CardSide } from "../../types/canvas";
-import { textRect } from "../../lib/canvasGeom";
+import { strokeRect, textRect } from "../../lib/canvasGeom";
 
 // Re-export local com nome curto pra usar nos rects do componente sem
 // poluir o escopo principal com `textRect` do canvasGeom.
@@ -28,46 +28,52 @@ const textRectInline = (t: CanvasText) => textRect(t);
  * entre centros — somia quando os cards se sobrepunham e não dava
  * sensação de direção.
  */
-export function ArrowLayer({
+export const ArrowLayer = memo(function ArrowLayer({
   worldWidth,
   worldHeight,
 }: {
   worldWidth: number;
   worldHeight: number;
 }) {
-  const {
-    cards,
-    arrows,
-    texts,
-    images,
-    removeArrow,
-    selectedId,
-    selectedIds,
-    select,
-    setArrowBend,
-    viewport,
-    tool,
-    linkingFromId,
-    linkingFromSide,
-  } = useCanvasStore();
+  const cards = useCanvasStore((s) => s.cards);
+  const arrows = useCanvasStore((s) => s.arrows);
+  const texts = useCanvasStore((s) => s.texts);
+  const strokes = useCanvasStore((s) => s.strokes);
+  const images = useCanvasStore((s) => s.images);
+  const removeArrow = useCanvasStore((s) => s.removeArrow);
+  const selectedId = useCanvasStore((s) => s.selectedId);
+  const selectedIds = useCanvasStore((s) => s.selectedIds);
+  const select = useCanvasStore((s) => s.select);
+  const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
+  const setArrowBend = useCanvasStore((s) => s.setArrowBend);
+  const viewport = useCanvasStore((s) => s.viewport);
+  const tool = useCanvasStore((s) => s.tool);
+  const linkingFromId = useCanvasStore((s) => s.linkingFromId);
+  const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
   // Mapa de id → Rect cobrindo cards, texts e images. Antes a gente
   // mapeava so cards, entao setas com endpoint em texto/imagem viravam
   // null e desapareciam silenciosamente. `getEntityRect` resolve por
   // tipo na hora — aqui pre-construimos o mapa pra evitar O(n) por
   // arrow no render.
-  const rectById = new Map<string, { x: number; y: number; w: number; h: number }>();
-  for (const c of cards) rectById.set(c.id, { x: c.x, y: c.y, w: c.w, h: c.h });
-  for (const im of images) rectById.set(im.id, { x: im.x, y: im.y, w: im.w, h: im.h });
-  for (const t of texts) rectById.set(t.id, textRectInline(t));
+  const rectById = useMemo(() => {
+    const map = new Map<string, { x: number; y: number; w: number; h: number }>();
+    for (const c of cards) map.set(c.id, { x: c.x, y: c.y, w: c.w, h: c.h });
+    for (const im of images) map.set(im.id, { x: im.x, y: im.y, w: im.w, h: im.h });
+    for (const t of texts) map.set(t.id, textRectInline(t));
+    for (const st of strokes) {
+      const rect = strokeRect(st);
+      if (rect) map.set(st.id, rect);
+    }
+    return map;
+  }, [cards, images, strokes, texts]);
 
   // Preview pointilhado enquanto o usuário está "linkando" — sai do card
   // de origem até o cursor. Sem isso o usuário clica e vai cego até o
   // destino sem feedback de pra onde a seta vai.
   //
-  // Throttle via rAF: `mousemove` em Chromium moderno dispara ~500Hz em
-  // mouses gamer; atualizar estado a essa taxa causa re-render inútil (o
-  // monitor só redesenha a ~60-120Hz). Coalescemos via rAF pra 1 update
-  // por frame.
+  // Atualiza direto no pointermove, mas ignora deslocamento sub-pixel em world
+  // coords. O rAF anterior economizava render, mas introduzia atraso visível
+  // ao arrastar a ponta da seta.
   const [previewWorld, setPreviewWorld] = useState<
     { x: number; y: number } | null
   >(null);
@@ -76,34 +82,28 @@ export function ArrowLayer({
       setPreviewWorld(null);
       return;
     }
-    let rafId: number | null = null;
-    let pendingEvent: MouseEvent | null = null;
+    let last: { x: number; y: number } | null = null;
 
-    const flush = () => {
-      rafId = null;
-      const e = pendingEvent;
-      if (!e) return;
-      pendingEvent = null;
+    const onMove = (e: PointerEvent) => {
       const surface = document.querySelector(
         ".canvas-surface",
       ) as HTMLElement | null;
       if (!surface) return;
       const rect = surface.getBoundingClientRect();
       const { viewport: vp } = useCanvasStore.getState();
-      setPreviewWorld({
+      const next = {
         x: (e.clientX - rect.left - vp.x) / vp.zoom,
         y: (e.clientY - rect.top - vp.y) / vp.zoom,
-      });
+      };
+      if (last && Math.hypot(next.x - last.x, next.y - last.y) < 0.75 / vp.zoom) {
+        return;
+      }
+      last = next;
+      setPreviewWorld(next);
     };
-
-    const onMove = (e: MouseEvent) => {
-      pendingEvent = e;
-      if (rafId == null) rafId = requestAnimationFrame(flush);
-    };
-    document.addEventListener("mousemove", onMove);
+    document.addEventListener("pointermove", onMove);
     return () => {
-      document.removeEventListener("mousemove", onMove);
-      if (rafId != null) cancelAnimationFrame(rafId);
+      document.removeEventListener("pointermove", onMove);
     };
   }, [linkingFromId]);
   const dragRef = useRef<{
@@ -161,7 +161,6 @@ export function ArrowLayer({
   // zoom-out (<1), 1.5 world px vira sub-pixel e a arrow some.
   const zoom = viewport.zoom || 1;
   const baseStroke = 2 / zoom;
-  const selStroke = 2.5 / zoom;
   const hitStroke = 16 / zoom;
   const handleR = 6 / zoom;
   const handleStroke = 1.5 / zoom;
@@ -225,6 +224,9 @@ export function ArrowLayer({
         });
         const d = `M ${p1.x} ${p1.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${p2.x} ${p2.y}`;
 
+        const arrowStroke = Math.max(1, a.width ?? 2) / zoom;
+        const selectedStroke = Math.max(arrowStroke + 0.75 / zoom, 2.5 / zoom);
+
         // Ponto médio da cubic bezier (t=0.5):
         // B(0.5) = 0.125·P0 + 0.375·P1 + 0.375·P2 + 0.125·P3
         const handleX =
@@ -253,6 +255,10 @@ export function ArrowLayer({
                   removeArrow(a.id);
                   return;
                 }
+                if (e.ctrlKey || e.metaKey) {
+                  toggleInSelection(a.id);
+                  return;
+                }
                 select(a.id);
               }}
               onDoubleClick={(e) => {
@@ -262,7 +268,7 @@ export function ArrowLayer({
             />
             <path
               d={d}
-              strokeWidth={isSel ? selStroke : baseStroke}
+              strokeWidth={isSel ? selectedStroke : arrowStroke}
               strokeLinecap="round"
               fill="none"
               markerEnd={`url(#${isSel ? "arrowhead-selected" : "arrowhead"})`}
@@ -341,7 +347,7 @@ export function ArrowLayer({
         })()}
     </svg>
   );
-}
+});
 
 // ---------------- roteamento -----------------
 

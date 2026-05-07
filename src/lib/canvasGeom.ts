@@ -1,4 +1,4 @@
-import type { CanvasText } from "../types/canvas";
+import type { CanvasStroke, CanvasText } from "../types/canvas";
 import { useCanvasStore } from "../store/useCanvasStore";
 
 export type Rect = { x: number; y: number; w: number; h: number };
@@ -8,6 +8,8 @@ export type Rect = { x: number; y: number; w: number; h: number };
  * pra evitar criar elemento canvas a cada bbox de texto.
  */
 let measureCtx: CanvasRenderingContext2D | null | undefined;
+const CANVAS_TEXT_FONT =
+  '"Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
 function getMeasureCtx(): CanvasRenderingContext2D | null {
   if (measureCtx !== undefined) return measureCtx;
   if (typeof document === "undefined") {
@@ -37,7 +39,7 @@ export function textRect(t: CanvasText): Rect {
   };
 
   if (ctx) {
-    ctx.font = `${t.bold ? "700 " : ""}${t.size}px 'EB Garamond', Georgia, serif`;
+    ctx.font = `${t.bold ? "700 " : "500 "}${t.size}px ${CANVAS_TEXT_FONT}`;
   }
 
   for (const line of lines) {
@@ -56,6 +58,31 @@ export function textRect(t: CanvasText): Rect {
   const w = Math.max(40, t.width ?? maxW);
   const h = Math.max(lineHeight, t.height ?? visualLines * lineHeight);
   return { x: t.x, y: t.y, w, h };
+}
+
+export function strokeRect(stroke: CanvasStroke): Rect | null {
+  if (stroke.points.length < 2) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < stroke.points.length; i += 2) {
+    const x = stroke.points[i];
+    const y = stroke.points[i + 1];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
+  const pad = Math.max(8, stroke.width / 2 + 4);
+  return {
+    x: minX - pad,
+    y: minY - pad,
+    w: Math.max(16, maxX - minX + pad * 2),
+    h: Math.max(16, maxY - minY + pad * 2),
+  };
 }
 
 function wrapMeasuredLine(
@@ -111,5 +138,7 @@ export function getEntityRect(id: string): Rect | null {
   if (im) return { x: im.x, y: im.y, w: im.w, h: im.h };
   const t = s.texts.find((x) => x.id === id);
   if (t) return textRect(t);
+  const st = s.strokes.find((x) => x.id === id);
+  if (st) return strokeRect(st);
   return null;
 }

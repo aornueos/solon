@@ -41,6 +41,8 @@
   --marquee-fill: rgba(160, 120, 80, 0.08);
   --marquee-stroke: rgba(160, 120, 80, 0.7);
   --selection-ring: rgba(160, 120, 80, 0.55);
+  --canvas-text-auto: #242321;
+  --canvas-text-placeholder: rgba(31, 30, 28, 0.42);
 
   --shadow-sm: 0 1px 2px rgba(30, 28, 25, 0.08);
   --shadow-md: 0 3px 10px rgba(30, 28, 25, 0.12);
@@ -77,6 +79,8 @@
   --marquee-fill: rgba(201, 160, 90, 0.1);
   --marquee-stroke: rgba(201, 160, 90, 0.7);
   --selection-ring: rgba(201, 160, 90, 0.75);
+  --canvas-text-auto: #f2f0ec;
+  --canvas-text-placeholder: rgba(242, 240, 236, 0.36);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
@@ -147,7 +151,7 @@
   user-select: text;
   -webkit-user-select: text;
   cursor: text;
-  font-family: "Lora", Georgia, serif !important;
+  font-family: var(--editor-font-family, "Lora", Georgia, serif) !important;
   /* `--editor-zoom` e settado pelo wrapper do EditorContent (Editor.tsx).
      Default 1 mantem comportamento atual quando settings inativas. Multi-
      plicador aplicado em todos os font-sizes abaixo via calc(). */
@@ -176,7 +180,7 @@
 }
 
 .ProseMirror h1 {
-  font-family: "Lora", Georgia, serif !important;
+  font-family: var(--editor-font-family, "Lora", Georgia, serif) !important;
   font-size: calc(2rem * var(--editor-zoom, 1)) !important;
   font-weight: 700 !important;
   line-height: 1.15;
@@ -191,7 +195,7 @@
 .ProseMirror h1:first-child { margin-top: 0; }
 
 .ProseMirror h2 {
-  font-family: "Lora", Georgia, serif !important;
+  font-family: var(--editor-font-family, "Lora", Georgia, serif) !important;
   font-size: calc(1.35rem * var(--editor-zoom, 1)) !important;
   font-weight: 600 !important;
   line-height: 1.3;
@@ -204,7 +208,7 @@
 }
 
 .ProseMirror h3 {
-  font-family: "Inter", sans-serif !important;
+  font-family: var(--editor-font-family, "Inter", sans-serif) !important;
   font-size: calc(0.72rem * var(--editor-zoom, 1)) !important;
   font-weight: 700 !important;
   line-height: 1.4;
@@ -216,7 +220,7 @@
 }
 
 .ProseMirror h4 {
-  font-family: "Inter", sans-serif !important;
+  font-family: var(--editor-font-family, "Inter", sans-serif) !important;
   font-size: calc(0.7rem * var(--editor-zoom, 1)) !important;
   font-weight: 600 !important;
   margin-top: 1.75rem;
@@ -228,7 +232,7 @@
 
 .ProseMirror h5,
 .ProseMirror h6 {
-  font-family: "Inter", sans-serif !important;
+  font-family: var(--editor-font-family, "Inter", sans-serif) !important;
   font-size: calc(0.68rem * var(--editor-zoom, 1)) !important;
   font-weight: 500 !important;
   margin-top: 1.25rem;
@@ -456,7 +460,11 @@
 ───────────────────────────────────────── */
 .canvas-surface {
   background-color: var(--bg-app);
-  background-image: radial-gradient(circle, var(--dot-grid) 1px, transparent 1px);
+}
+
+.canvas-text-input::placeholder {
+  color: var(--canvas-text-placeholder);
+  opacity: 1;
 }
 
 /* ─────────────────────────────────────────

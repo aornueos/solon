@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CanvasText, DRAW_COLORS } from "../../types/canvas";
 import { useCanvasStore } from "../../store/useCanvasStore";
@@ -13,8 +13,14 @@ import {
   Underline,
   Highlighter,
   Type,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  List,
+  Link as LinkIcon,
 } from "lucide-react";
 import clsx from "clsx";
+import { ConnectionDots } from "./ConnectionDots";
 
 interface Props {
   text: CanvasText;
@@ -35,6 +41,8 @@ const HIGHLIGHT_COLORS: { label: string; value: string }[] = [
 const TEXT_SIZES = [12, 14, 18, 24, 32, 48] as const;
 const MIN_TEXT_SIZE = 8;
 const MAX_TEXT_SIZE = 160;
+const CANVAS_TEXT_FONT =
+  '"Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
 
 type ResizeDir = "n" | "e" | "s" | "w" | "ne" | "nw" | "se" | "sw";
 
@@ -49,28 +57,32 @@ const RESIZE_HANDLES: { dir: ResizeDir; cursor: string; title: string }[] = [
   { dir: "w", cursor: "ew-resize", title: "Redimensionar largura" },
 ];
 
-export function FloatingText({ text, autoEdit }: Props) {
-  const {
-    updateText,
-    removeText,
-    select,
-    selectedId,
-    selectedIds,
-    snapshotSelection,
-    translateSelection,
-    viewport,
-    tool,
-    linkingFromId,
-    beginLink,
-    completeLink,
-    pushHistory,
-  } = useCanvasStore();
+export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props) {
+  const updateText = useCanvasStore((s) => s.updateText);
+  const removeText = useCanvasStore((s) => s.removeText);
+  const select = useCanvasStore((s) => s.select);
+  const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
+  const selectedId = useCanvasStore((s) => s.selectedId);
+  const selectedIds = useCanvasStore((s) => s.selectedIds);
+  const snapshotSelection = useCanvasStore((s) => s.snapshotSelection);
+  const translateSelection = useCanvasStore((s) => s.translateSelection);
+  const viewport = useCanvasStore((s) => s.viewport);
+  const tool = useCanvasStore((s) => s.tool);
+  const linkingFromId = useCanvasStore((s) => s.linkingFromId);
+  const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
+  const beginLink = useCanvasStore((s) => s.beginLink);
+  const completeLink = useCanvasStore((s) => s.completeLink);
+  const pushHistory = useCanvasStore((s) => s.pushHistory);
+  const openPrompt = useAppStore((s) => s.openPrompt);
   const canvasSnapToGrid = useAppStore((s) => s.canvasSnapToGrid);
   const canvasGridSize = useAppStore((s) => s.canvasGridSize);
 
   const isSelected = selectedId === text.id;
   const isInGroup = selectedId !== text.id && selectedIds.has(text.id);
+  const isLinkSource = linkingFromId === text.id;
+  const isLinkCandidate = linkingFromId !== null && linkingFromId !== text.id;
   const [editing, setEditing] = useState(!!autoEdit);
+  const [draftText, setDraftText] = useState(text.text);
   const [openMenu, setOpenMenu] = useState<
     null | "color" | "highlight" | "size"
   >(null);
@@ -91,14 +103,17 @@ export function FloatingText({ text, autoEdit }: Props) {
       ? Math.round(value / canvasGridSize) * canvasGridSize
       : value;
 
+  const displayText = editing ? draftText : text.text;
+  const displayModel = { ...text, text: displayText };
+
   const naturalRect = textRect({
-    ...text,
+    ...displayModel,
     width: undefined,
     height: undefined,
   });
   const implicitWidth = Math.max(80, Math.min(800, Math.ceil(naturalRect.w)));
   const measuredRect = textRect({
-    ...text,
+    ...displayModel,
     width: text.width ?? implicitWidth,
     height: text.height,
   });
@@ -116,13 +131,20 @@ export function FloatingText({ text, autoEdit }: Props) {
   }, [editing]);
 
   useEffect(() => {
+    if (!editing) setDraftText(text.text);
+  }, [editing, text.text]);
+
+  useEffect(() => {
     if (!openMenu) return;
     const onClick = () => setOpenMenu(null);
     const id = window.setTimeout(
-      () => document.addEventListener("click", onClick, { once: true }),
+      () => document.addEventListener("click", onClick),
       0,
     );
-    return () => window.clearTimeout(id);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener("click", onClick);
+    };
   }, [openMenu]);
 
   useLayoutEffect(() => {
@@ -192,6 +214,12 @@ export function FloatingText({ text, autoEdit }: Props) {
     if (tool !== "select") return;
 
     e.stopPropagation();
+
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      toggleInSelection(text.id);
+      return;
+    }
 
     const currentIds = useCanvasStore.getState().selectedIds;
     const isGroupDrag = currentIds.size > 1 && currentIds.has(text.id);
@@ -263,7 +291,12 @@ export function FloatingText({ text, autoEdit }: Props) {
   const onDoubleClick = (e: React.MouseEvent) => {
     if (tool !== "select") return;
     e.stopPropagation();
+    setDraftText(text.text);
     setEditing(true);
+  };
+
+  const commitDraft = (value = draftText) => {
+    updateText(text.id, { text: value });
   };
 
   const onResizeMouseDown = (dir: ResizeDir, e: React.MouseEvent) => {
@@ -286,6 +319,26 @@ export function FloatingText({ text, autoEdit }: Props) {
     const minH = Math.max(28, text.size * 1.35);
     const maxW = 2000;
     const maxH = 1600;
+    let frame: number | null = null;
+    let pendingPatch: Partial<CanvasText> | null = null;
+
+    const flushResize = () => {
+      frame = null;
+      if (!pendingPatch) return;
+      updateText(text.id, pendingPatch);
+      pendingPatch = null;
+    };
+
+    const scheduleResize = (patch: Partial<CanvasText>) => {
+      pendingPatch = patch;
+      if (frame == null) frame = requestAnimationFrame(flushResize);
+    };
+
+    const cancelPendingResize = () => {
+      if (frame != null) cancelAnimationFrame(frame);
+      frame = null;
+      pendingPatch = null;
+    };
 
     startDrag({
       onMove: (ev) => {
@@ -353,9 +406,16 @@ export function FloatingText({ text, autoEdit }: Props) {
           );
         }
 
-        updateText(text.id, next);
+        scheduleResize(next);
+      },
+      onEnd: () => {
+        if (frame != null) {
+          cancelAnimationFrame(frame);
+          flushResize();
+        }
       },
       onCancel: () => {
+        cancelPendingResize();
         updateText(text.id, {
           x: orig.x,
           y: orig.y,
@@ -369,8 +429,9 @@ export function FloatingText({ text, autoEdit }: Props) {
 
   const renderColor =
     !text.color || text.color === "#2a2420"
-      ? "var(--text-primary)"
+      ? "var(--canvas-text-auto)"
       : text.color;
+  const hasVisibleText = displayText.trim().length > 0;
 
   const rootStyle: React.CSSProperties = {
     position: "absolute",
@@ -400,24 +461,29 @@ export function FloatingText({ text, autoEdit }: Props) {
     boxSizing: "border-box",
     color: renderColor,
     fontSize: text.size,
-    fontWeight: text.bold ? 700 : 400,
+    fontWeight: text.bold ? 700 : 500,
     fontStyle: text.italic ? "italic" : "normal",
     textDecoration: text.underline ? "underline" : "none",
-    lineHeight: 1.25,
-    fontFamily: "'EB Garamond', Georgia, serif",
+    textAlign: text.align ?? "left",
+    lineHeight: 1.18,
+    fontFamily: CANVAS_TEXT_FONT,
+    letterSpacing: 0,
     whiteSpace: "pre-wrap",
     wordBreak: "break-word",
-    overflow: "hidden",
+    overflow: editing ? "auto" : "visible",
     padding: text.highlight ? "1px 4px" : 0,
     background: text.highlight || "transparent",
     borderRadius: text.highlight ? 2 : 0,
   };
+
+  const renderedLines = displayText.split("\n").filter((line) => line.trim());
 
   return (
     <div
       ref={rootRef}
       onMouseDown={onMouseDown}
       onDoubleClick={onDoubleClick}
+      data-canvas-entity-id={text.id}
       className={clsx(
         "group",
         tool === "select"
@@ -433,17 +499,23 @@ export function FloatingText({ text, autoEdit }: Props) {
       {editing ? (
         <textarea
           ref={textareaRef}
-          value={text.text}
-          onChange={(e) => updateText(text.id, { text: e.target.value })}
+          className="canvas-text-input"
+          value={draftText}
+          onChange={(e) => {
+            const next = e.target.value;
+            setDraftText(next);
+          }}
           onBlur={() => {
+            commitDraft();
             setEditing(false);
-            if (!text.text.trim()) removeText(text.id);
+            if (!draftText.trim()) removeText(text.id);
           }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.preventDefault();
+              commitDraft();
               setEditing(false);
-              if (!text.text.trim()) removeText(text.id);
+              if (!draftText.trim()) removeText(text.id);
             }
             e.stopPropagation();
           }}
@@ -451,18 +523,41 @@ export function FloatingText({ text, autoEdit }: Props) {
           placeholder="Digite..."
           style={{
             ...contentStyle,
-            border: "1px dashed var(--accent-2)",
+            border: hasVisibleText
+              ? "1px solid transparent"
+              : "1px dashed var(--selection-ring)",
             resize: "none",
             outline: "none",
             background: text.highlight || "transparent",
+            caretColor: "var(--accent)",
+            minHeight: boxHeight,
           }}
         />
       ) : (
-        <div style={contentStyle}>
-          {text.text || (
-            <span className="italic opacity-50">(texto vazio)</span>
-          )}
-        </div>
+        <TextPreview
+          text={displayText}
+          lines={renderedLines}
+          list={text.list}
+          link={text.link}
+          style={contentStyle}
+        />
+      )}
+
+      {tool !== "eraser" && !editing && (
+        <ConnectionDots
+          entityId={text.id}
+          isLinkSource={isLinkSource}
+          isLinkCandidate={isLinkCandidate}
+          linkingFromSide={linkingFromSide}
+          isSelected={isSelected}
+          onPick={(side) => {
+            if (linkingFromId && linkingFromId !== text.id) {
+              completeLink(text.id, side);
+            } else {
+              beginLink(text.id, side);
+            }
+          }}
+        />
       )}
 
       {isSelected && !editing && text.text.trim().length > 0 && (
@@ -522,6 +617,68 @@ export function FloatingText({ text, autoEdit }: Props) {
             }}
           >
             <Underline size={11} />
+          </TinyBtn>
+          <Divider />
+
+          <TinyBtn
+            title="Bullet point"
+            active={text.list === "bullet"}
+            onClick={(e) => {
+              e.stopPropagation();
+              updateText(text.id, {
+                list: text.list === "bullet" ? undefined : "bullet",
+              });
+            }}
+          >
+            <List size={11} />
+          </TinyBtn>
+          <TinyBtn
+            title="Alinhar a esquerda"
+            active={!text.align || text.align === "left"}
+            onClick={(e) => {
+              e.stopPropagation();
+              updateText(text.id, { align: "left" });
+            }}
+          >
+            <AlignLeft size={11} />
+          </TinyBtn>
+          <TinyBtn
+            title="Centralizar"
+            active={text.align === "center"}
+            onClick={(e) => {
+              e.stopPropagation();
+              updateText(text.id, { align: "center" });
+            }}
+          >
+            <AlignCenter size={11} />
+          </TinyBtn>
+          <TinyBtn
+            title="Alinhar a direita"
+            active={text.align === "right"}
+            onClick={(e) => {
+              e.stopPropagation();
+              updateText(text.id, { align: "right" });
+            }}
+          >
+            <AlignRight size={11} />
+          </TinyBtn>
+          <TinyBtn
+            title={text.link ? "Editar link" : "Adicionar link"}
+            active={!!text.link}
+            onClick={async (e) => {
+              e.stopPropagation();
+              const value = await openPrompt({
+                title: "Link do texto",
+                message: "Cole uma URL ou deixe em branco para remover.",
+                defaultValue: text.link ?? "",
+                placeholder: "https://...",
+                confirmLabel: "Aplicar",
+              });
+              if (value === null) return;
+              updateText(text.id, { link: value.trim() || undefined });
+            }}
+          >
+            <LinkIcon size={11} />
           </TinyBtn>
           <Divider />
 
@@ -648,6 +805,83 @@ export function FloatingText({ text, autoEdit }: Props) {
       )}
     </div>
   );
+});
+
+function TextPreview({
+  text,
+  lines,
+  list,
+  link,
+  style,
+}: {
+  text: string;
+  lines: string[];
+  list?: "bullet";
+  link?: string;
+  style: React.CSSProperties;
+}) {
+  const content = !text ? (
+    <span style={{ color: "var(--canvas-text-placeholder)" }}>Digite...</span>
+  ) : list === "bullet" ? (
+    <ul
+      style={{
+        margin: 0,
+        paddingLeft: "1.15em",
+        listStylePosition: "outside",
+      }}
+    >
+      {(lines.length ? lines : [" "]).map((line, index) => (
+        <li key={`${line}-${index}`}>{line || " "}</li>
+      ))}
+    </ul>
+  ) : (
+    text
+  );
+
+  if (!link) return <div style={style}>{content}</div>;
+  const safeHref = normalizeLinkHref(link);
+
+  return (
+    <div
+      onMouseDown={(e) => {
+        if (!safeHref || (!e.ctrlKey && !e.metaKey)) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onClick={(e) => {
+        if (!safeHref || (!e.ctrlKey && !e.metaKey)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        window.open(safeHref, "_blank", "noopener,noreferrer");
+      }}
+      style={{
+        ...style,
+        textDecoration: "underline",
+        textUnderlineOffset: 3,
+        cursor: safeHref ? "alias" : style.cursor,
+      }}
+      title={safeHref ? `${safeHref} (Ctrl+clique para abrir)` : link}
+    >
+      {content}
+    </div>
+  );
+}
+
+function normalizeLinkHref(value: string): string | null {
+  const raw = value.trim();
+  if (!raw) return null;
+  const withProtocol = /^[a-z][a-z0-9+.-]*:/i.test(raw)
+    ? raw
+    : `https://${raw}`;
+  try {
+    const url = new URL(withProtocol);
+    if (url.protocol === "http:" || url.protocol === "https:" || url.protocol === "mailto:") {
+      return url.toString();
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function clamp(value: number, min: number, max: number) {

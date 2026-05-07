@@ -6,6 +6,8 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Heading4,
+  Heading5,
   Quote,
   Minus,
   List,
@@ -59,16 +61,25 @@ export function EditorToolbar({ editor }: Props) {
     },
   ];
 
-  const headingTools: ToolSpec[] = [1, 2, 3].map((level) => ({
+  const headingTools: ToolSpec[] = [1, 2, 3, 4, 5].map((level) => ({
     icon:
       level === 1 ? <Heading1 size={15} /> :
       level === 2 ? <Heading2 size={15} /> :
-      <Heading3 size={15} />,
+      level === 3 ? <Heading3 size={15} /> :
+      level === 4 ? <Heading4 size={15} /> :
+      <Heading5 size={15} />,
     title:
       level === 1 ? "Capítulo (H1)" :
       level === 2 ? "Seção (H2)" :
-      "Cena (H3)",
-    run: (e) => e.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 }).run(),
+      level === 3 ? "Cena (H3)" :
+      level === 4 ? "Bloco (H4)" :
+      "Detalhe (H5)",
+    run: (e) =>
+      e
+        .chain()
+        .focus()
+        .toggleHeading({ level: level as 1 | 2 | 3 | 4 | 5 })
+        .run(),
     isActive: (e) => e.isActive("heading", { level }),
   }));
 
@@ -495,13 +506,13 @@ function NovelPresets({ editor }: { editor: Editor }) {
           .chain()
           .focus()
           .setHorizontalRule()
-          .insertContent("<h1>Capítulo</h1>")
+          .insertContent("<h1></h1>")
           .run(),
     },
     {
       label: "Cena",
       action: () =>
-        editor.chain().focus().insertContent("<hr /><h3>Nova Cena</h3>").run(),
+        editor.chain().focus().insertContent("<hr /><h3></h3>").run(),
     },
   ];
 

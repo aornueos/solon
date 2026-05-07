@@ -14,13 +14,9 @@ import {
   Loader2,
   Trash2,
   ExternalLink,
-  Grid3X3,
 } from "lucide-react";
 import {
-  CANVAS_DEFAULT_TOOLS,
-  CANVAS_DRAW_WIDTHS,
-  CANVAS_GRID_SIZES,
-  CANVAS_TEXT_SIZES,
+  EDITOR_FONT_FAMILIES,
   EDITOR_INDENT_SIZES,
   EDITOR_LINE_HEIGHTS,
   EDITOR_MAX_WIDTHS,
@@ -70,6 +66,8 @@ export function SettingsDialog() {
   );
   const editorIndentSize = useAppStore((s) => s.editorIndentSize);
   const setEditorIndentSize = useAppStore((s) => s.setEditorIndentSize);
+  const editorFontFamily = useAppStore((s) => s.editorFontFamily);
+  const setEditorFontFamily = useAppStore((s) => s.setEditorFontFamily);
   const startView = useAppStore((s) => s.startView);
   const setStartView = useAppStore((s) => s.setStartView);
   const autoSaveEnabled = useAppStore((s) => s.autoSaveEnabled);
@@ -82,18 +80,6 @@ export function SettingsDialog() {
   const setShowStatusStats = useAppStore((s) => s.setShowStatusStats);
   const showStatusPath = useAppStore((s) => s.showStatusPath);
   const setShowStatusPath = useAppStore((s) => s.setShowStatusPath);
-  const canvasGridEnabled = useAppStore((s) => s.canvasGridEnabled);
-  const setCanvasGridEnabled = useAppStore((s) => s.setCanvasGridEnabled);
-  const canvasSnapToGrid = useAppStore((s) => s.canvasSnapToGrid);
-  const setCanvasSnapToGrid = useAppStore((s) => s.setCanvasSnapToGrid);
-  const canvasGridSize = useAppStore((s) => s.canvasGridSize);
-  const setCanvasGridSize = useAppStore((s) => s.setCanvasGridSize);
-  const canvasDefaultTool = useAppStore((s) => s.canvasDefaultTool);
-  const setCanvasDefaultTool = useAppStore((s) => s.setCanvasDefaultTool);
-  const canvasDefaultTextSize = useAppStore((s) => s.canvasDefaultTextSize);
-  const setCanvasDefaultTextSize = useAppStore((s) => s.setCanvasDefaultTextSize);
-  const canvasDefaultDrawWidth = useAppStore((s) => s.canvasDefaultDrawWidth);
-  const setCanvasDefaultDrawWidth = useAppStore((s) => s.setCanvasDefaultDrawWidth);
   const localHistoryEnabled = useAppStore((s) => s.localHistoryEnabled);
   const setLocalHistoryEnabled = useAppStore((s) => s.setLocalHistoryEnabled);
   const openLastFileOnStartup = useAppStore((s) => s.openLastFileOnStartup);
@@ -214,6 +200,15 @@ export function SettingsDialog() {
     pushToast("success", "Versao ignorada liberada.");
   };
 
+  const openReleaseChannel = async () => {
+    try {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl(RELEASES_URL);
+    } catch {
+      window.open(RELEASES_URL, "_blank", "noopener,noreferrer");
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-[110] flex items-center justify-center p-4"
@@ -226,7 +221,7 @@ export function SettingsDialog() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="w-full max-w-xl rounded-lg shadow-xl flex flex-col max-h-[85vh]"
+        className="w-full max-w-3xl rounded-lg shadow-xl flex flex-col max-h-[85vh]"
         style={{
           background: "var(--bg-panel)",
           border: "1px solid var(--border)",
@@ -384,66 +379,15 @@ export function SettingsDialog() {
                 onChange={(v) => setEditorIndentSize(v)}
               />
             </Row>
-          </Section>
 
-          <Section title="Canvas">
-            <Row label="Grade" icon={<Grid3X3 size={11} />}>
-              <Toggle
-                checked={canvasGridEnabled}
-                onChange={setCanvasGridEnabled}
-                label={canvasGridEnabled ? "Visível" : "Oculta"}
-              />
-            </Row>
-
-            <Row label="Snap na grade">
-              <Toggle
-                checked={canvasSnapToGrid}
-                onChange={setCanvasSnapToGrid}
-                label={canvasSnapToGrid ? "Ativo" : "Livre"}
-              />
-            </Row>
-
-            <Row label="Tamanho da grade" hint={`${canvasGridSize}px`}>
+            <Row label="Fonte padrão">
               <SegmentedControl
-                value={String(canvasGridSize)}
-                options={CANVAS_GRID_SIZES.map((size) => ({
-                  value: String(size),
-                  label: String(size),
+                value={editorFontFamily}
+                options={EDITOR_FONT_FAMILIES.map((option) => ({
+                  value: option.value,
+                  label: option.label,
                 }))}
-                onChange={(v) => setCanvasGridSize(parseInt(v, 10))}
-              />
-            </Row>
-
-            <Row label="Ferramenta inicial">
-              <SegmentedControl
-                value={canvasDefaultTool}
-                options={CANVAS_DEFAULT_TOOLS.map((tool) => ({
-                  value: tool,
-                  label: getCanvasToolLabel(tool),
-                }))}
-                onChange={(v) => setCanvasDefaultTool(v)}
-              />
-            </Row>
-
-            <Row label="Texto novo" hint={`${canvasDefaultTextSize}px`}>
-              <SegmentedControl
-                value={String(canvasDefaultTextSize)}
-                options={CANVAS_TEXT_SIZES.map((size) => ({
-                  value: String(size),
-                  label: String(size),
-                }))}
-                onChange={(v) => setCanvasDefaultTextSize(parseInt(v, 10))}
-              />
-            </Row>
-
-            <Row label="Traço novo" hint={`${canvasDefaultDrawWidth}px`}>
-              <SegmentedControl
-                value={String(canvasDefaultDrawWidth)}
-                options={CANVAS_DRAW_WIDTHS.map((width) => ({
-                  value: String(width),
-                  label: String(width),
-                }))}
-                onChange={(v) => setCanvasDefaultDrawWidth(Number(v))}
+                onChange={(v) => setEditorFontFamily(v)}
               />
             </Row>
           </Section>
@@ -474,7 +418,7 @@ export function SettingsDialog() {
               <Toggle
                 checked={spellcheckEnabled}
                 onChange={setSpellcheckEnabled}
-                label={spellcheckEnabled ? "Ativada" : "Desativada"}
+                label={spellcheckEnabled ? "Ativado" : "Desativado"}
               />
             </Row>
             {personalDictSize > 0 && (
@@ -555,7 +499,7 @@ export function SettingsDialog() {
               <Toggle
                 checked={showStatusStats}
                 onChange={setShowStatusStats}
-                label={showStatusStats ? "Visíveis" : "Ocultas"}
+                label={showStatusStats ? "Ativado" : "Desativado"}
               />
             </Row>
 
@@ -563,7 +507,7 @@ export function SettingsDialog() {
               <Toggle
                 checked={showStatusPath}
                 onChange={setShowStatusPath}
-                label={showStatusPath ? "Visível" : "Oculto"}
+                label={showStatusPath ? "Ativado" : "Desativado"}
               />
             </Row>
           </Section>
@@ -573,7 +517,7 @@ export function SettingsDialog() {
               <Toggle
                 checked={openLastFileOnStartup}
                 onChange={setOpenLastFileOnStartup}
-                label={openLastFileOnStartup ? "Ativo" : "Desativado"}
+                label={openLastFileOnStartup ? "Ativado" : "Desativado"}
               />
             </Row>
 
@@ -581,7 +525,7 @@ export function SettingsDialog() {
               <Toggle
                 checked={autoExpandMovedFolders}
                 onChange={setAutoExpandMovedFolders}
-                label={autoExpandMovedFolders ? "Ativo" : "Manual"}
+                label={autoExpandMovedFolders ? "Ativado" : "Desativado"}
               />
             </Row>
 
@@ -589,7 +533,7 @@ export function SettingsDialog() {
               <Toggle
                 checked={localHistoryEnabled}
                 onChange={setLocalHistoryEnabled}
-                label={localHistoryEnabled ? "Ativo" : "Desativado"}
+                label={localHistoryEnabled ? "Ativado" : "Desativado"}
               />
             </Row>
           </Section>
@@ -666,7 +610,7 @@ export function SettingsDialog() {
             )}
             <Row label="Canal de release">
               <button
-                onClick={() => window.open(RELEASES_URL, "_blank", "noopener,noreferrer")}
+                onClick={openReleaseChannel}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[0.72rem]"
                 style={{
                   border: "1px solid var(--border)",
@@ -756,14 +700,6 @@ function getIndentSizeLabel(value: string): string {
   if (value === "small") return "Recuo curto";
   if (value === "large") return "Recuo amplo";
   return "Recuo clássico";
-}
-
-function getCanvasToolLabel(value: string): string {
-  if (value === "arrow") return "Seta";
-  if (value === "draw") return "Desenho";
-  if (value === "text") return "Texto";
-  if (value === "eraser") return "Borracha";
-  return "Selecionar";
 }
 
 function Section({

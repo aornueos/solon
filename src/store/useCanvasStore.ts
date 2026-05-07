@@ -562,7 +562,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       ) {
         return s;
       }
-      const arrow: CanvasArrow = { id: nanoid(), from, to };
+      const arrow: CanvasArrow = { id: nanoid(), from, to, width: s.drawWidth };
       if (sides?.from) arrow.fromSide = sides.from;
       if (sides?.to) arrow.toSide = sides.to;
       return { arrows: [...s.arrows, arrow] };
@@ -638,6 +638,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().pushHistory();
     set((s) => ({
       texts: s.texts.filter((t) => t.id !== id),
+      arrows: s.arrows.filter((a) => a.from !== id && a.to !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
     }));
   },
@@ -658,6 +659,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().pushHistory();
     set((s) => ({
       strokes: s.strokes.filter((t) => t.id !== id),
+      arrows: s.arrows.filter((a) => a.from !== id && a.to !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
     }));
   },
@@ -678,6 +680,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().pushHistory();
     set((s) => ({
       images: s.images.filter((i) => i.id !== id),
+      arrows: s.arrows.filter((a) => a.from !== id && a.to !== id),
       selectedId: s.selectedId === id ? null : s.selectedId,
     }));
   },
@@ -739,9 +742,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   toggleInSelection: (id) =>
     set((s) => {
       const next = new Set<string>(s.selectedIds);
-      if (next.has(id)) next.delete(id);
+      const removing = next.has(id);
+      if (removing) next.delete(id);
       else next.add(id);
-      const primary = next.size === 1 ? [...next][0] : null;
+      const primary = removing
+        ? s.selectedId === id
+          ? [...next][0] ?? null
+          : s.selectedId
+        : id;
       return { selectedIds: next, selectedId: primary };
     }),
 

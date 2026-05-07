@@ -1,10 +1,11 @@
-import { useRef, useState, useEffect } from "react";
+import { memo, useRef, useState, useEffect } from "react";
 import { CanvasCard, CARD_COLORS, CardSide } from "../../types/canvas";
 import { SCENE_STATUSES } from "../../types/scene";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { useAppStore } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { startDrag } from "../../lib/drag";
+import { startCanvasLinkDrag } from "../../lib/canvasLinkDrag";
 import { Link2, Trash2, Palette, FileText, MapPin, Clock, User } from "lucide-react";
 import clsx from "clsx";
 
@@ -12,25 +13,23 @@ interface Props {
   card: CanvasCard;
 }
 
-export function Card({ card }: Props) {
-  const {
-    updateCard,
-    removeCard,
-    bringToFront,
-    select,
-    selectedId,
-    selectedIds,
-    linkingFromId,
-    linkingFromSide,
-    beginLink,
-    completeLink,
-    cancelLink,
-    snapshotSelection,
-    translateSelection,
-    viewport,
-    tool,
-    pushHistory,
-  } = useCanvasStore();
+export const Card = memo(function Card({ card }: Props) {
+  const updateCard = useCanvasStore((s) => s.updateCard);
+  const removeCard = useCanvasStore((s) => s.removeCard);
+  const bringToFront = useCanvasStore((s) => s.bringToFront);
+  const select = useCanvasStore((s) => s.select);
+  const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
+  const selectedId = useCanvasStore((s) => s.selectedId);
+  const selectedIds = useCanvasStore((s) => s.selectedIds);
+  const linkingFromId = useCanvasStore((s) => s.linkingFromId);
+  const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
+  const beginLink = useCanvasStore((s) => s.beginLink);
+  const completeLink = useCanvasStore((s) => s.completeLink);
+  const cancelLink = useCanvasStore((s) => s.cancelLink);
+  const snapshotSelection = useCanvasStore((s) => s.snapshotSelection);
+  const translateSelection = useCanvasStore((s) => s.translateSelection);
+  const tool = useCanvasStore((s) => s.tool);
+  const pushHistory = useCanvasStore((s) => s.pushHistory);
 
   const setActiveView = useAppStore((s) => s.setActiveView);
   const canvasSnapToGrid = useAppStore((s) => s.canvasSnapToGrid);
@@ -103,6 +102,12 @@ export function Card({ card }: Props) {
 
     e.stopPropagation();
 
+    if ((e.ctrlKey || e.metaKey) && tool === "select") {
+      e.preventDefault();
+      toggleInSelection(card.id);
+      return;
+    }
+
     if (linkingFromId) {
       bringToFront(card.id);
       completeLink(card.id);
@@ -131,8 +136,9 @@ export function Card({ card }: Props) {
       dragState.current = { startX: orig.startX, startY: orig.startY, origX: card.x, origY: card.y };
       startDrag({
         onMove: (ev) => {
-          const dx = (ev.clientX - orig.startX) / viewport.zoom;
-          const dy = (ev.clientY - orig.startY) / viewport.zoom;
+          const zoom = useCanvasStore.getState().viewport.zoom || 1;
+          const dx = (ev.clientX - orig.startX) / zoom;
+          const dy = (ev.clientY - orig.startY) / zoom;
           translateSelection(snapshot, dx, dy);
         },
         onEnd: () => {
@@ -162,8 +168,9 @@ export function Card({ card }: Props) {
     startDrag({
       onMove: (ev) => {
         if (!dragState.current) return;
-        const dx = (ev.clientX - orig.startX) / viewport.zoom;
-        const dy = (ev.clientY - orig.startY) / viewport.zoom;
+        const zoom = useCanvasStore.getState().viewport.zoom || 1;
+        const dx = (ev.clientX - orig.startX) / zoom;
+        const dy = (ev.clientY - orig.startY) / zoom;
         updateCard(card.id, {
           x: snap(orig.origX + dx),
           y: snap(orig.origY + dy),
@@ -244,6 +251,7 @@ export function Card({ card }: Props) {
         boxShadow: isSelected ? "var(--shadow-md)" : "var(--shadow-sm)",
         ...ringStyle,
       }}
+      data-canvas-entity-id={card.id}
       className={clsx(
         "rounded-md border transition-shadow group",
         linkingFromId || tool === "arrow"
@@ -409,6 +417,7 @@ export function Card({ card }: Props) {
           nao funciona em alguns pontos do card". */}
       {tool !== "eraser" && (
         <ConnectionDots
+          entityId={card.id}
           isLinkSource={isLinkSource}
           isLinkCandidate={isLinkCandidate}
           linkingFromSide={linkingFromSide}
@@ -431,21 +440,27 @@ export function Card({ card }: Props) {
       {tool !== "eraser" && <ResizeHandle card={card} />}
     </div>
   );
-}
+});
 
 function ConnectionDots({
+  entityId,
   isLinkSource,
   isLinkCandidate,
   linkingFromSide,
   isSelected,
   onPick,
 }: {
+  entityId: string;
   isLinkSource: boolean;
   isLinkCandidate: boolean;
   linkingFromSide: CardSide | null;
   isSelected: boolean;
   onPick: (side: CardSide) => void;
 }) {
+  const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
+  const dotSize = 12 / zoom;
+  const border = 2 / zoom;
+  const mask = 3 / zoom;
   // Posicionamento em CSS: cada dot fica centrado no midpoint do seu lado,
   // usando translate(-50%,-50%) pra o centro do círculo coincidir com a
   // borda do card. Assim o dot "monta" a borda como num Miro clássico.
@@ -490,6 +505,7 @@ function ConnectionDots({
           <button
             key={side}
             data-card-action
+            data-connection-side={side}
             title={title}
             onMouseDown={(e) => {
               // stopPropagation garante que o onMouseDown do card pai não
@@ -498,21 +514,24 @@ function ConnectionDots({
               e.stopPropagation();
               e.preventDefault();
               onPick(side);
+              startCanvasLinkDrag(entityId, e);
             }}
             onClick={(e) => e.stopPropagation()}
             onDoubleClick={(e) => e.stopPropagation()}
             className={clsx(
-              "absolute w-3 h-3 rounded-full transition-opacity",
+              "absolute rounded-full transition-opacity",
               alwaysShow ? "opacity-100" : "opacity-0 group-hover:opacity-100",
             )}
             style={{
               ...style,
+              width: dotSize,
+              height: dotSize,
               background: activeSource ? "var(--accent)" : "var(--bg-panel)",
-              border: "2px solid var(--accent)",
+              border: `${border}px solid var(--accent)`,
               cursor: "crosshair",
               // zIndex acima do resize handle e da barra de ações
-              zIndex: 5,
-              boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
+              zIndex: 30,
+              boxShadow: `0 0 0 ${mask}px var(--bg-app), 0 ${1 / zoom}px ${2 / zoom}px rgba(0,0,0,0.18)`,
             }}
           />
         );
@@ -702,7 +721,8 @@ function MetaItem({
 }
 
 function ResizeHandle({ card }: { card: CanvasCard }) {
-  const { updateCard, viewport, pushHistory } = useCanvasStore();
+  const updateCard = useCanvasStore((s) => s.updateCard);
+  const pushHistory = useCanvasStore((s) => s.pushHistory);
   const onDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -713,8 +733,9 @@ function ResizeHandle({ card }: { card: CanvasCard }) {
     const origH = card.h;
     startDrag({
       onMove: (ev) => {
-        const dw = (ev.clientX - startX) / viewport.zoom;
-        const dh = (ev.clientY - startY) / viewport.zoom;
+        const zoom = useCanvasStore.getState().viewport.zoom || 1;
+        const dw = (ev.clientX - startX) / zoom;
+        const dh = (ev.clientY - startY) / zoom;
         updateCard(card.id, {
           w: Math.max(120, origW + dw),
           h: Math.max(60, origH + dh),

@@ -156,52 +156,17 @@ export function useFileSystem() {
         }
       } else {
         const mockContent: Record<string, string> = {
-          "/mock/romance/parte1/cap01.md": `# Capítulo 1 — O Chamado
-
-A manhã chegou antes do esperado. Elara abriu os olhos para o teto de pedra fria e sentiu, como sempre, o peso do silêncio.
-
-## A Aldeia
-
-Nenhum som vinha do lado de fora — nem o mugido das vacas, nem o chiado das rodas d'água. Apenas vento.
-
-> "Você não vai durar nem um dia fora dessas muralhas," dissera o ancião.
-
-Ela se levantou mesmo assim.
-
----
-
-### Cena 2
-
-O mercado estava vazio quando ela chegou. Não por falta de vendedores — haviam muitos, com suas barracas coloridas e vozes altas — mas porque ninguém a via. Nunca a viam.
-
-Elara era a sombra que a aldeia havia aprendido a ignorar.`,
+          "/mock/romance/parte1/cap01.md": `# Capitulo 1
+`,
           "/mock/romance/personagens.md": `# Notas de Personagens
-
-## Elara Voss
-
-- **Idade:** 24
-- **Papel:** Protagonista
-- **Motivação:** Descobrir a verdade sobre o desaparecimento da mãe
-
-## Doran
-
-- **Idade:** 31
-- **Papel:** Antagonista / aliado ambíguo
-- **Motivação:** Desconhecida`,
+`,
           "/mock/romance/world.md": `# Worldbuilding
-
-## A Cidade de Arken
-
-Arken foi construída sobre as ruínas de uma civilização mais antiga. As fundações das casas mais velhas ainda exibem inscrições que ninguém consegue decifrar.
-
-### Política
-
-O Conselho dos Seis governa a cidade há três gerações. Cada membro representa um distrito.`,
+`,
         };
 
         const content =
           mockContent[path] ||
-          `# ${name.replace(".md", "")}\n\nComece a escrever aqui...`;
+          `# ${name.replace(".md", "")}\n`;
         const { meta, body } = parseDocument(content);
         setActiveFile(path, name, body, meta);
       }

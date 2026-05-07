@@ -53,6 +53,8 @@ export interface CanvasArrow {
   from: string; // card id
   to: string;   // card id
   label?: string;
+  /** Espessura visual da seta em world px. */
+  width?: number;
   /** Offset (em world coords) do ponto de controle em relação ao ponto médio
    *  da reta from→to. Quando ausente, a arrow usa uma curva padrão sutil. */
   bend?: { dx: number; dy: number };
@@ -78,6 +80,9 @@ export interface CanvasText {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  align?: "left" | "center" | "right";
+  list?: "bullet";
+  link?: string;
   /** Cor de grifo (background). Vazio/undefined = sem grifo. */
   highlight?: string;
   /** Largura maxima da caixa (world px). Quando settada, texto quebra
@@ -146,7 +151,7 @@ export const DRAW_COLORS: { label: string; value: string }[] = [
 ];
 
 export const DEFAULT_DRAW_WIDTH = 2;
-export const DEFAULT_TEXT_SIZE = 18;
+export const DEFAULT_TEXT_SIZE = 24;
 
 export interface CanvasViewport {
   x: number;

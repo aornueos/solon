@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { CanvasImage } from "../../types/canvas";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { useAppStore } from "../../store/useAppStore";
@@ -6,6 +6,7 @@ import { resolveImageUrl } from "../../lib/canvasImages";
 import { startDrag } from "../../lib/drag";
 import { Trash2 } from "lucide-react";
 import clsx from "clsx";
+import { ConnectionDots } from "./ConnectionDots";
 
 interface Props {
   image: CanvasImage;
@@ -20,22 +21,22 @@ const RESIZE_HANDLES: { dir: ResizeDir; cursor: string }[] = [
   { dir: "sw", cursor: "nesw-resize" },
 ];
 
-export function ImageNode({ image }: Props) {
-  const {
-    updateImage,
-    removeImage,
-    select,
-    selectedId,
-    selectedIds,
-    snapshotSelection,
-    translateSelection,
-    viewport,
-    tool,
-    linkingFromId,
-    beginLink,
-    completeLink,
-    pushHistory,
-  } = useCanvasStore();
+export const ImageNode = memo(function ImageNode({ image }: Props) {
+  const updateImage = useCanvasStore((s) => s.updateImage);
+  const removeImage = useCanvasStore((s) => s.removeImage);
+  const select = useCanvasStore((s) => s.select);
+  const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
+  const selectedId = useCanvasStore((s) => s.selectedId);
+  const selectedIds = useCanvasStore((s) => s.selectedIds);
+  const snapshotSelection = useCanvasStore((s) => s.snapshotSelection);
+  const translateSelection = useCanvasStore((s) => s.translateSelection);
+  const viewport = useCanvasStore((s) => s.viewport);
+  const tool = useCanvasStore((s) => s.tool);
+  const linkingFromId = useCanvasStore((s) => s.linkingFromId);
+  const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
+  const beginLink = useCanvasStore((s) => s.beginLink);
+  const completeLink = useCanvasStore((s) => s.completeLink);
+  const pushHistory = useCanvasStore((s) => s.pushHistory);
   const rootFolder = useAppStore((s) => s.rootFolder);
   const canvasSnapToGrid = useAppStore((s) => s.canvasSnapToGrid);
   const canvasGridSize = useAppStore((s) => s.canvasGridSize);
@@ -44,6 +45,8 @@ export function ImageNode({ image }: Props) {
 
   const isSelected = selectedId === image.id;
   const isInGroup = selectedId !== image.id && selectedIds.has(image.id);
+  const isLinkSource = linkingFromId === image.id;
+  const isLinkCandidate = linkingFromId !== null && linkingFromId !== image.id;
 
   const dragState = useRef<{
     startX: number;
@@ -103,6 +106,12 @@ export function ImageNode({ image }: Props) {
     if (tool !== "select") return;
 
     e.stopPropagation();
+
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      toggleInSelection(image.id);
+      return;
+    }
 
     // Group drag: preserva a selecao multipla e translada tudo junto.
     const currentIds = useCanvasStore.getState().selectedIds;
@@ -206,6 +215,7 @@ export function ImageNode({ image }: Props) {
   return (
     <div
       onMouseDown={onMouseDown}
+      data-canvas-entity-id={image.id}
       className={clsx(
         "group",
         tool === "select"
@@ -315,9 +325,26 @@ export function ImageNode({ image }: Props) {
             onMouseDown={(e) => onResizeDown(handle.dir, e)}
           />
         ))}
+
+      {tool !== "eraser" && (
+        <ConnectionDots
+          entityId={image.id}
+          isLinkSource={isLinkSource}
+          isLinkCandidate={isLinkCandidate}
+          linkingFromSide={linkingFromSide}
+          isSelected={isSelected}
+          onPick={(side) => {
+            if (linkingFromId && linkingFromId !== image.id) {
+              completeLink(image.id, side);
+            } else {
+              beginLink(image.id, side);
+            }
+          }}
+        />
+      )}
     </div>
   );
-}
+});
 
 function ImageResizeHandle({
   dir,

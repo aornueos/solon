@@ -7,6 +7,8 @@ import { StrokeLayer } from "./StrokeLayer";
 import { FloatingText } from "./FloatingText";
 import { ImageNode } from "./ImageNode";
 import { CanvasToolbar } from "./CanvasToolbar";
+import { CanvasSidePanel } from "./CanvasSidePanel";
+import { SelectionOverlay } from "./SelectionOverlay";
 import {
   CANVAS_TOOL_ORDER,
   CanvasStroke,
@@ -17,6 +19,10 @@ import { readSceneSnapshot } from "../../lib/sceneSnapshot";
 import { saveImageForCanvas } from "../../lib/canvasImages";
 import { startDrag } from "../../lib/drag";
 import { textRect } from "../../lib/canvasGeom";
+import {
+  CANVAS_EMPTY_LINK_EVENT,
+  CanvasEmptyLinkDetail,
+} from "../../lib/canvasLinkDrag";
 
 /**
  * Infinite canvas Miro-inspired.
@@ -78,6 +84,12 @@ export function CanvasView() {
   const [liveStroke, setLiveStroke] = useState<CanvasStroke | null>(null);
   const liveStrokeRef = useRef<CanvasStroke | null>(null);
   const [justCreatedTextId, setJustCreatedTextId] = useState<string | null>(null);
+  const [emptyLinkMenu, setEmptyLinkMenu] = useState<{
+    screenX: number;
+    screenY: number;
+    worldX: number;
+    worldY: number;
+  } | null>(null);
 
   /** Retângulo de marquee selection em screen coords (null = inativo). */
   const [marquee, setMarquee] = useState<{
@@ -140,6 +152,7 @@ export function CanvasView() {
       if (typing) return;
 
       if (e.key === "Escape") {
+        setEmptyLinkMenu(null);
         cancelLink();
         select(null);
         setTool("select");
@@ -151,6 +164,19 @@ export function CanvasView() {
         const { selectedIds } = useCanvasStore.getState();
         if (!selectedId && selectedIds.size === 0) return;
         removeSelected();
+      }
+      if ((e.key === "a" || e.key === "A") && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        const state = useCanvasStore.getState();
+        const ids = [
+          ...state.cards.map((item) => item.id),
+          ...state.texts.map((item) => item.id),
+          ...state.images.map((item) => item.id),
+          ...state.strokes.map((item) => item.id),
+          ...state.arrows.map((item) => item.id),
+        ];
+        state.selectMany(ids, ids[0] ?? null);
+        return;
       }
       // Undo/Redo. Ctrl+Z = undo; Ctrl+Shift+Z OU Ctrl+Y = redo.
       // Convencao multi-plataforma — Windows usa Ctrl+Y, Mac usa Cmd+Shift+Z;
@@ -251,14 +277,20 @@ export function CanvasView() {
       .getState()
       .cards.filter((c) => c.kind === "scene" && c.scenePath);
     if (sceneCards.length === 0) return;
+    let alive = true;
     const paths = Array.from(new Set(sceneCards.map((c) => c.scenePath!)));
     (async () => {
       for (const p of paths) {
+        if (!alive) return;
         const name = p.split(/[\\/]/).pop() ?? p;
         const snap = await readSceneSnapshot(p, name);
+        if (!alive) return;
         updateSceneSnapshotByPath(p, snap);
       }
     })();
+    return () => {
+      alive = false;
+    };
   }, [activeView, updateSceneSnapshotByPath]);
 
   // Paste de imagens (somente quando canvas visível e nada focado)
@@ -364,6 +396,51 @@ export function CanvasView() {
     };
   };
 
+  useEffect(() => {
+    const onEmptyLink = (event: Event) => {
+      const { clientX, clientY } = (event as CustomEvent<CanvasEmptyLinkDetail>).detail;
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const point = screenToWorld(clientX, clientY);
+      setEmptyLinkMenu({
+        screenX: clientX - rect.left,
+        screenY: clientY - rect.top,
+        worldX: snap(point.x),
+        worldY: snap(point.y),
+      });
+    };
+    window.addEventListener(CANVAS_EMPTY_LINK_EVENT, onEmptyLink);
+    return () => window.removeEventListener(CANVAS_EMPTY_LINK_EVENT, onEmptyLink);
+  });
+
+  const createLinkedItem = (kind: "text" | "card") => {
+    if (!emptyLinkMenu) return;
+    const state = useCanvasStore.getState();
+    if (!state.linkingFromId) return;
+
+    if (kind === "text") {
+      const id = addText({
+        x: emptyLinkMenu.worldX,
+        y: emptyLinkMenu.worldY,
+        text: "",
+        size: canvasDefaultTextSize || DEFAULT_TEXT_SIZE,
+        color: drawColor,
+      });
+      setJustCreatedTextId(id);
+      state.completeLink(id);
+    } else {
+      const id = addCard({
+        x: snap(emptyLinkMenu.worldX - 110),
+        y: snap(emptyLinkMenu.worldY - 60),
+      });
+      state.completeLink(id);
+    }
+
+    setEmptyLinkMenu(null);
+    setTool("select");
+  };
+
   const startPan = (e: React.MouseEvent) => {
     e.preventDefault();
     document.body.style.cursor = "grabbing";
@@ -402,6 +479,20 @@ export function CanvasView() {
     };
     liveStrokeRef.current = stroke;
     setLiveStroke(stroke);
+    let strokeFrame: number | null = null;
+    const scheduleLiveStroke = () => {
+      if (strokeFrame != null) return;
+      strokeFrame = requestAnimationFrame(() => {
+        strokeFrame = null;
+        const cur = liveStrokeRef.current;
+        if (!cur) return;
+        setLiveStroke({ ...cur, points: cur.points.slice() });
+      });
+    };
+    const clearLiveStrokeFrame = () => {
+      if (strokeFrame != null) cancelAnimationFrame(strokeFrame);
+      strokeFrame = null;
+    };
 
     startDrag({
       onMove: (ev) => {
@@ -415,9 +506,10 @@ export function CanvasView() {
         if (Math.hypot(p.x - lastX, p.y - lastY) < minDist) return;
         cur.points.push(p.x, p.y);
         // Shallow clone pra forçar re-render
-        setLiveStroke({ ...cur, points: cur.points.slice() });
+        scheduleLiveStroke();
       },
       onEnd: () => {
+        clearLiveStrokeFrame();
         const cur = liveStrokeRef.current;
         liveStrokeRef.current = null;
         setLiveStroke(null);
@@ -432,6 +524,7 @@ export function CanvasView() {
         }
       },
       onCancel: () => {
+        clearLiveStrokeFrame();
         // Descarta traço incompleto sem commitar
         liveStrokeRef.current = null;
         setLiveStroke(null);
@@ -447,6 +540,23 @@ export function CanvasView() {
     const startX = e.clientX - rect.left;
     const startY = e.clientY - rect.top;
     setMarquee({ x: startX, y: startY, w: 0, h: 0 });
+    let marqueeFrame: number | null = null;
+    let pendingMarquee: typeof marquee = null;
+    const flushMarquee = () => {
+      marqueeFrame = null;
+      if (!pendingMarquee) return;
+      setMarquee(pendingMarquee);
+      pendingMarquee = null;
+    };
+    const scheduleMarquee = (next: NonNullable<typeof marquee>) => {
+      pendingMarquee = next;
+      if (marqueeFrame == null) marqueeFrame = requestAnimationFrame(flushMarquee);
+    };
+    const clearMarqueeFrame = () => {
+      if (marqueeFrame != null) cancelAnimationFrame(marqueeFrame);
+      marqueeFrame = null;
+      pendingMarquee = null;
+    };
 
     startDrag({
       onMove: (ev) => {
@@ -454,9 +564,10 @@ export function CanvasView() {
         const y = Math.min(startY, ev.clientY - rect.top);
         const w = Math.abs(ev.clientX - rect.left - startX);
         const h = Math.abs(ev.clientY - rect.top - startY);
-        setMarquee({ x, y, w, h });
+        scheduleMarquee({ x, y, w, h });
       },
       onEnd: (ev) => {
+        clearMarqueeFrame();
         const endX = ev.clientX - rect.left;
         const endY = ev.clientY - rect.top;
         const x0 = Math.min(startX, endX);
@@ -527,15 +638,21 @@ export function CanvasView() {
           if (fromHit && toHit) ids.push(a.id);
         }
 
-        selectMany(ids);
+        selectMany(ids, ids[0] ?? null);
       },
       onCancel: () => {
+        clearMarqueeFrame();
         setMarquee(null);
       },
     });
   };
 
   const onBgMouseDown = (e: React.MouseEvent) => {
+    if (emptyLinkMenu) {
+      setEmptyLinkMenu(null);
+      cancelLink();
+    }
+
     // Commit explicito de qualquer textarea/input em edicao no canvas
     // (FloatingText editing, label de card etc.). Sem isso, o
     // `e.preventDefault()` que viria abaixo (em startMarquee/startDraw)
@@ -629,7 +746,7 @@ export function CanvasView() {
       style={{
         cursor: bgCursor,
         backgroundImage: canvasGridEnabled
-          ? "radial-gradient(circle, var(--border-subtle) 1px, transparent 1px)"
+          ? "radial-gradient(circle at 1px 1px, var(--dot-grid) 1px, transparent 1px)"
           : "none",
         backgroundSize: `${canvasGridSize * viewport.zoom}px ${canvasGridSize * viewport.zoom}px`,
         backgroundPosition: `${viewport.x}px ${viewport.y}px`,
@@ -653,6 +770,8 @@ export function CanvasView() {
       )}
 
       <CanvasToolbar />
+      <CanvasSidePanel />
+      <SelectionOverlay />
 
       {/* World container */}
       <div
@@ -662,6 +781,7 @@ export function CanvasView() {
           top: 0,
           transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
           transformOrigin: "0 0",
+          willChange: "transform",
           width: 0,
           height: 0,
         }}
@@ -700,7 +820,7 @@ export function CanvasView() {
 
       {marquee && (
         <div
-          className="absolute pointer-events-none z-15"
+          className="absolute pointer-events-none"
           style={{
             left: marquee.x,
             top: marquee.y,
@@ -708,8 +828,46 @@ export function CanvasView() {
             height: marquee.h,
             background: "var(--marquee-fill)",
             border: "1px solid var(--marquee-stroke)",
+            zIndex: 35,
           }}
         />
+      )}
+
+      {emptyLinkMenu && (
+        <div
+          data-canvas-link-menu
+          className="absolute z-[80] min-w-36 rounded-md p-1 shadow-lg"
+          style={{
+            left: Math.min(emptyLinkMenu.screenX + 10, window.innerWidth - 180),
+            top: Math.min(emptyLinkMenu.screenY + 10, window.innerHeight - 110),
+            background: "var(--bg-panel)",
+            border: "1px solid var(--border)",
+            color: "var(--text-primary)",
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="block w-full rounded px-3 py-1.5 text-left text-[0.78rem]"
+            style={{ color: "var(--text-primary)" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              createLinkedItem("text");
+            }}
+          >
+            Novo texto
+          </button>
+          <button
+            className="block w-full rounded px-3 py-1.5 text-left text-[0.78rem]"
+            style={{ color: "var(--text-primary)" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              createLinkedItem("card");
+            }}
+          >
+            Novo card
+          </button>
+        </div>
       )}
 
       {(linkingFromId || tool === "arrow") && (
@@ -721,8 +879,8 @@ export function CanvasView() {
           }}
         >
           {linkingFromId
-            ? "Clique no destino (Esc p/ cancelar)"
-            : "Clique em 2 itens para conectar (cards, textos, imagens)"}
+            ? "Clique no destino ou arraste para o vazio (Esc p/ cancelar)"
+            : "Clique em 2 itens para conectar (cards, textos, imagens, traços)"}
         </div>
       )}
 
