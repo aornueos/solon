@@ -202,10 +202,6 @@ export function EditorToolbar({ editor }: Props) {
           />
         )}
       </div>
-
-      <div className="ml-auto flex items-center gap-1">
-        <NovelPresets editor={editor} />
-      </div>
     </div>
   );
 }
@@ -494,60 +490,5 @@ function Divider() {
       className="w-px h-4 mx-1"
       style={{ background: "var(--border-subtle)" }}
     />
-  );
-}
-
-function NovelPresets({ editor }: { editor: Editor }) {
-  const presets = [
-    {
-      label: "Capítulo",
-      action: () =>
-        editor
-          .chain()
-          .focus()
-          .setHorizontalRule()
-          .insertContent("<h1></h1>")
-          .run(),
-    },
-    {
-      label: "Cena",
-      action: () =>
-        editor.chain().focus().insertContent("<hr /><h3></h3>").run(),
-    },
-  ];
-
-  return (
-    <>
-      <span
-        className="text-[0.65rem] uppercase tracking-wider mr-1"
-        style={{ color: "var(--text-placeholder)" }}
-      >
-        Inserir
-      </span>
-      {presets.map((p) => (
-        <button
-          key={p.label}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            p.action();
-          }}
-          className="text-[0.72rem] px-2 py-1 rounded transition-colors"
-          style={{
-            border: "1px solid var(--border)",
-            color: "var(--text-secondary)",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-            (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "transparent";
-            (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
-          }}
-        >
-          {p.label}
-        </button>
-      ))}
-    </>
   );
 }
