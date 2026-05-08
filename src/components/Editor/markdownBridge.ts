@@ -2,7 +2,7 @@ import { marked } from "marked";
 import TurndownService from "turndown";
 // `turndown-plugin-gfm` não publica tipos; a shim fica em `src/types/shims.d.ts`.
 import { gfm, tables, strikethrough } from "turndown-plugin-gfm";
-import DOMPurify from "dompurify";
+import DOMPurify, { type Config as DOMPurifyConfig } from "dompurify";
 
 /** Narrow turndown Node type — a propriedade `isBlock` é adicionada pelo
  *  turndown ao DOM node em runtime mas não está em `HTMLElement`. */
@@ -26,10 +26,102 @@ type TurndownNode = HTMLElement & { isBlock: boolean };
  *    color: …">` HTML literal.
  */
 
-// EM SPACE como constante nomeada — o codepoint U+2003 e' invisivel no
-// codigo-fonte e foda de identificar. Usamos como marker do indent porque
-// e' "neutro" em markdown (nao quebra parser nem visualiza estranho).
-const EM_SPACE = " ";
+// Marcadores por escape para evitar caracteres invisiveis no fonte.
+// EM SPACE = indent editorial; NBSP = espacos visuais digitados pelo user.
+const EM_SPACE = "\u2003";
+const NBSP = "\u00a0";
+const EMPTY_PARAGRAPH_HTML = "<p><br></p>";
+
+const BLOCK_TAGS = new Set([
+  "address", "article", "aside", "blockquote", "body", "dd", "div", "dl",
+  "dt", "fieldset", "figcaption", "figure", "footer", "form", "h1", "h2",
+  "h3", "h4", "h5", "h6", "header", "hr", "li", "main", "nav", "ol", "p",
+  "pre", "section", "table", "tbody", "td", "tfoot", "th", "thead", "tr",
+  "ul",
+]);
+
+const PRESERVE_SPACE_TAGS = new Set(["code", "pre"]);
+
+function tagNameOf(token: string): string | null {
+  const match = token.match(/^<\/?\s*([a-zA-Z0-9-]+)/);
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+function isClosingTag(token: string): boolean {
+  return /^<\//.test(token);
+}
+
+function isSelfClosingTag(token: string): boolean {
+  return /\/>$/.test(token) || /^<\s*(br|hr)\b/i.test(token);
+}
+
+function protectSpaceRun(run: string, atBlockStart: boolean, offset: number, source: string): string {
+  const atStart = atBlockStart && offset === 0;
+  const atEnd = run.length > 1 && offset + run.length === source.length;
+  if (atStart || atEnd) return NBSP.repeat(run.length);
+  if (run.length > 1) return ` ${NBSP.repeat(run.length - 1)}`;
+  return run;
+}
+
+function protectTextSpaces(text: string, atBlockStart: boolean): string {
+  return text.replace(/ +/g, (run, offset, source) =>
+    protectSpaceRun(run, atBlockStart, offset, source),
+  );
+}
+
+/**
+ * Turndown colapsa/remover espacos ASCII antes das regras rodarem. Isso
+ * destrói exatamente o que escritor usa para respiro visual: recuo manual,
+ * alinhamento com espacos, e linhas com multiplos espacos. Antes de entregar
+ * o HTML ao Turndown, transformamos apenas espacos significativos em NBSP.
+ *
+ * Markdown normal comeca com 4 espacos = code block; NBSP preserva visual sem
+ * mudar a semantica do paragrafo.
+ */
+function protectEditorSpaces(html: string): string {
+  const tokens = html.split(/(<[^>]+>)/g);
+  let preserveDepth = 0;
+  let atBlockStart = true;
+
+  return tokens
+    .map((token) => {
+      if (!token) return token;
+      if (token.startsWith("<")) {
+        const name = tagNameOf(token);
+        if (!name) return token;
+
+        const closing = isClosingTag(token);
+        if (PRESERVE_SPACE_TAGS.has(name)) {
+          preserveDepth += closing ? -1 : 1;
+          preserveDepth = Math.max(0, preserveDepth);
+        }
+        if (!closing && (BLOCK_TAGS.has(name) || name === "br")) {
+          atBlockStart = true;
+        }
+        if (closing && BLOCK_TAGS.has(name)) {
+          atBlockStart = false;
+        }
+        if (isSelfClosingTag(token) && BLOCK_TAGS.has(name)) {
+          atBlockStart = true;
+        }
+        return token;
+      }
+
+      if (preserveDepth > 0) return token;
+      const protectedText = protectTextSpaces(token, atBlockStart);
+      if (token.replace(/ +/g, "").length > 0) {
+        atBlockStart = false;
+      }
+      return protectedText;
+    })
+    .join("");
+}
+
+function isVisuallyEmptyParagraph(node: HTMLElement): boolean {
+  if (node.nodeName !== "P") return false;
+  const text = (node.textContent ?? "").replace(/\u00a0/g, "").trim();
+  return text.length === 0;
+}
 
 marked.setOptions({
   gfm: true,       // GFM: tabelas, ~~strike~~, task lists
@@ -44,8 +136,13 @@ const turndown = new TurndownService({
   emDelimiter: "*",
   strongDelimiter: "**",
   hr: "---",
-  blankReplacement: (_, node) =>
-    (node as TurndownNode).isBlock ? "\n\n" : "",
+  blankReplacement: (_, node) => {
+    const el = node as HTMLElement & TurndownNode;
+    if (isVisuallyEmptyParagraph(el)) {
+      return `\n\n${EMPTY_PARAGRAPH_HTML}\n\n`;
+    }
+    return el.isBlock ? "\n\n" : "";
+  },
 });
 
 // Plugins GFM: tabelas + strike + checkboxes
@@ -64,6 +161,11 @@ turndown.addRule("paragraphStrip", {
     }
     return `\n\n${prefix}${content}\n\n`;
   },
+});
+
+turndown.addRule("emptyParagraph", {
+  filter: (node) => isVisuallyEmptyParagraph(node as HTMLElement),
+  replacement: () => `\n\n${EMPTY_PARAGRAPH_HTML}\n\n`,
 });
 
 // Highlight (grifo) — emite <mark> com style preservado.
@@ -132,6 +234,22 @@ const ALLOWED_ATTR = [
   "style",
 ];
 
+function sanitizeEditorHtml(html: string): string {
+  const purifier = DOMPurify as typeof DOMPurify & {
+    sanitize?: (dirty: string, config?: DOMPurifyConfig) => string;
+  };
+  if (typeof purifier.sanitize !== "function") {
+    return html;
+  }
+  return purifier.sanitize(html, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR,
+    // `style` saiu do FORBID porque virou whitelist (suporta text-align
+    // e highlight color). Mantemos os outros vetores classicos de XSS.
+    FORBID_ATTR: ["srcdoc", "href", "src", "onerror", "onload"],
+  });
+}
+
 export function markdownToHtml(md: string): string {
   if (!md) return "";
   const rawHtml = marked.parse(md, { async: false }) as string;
@@ -143,13 +261,7 @@ export function markdownToHtml(md: string): string {
     new RegExp(`<p([^>]*)>${EM_SPACE}`, "g"),
     '<p data-indent="true"$1>',
   );
-  return DOMPurify.sanitize(withIndent, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    // `style` saiu do FORBID porque virou whitelist (suporta text-align
-    // e highlight color). Mantemos os outros vetores classicos de XSS.
-    FORBID_ATTR: ["srcdoc", "href", "src", "onerror", "onload"],
-  });
+  return sanitizeEditorHtml(withIndent);
 }
 
 export function htmlToMarkdown(html: string): string {
@@ -158,7 +270,7 @@ export function htmlToMarkdown(html: string): string {
   // padrao porque ele considera EM SPACE como whitespace e come o
   // marker de indent do primeiro paragrafo.
   return turndown
-    .turndown(html)
+    .turndown(protectEditorSpaces(html))
     .replace(/^[\n ]+/, "")
     .replace(/[\n ]+$/, "\n");
 }

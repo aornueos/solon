@@ -120,6 +120,23 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
     if (isGroupDrag) {
       const snapshot = snapshotSelection();
       const orig = { startX: e.clientX, startY: e.clientY };
+      let frame: number | null = null;
+      let pendingDelta: { dx: number; dy: number } | null = null;
+      const flushMove = () => {
+        frame = null;
+        if (!pendingDelta) return;
+        translateSelection(snapshot, pendingDelta.dx, pendingDelta.dy);
+        pendingDelta = null;
+      };
+      const scheduleMove = (dx: number, dy: number) => {
+        pendingDelta = { dx, dy };
+        if (frame == null) frame = requestAnimationFrame(flushMove);
+      };
+      const cancelMove = () => {
+        if (frame != null) cancelAnimationFrame(frame);
+        frame = null;
+        pendingDelta = null;
+      };
       pushHistory();
       dragState.current = {
         startX: orig.startX,
@@ -131,12 +148,17 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
         onMove: (ev) => {
           const dx = (ev.clientX - orig.startX) / viewport.zoom;
           const dy = (ev.clientY - orig.startY) / viewport.zoom;
-          translateSelection(snapshot, dx, dy);
+          scheduleMove(dx, dy);
         },
-        onEnd: () => {
+        onEnd: (ev) => {
+          cancelMove();
+          const dx = (ev.clientX - orig.startX) / viewport.zoom;
+          const dy = (ev.clientY - orig.startY) / viewport.zoom;
+          translateSelection(snapshot, dx, dy);
           dragState.current = null;
         },
         onCancel: () => {
+          cancelMove();
           dragState.current = null;
           translateSelection(snapshot, 0, 0);
         },
@@ -155,21 +177,46 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
       origY: image.y,
     };
     dragState.current = orig;
+    let frame: number | null = null;
+    let pendingPatch: Partial<CanvasImage> | null = null;
+    const flushMove = () => {
+      frame = null;
+      if (!pendingPatch) return;
+      updateImage(image.id, pendingPatch);
+      pendingPatch = null;
+    };
+    const scheduleMove = (patch: Partial<CanvasImage>) => {
+      pendingPatch = patch;
+      if (frame == null) frame = requestAnimationFrame(flushMove);
+    };
+    const cancelMove = () => {
+      if (frame != null) cancelAnimationFrame(frame);
+      frame = null;
+      pendingPatch = null;
+    };
 
     startDrag({
       onMove: (ev) => {
         if (!dragState.current) return;
         const dx = (ev.clientX - orig.startX) / viewport.zoom;
         const dy = (ev.clientY - orig.startY) / viewport.zoom;
-        updateImage(image.id, {
+        scheduleMove({
           x: snap(orig.origX + dx),
           y: snap(orig.origY + dy),
         });
       },
-      onEnd: () => {
+      onEnd: (ev) => {
+        cancelMove();
+        const dx = (ev.clientX - orig.startX) / viewport.zoom;
+        const dy = (ev.clientY - orig.startY) / viewport.zoom;
+        updateImage(image.id, {
+          x: snap(orig.origX + dx),
+          y: snap(orig.origY + dy),
+        });
         dragState.current = null;
       },
       onCancel: () => {
+        cancelMove();
         dragState.current = null;
         updateImage(image.id, { x: orig.origX, y: orig.origY });
       },
@@ -187,26 +234,50 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
     const origW = image.w;
     const origH = image.h;
     const aspect = origW / origH;
+    let frame: number | null = null;
+    let pendingPatch: Partial<CanvasImage> | null = null;
+    const flushResize = () => {
+      frame = null;
+      if (!pendingPatch) return;
+      updateImage(image.id, pendingPatch);
+      pendingPatch = null;
+    };
+    const scheduleResize = (patch: Partial<CanvasImage>) => {
+      pendingPatch = patch;
+      if (frame == null) frame = requestAnimationFrame(flushResize);
+    };
+    const cancelResizeFrame = () => {
+      if (frame != null) cancelAnimationFrame(frame);
+      frame = null;
+      pendingPatch = null;
+    };
+    const computePatch = (clientX: number, clientY: number): Partial<CanvasImage> => {
+      const zoom = useCanvasStore.getState().viewport.zoom || 1;
+      const dx = (clientX - startX) / zoom;
+      const dy = (clientY - startY) / zoom;
+      const signX = dir.includes("e") ? 1 : -1;
+      const signY = dir.includes("s") ? 1 : -1;
+      const delta =
+        Math.abs(dx) > Math.abs(dy) * aspect ? signX * dx : signY * dy * aspect;
+      const w = Math.max(40, origW + delta);
+      const h = Math.max(40, w / aspect);
+      return {
+        x: dir.includes("w") ? origX + origW - w : origX,
+        y: dir.includes("n") ? origY + origH - h : origY,
+        w,
+        h,
+      };
+    };
     startDrag({
       onMove: (ev) => {
-        const dx = (ev.clientX - startX) / viewport.zoom;
-        const dy = (ev.clientY - startY) / viewport.zoom;
-        const signX = dir.includes("e") ? 1 : -1;
-        const signY = dir.includes("s") ? 1 : -1;
-        // Mantém aspect ratio
-        const delta = Math.abs(dx) > Math.abs(dy) * aspect
-          ? signX * dx
-          : signY * dy * aspect;
-        const w = Math.max(40, origW + delta);
-        const h = Math.max(40, w / aspect);
-        updateImage(image.id, {
-          x: dir.includes("w") ? origX + origW - w : origX,
-          y: dir.includes("n") ? origY + origH - h : origY,
-          w,
-          h,
-        });
+        scheduleResize(computePatch(ev.clientX, ev.clientY));
+      },
+      onEnd: (ev) => {
+        cancelResizeFrame();
+        updateImage(image.id, computePatch(ev.clientX, ev.clientY));
       },
       onCancel: () => {
+        cancelResizeFrame();
         updateImage(image.id, { x: origX, y: origY, w: origW, h: origH });
       },
     });

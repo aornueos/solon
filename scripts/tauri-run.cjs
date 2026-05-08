@@ -44,7 +44,7 @@ if (isWindows && args[0] === "build") {
   const vcvars = findVcVars64();
   if (vcvars) {
     const tmpDir = join(root, ".tmp");
-    const tmpCmd = join(tmpDir, "tauri-msvc-build.cmd");
+    const tmpCmd = join(tmpDir, `tauri-msvc-build-${process.pid}.cmd`);
     mkdirSync(tmpDir, { recursive: true });
     writeFileSync(
       tmpCmd,

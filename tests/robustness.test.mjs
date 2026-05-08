@@ -7,6 +7,14 @@ import {
   renameFolderInOrder,
   reorderInFolder,
 } from "../src/lib/sidebarOrder.ts";
+import {
+  canMoveIntoFolder,
+  isSameOrDescendantPath,
+} from "../src/lib/sidebarDrop.ts";
+import {
+  htmlToMarkdown,
+  markdownToHtml,
+} from "../src/components/Editor/markdownBridge.ts";
 
 describe("frontmatter", () => {
   it("keeps body separators out of the yaml parser", () => {
@@ -81,5 +89,88 @@ describe("sidebar order", () => {
       "New/Old",
     );
     assert.deepEqual(Object.keys(order.folders).sort(), ["New/Old", "New/Old/Sub"]);
+  });
+});
+
+describe("sidebar folder drops", () => {
+  it("allows moving a folder into a sibling folder", () => {
+    assert.equal(
+      canMoveIntoFolder(
+        "C:\\Projeto\\Narrativas\\arcadia",
+        "C:\\Projeto\\Narrativas\\caos-eminente",
+      ),
+      true,
+    );
+  });
+
+  it("blocks dropping a folder into itself or its own child", () => {
+    assert.equal(
+      canMoveIntoFolder("C:/Projeto/Narrativas", "C:/Projeto/Narrativas"),
+      false,
+    );
+    assert.equal(
+      canMoveIntoFolder(
+        "C:/Projeto/Narrativas",
+        "C:/Projeto/Narrativas/arcadia",
+      ),
+      false,
+    );
+    assert.equal(
+      isSameOrDescendantPath(
+        "C:/Projeto/Narrativas/arcadia",
+        "C:/Projeto/Narrativas",
+      ),
+      true,
+    );
+  });
+
+  it("ignores drops into the current parent because they are no-ops", () => {
+    assert.equal(
+      canMoveIntoFolder(
+        "C:/Projeto/Narrativas/arcadia",
+        "C:/Projeto/Narrativas",
+      ),
+      false,
+    );
+  });
+});
+
+describe("editor markdown bridge", () => {
+  it("preserves leading visual spaces in paragraphs", () => {
+    const md = htmlToMarkdown("<p>  OLHOS</p>");
+    assert.equal(md, "\u00a0\u00a0OLHOS");
+  });
+
+  it("preserves repeated spaces inside prose without turning them into code", () => {
+    const md = htmlToMarkdown("<p>Kyra  percebe</p>");
+    assert.equal(md, `Kyra \u00a0percebe`);
+  });
+
+  it("keeps bullets, ordered lists, alignment, and editor indent markers", () => {
+    assert.match(htmlToMarkdown("<ul><li><p>item</p></li></ul>"), /^-\s+item/);
+    assert.match(htmlToMarkdown("<ol><li><p>item</p></li></ol>"), /^1\.\s+item/);
+    assert.equal(
+      htmlToMarkdown('<p data-indent="true" style="text-align: center">Cena</p>'),
+      '<p style="text-align: center">\u2003Cena</p>',
+    );
+  });
+
+  it("restores saved visual spaces and indent markers when loading markdown", () => {
+    assert.match(markdownToHtml("\u00a0\u00a0OLHOS"), /\u00a0\u00a0OLHOS/);
+    assert.match(
+      markdownToHtml('<p style="text-align: center">\u2003Cena</p>'),
+      /<p data-indent="true" style="text-align: center">Cena<\/p>/,
+    );
+  });
+
+  it("preserves empty paragraphs used as visual spacing", () => {
+    const md = htmlToMarkdown("<p>Um</p><p></p><p>Dois</p>");
+    assert.match(md, /Um\n\n<p><br><\/p>\n\nDois/);
+    assert.match(markdownToHtml(md), /<p>Um<\/p>\n<p><br><\/p>\n+<p>Dois<\/p>/);
+  });
+
+  it("preserves empty paragraphs represented with br", () => {
+    const md = htmlToMarkdown("<p>Um</p><p><br></p><p>Dois</p>");
+    assert.match(md, /Um\n\n<p><br><\/p>\n\nDois/);
   });
 });

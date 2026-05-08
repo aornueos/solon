@@ -144,6 +144,7 @@ export function Titlebar() {
             background: "transparent",
             color: "var(--text-primary)",
             opacity: activeView === "home" ? 0.6 : 1,
+            cursor: "default",
           }}
         >
           Solon
@@ -164,6 +165,7 @@ export function Titlebar() {
                 color: "var(--text-secondary)",
                 background: "transparent",
                 opacity: activeView === "editor" ? 1 : 0.85,
+                cursor: "default",
               }}
             >
               {activeFileName.replace(/\.(md|txt)$/, "")}
@@ -327,6 +329,7 @@ function WindowBtn({
         width: 46,
         background: bg,
         color: fg,
+        cursor: "default",
       }}
     >
       {children}
@@ -360,8 +363,13 @@ function ViewTab({
               background: "var(--bg-panel)",
               color: "var(--text-primary)",
               boxShadow: "var(--shadow-sm)",
+              cursor: "default",
             }
-          : { color: "var(--text-muted)", background: "transparent" }
+          : {
+              color: "var(--text-muted)",
+              background: "transparent",
+              cursor: "default",
+            }
       }
     >
       {children}
@@ -390,6 +398,7 @@ function IconBtn({
       style={{
         color: active ? "var(--text-secondary)" : "var(--text-placeholder)",
         background: active ? "var(--bg-hover)" : "transparent",
+        cursor: "default",
       }}
       onMouseEnter={(e) => {
         if (active) return;

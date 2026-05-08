@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { useAppStore } from "../../store/useAppStore";
 import { Card } from "./Card";
@@ -8,7 +8,6 @@ import { FloatingText } from "./FloatingText";
 import { ImageNode } from "./ImageNode";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { CanvasSidePanel } from "./CanvasSidePanel";
-import { SelectionOverlay } from "./SelectionOverlay";
 import {
   CANVAS_TOOL_ORDER,
   CanvasStroke,
@@ -37,33 +36,30 @@ import {
  * Delete/Backspace (remove selecionado), Esc (volta pra select).
  */
 export function CanvasView() {
-  const {
-    cards,
-    texts,
-    images,
-    viewport,
-    zoomAt,
-    panBy,
-    select,
-    selectedId,
-    linkingFromId,
-    cancelLink,
-    addCard,
-    addSceneCard,
-    updateSceneSnapshotByPath,
-    removeSelected,
-    duplicateSelected,
-    addStroke,
-    addText,
-    addImage,
-    tool,
-    setTool,
-    drawColor,
-    setDrawColor,
-    drawWidth,
-    setDrawWidth,
-    selectMany,
-  } = useCanvasStore();
+  const viewport = useCanvasStore((s) => s.viewport);
+  const zoomAt = useCanvasStore((s) => s.zoomAt);
+  const panBy = useCanvasStore((s) => s.panBy);
+  const select = useCanvasStore((s) => s.select);
+  const selectedId = useCanvasStore((s) => s.selectedId);
+  const linkingFromId = useCanvasStore((s) => s.linkingFromId);
+  const cancelLink = useCanvasStore((s) => s.cancelLink);
+  const addCard = useCanvasStore((s) => s.addCard);
+  const addSceneCard = useCanvasStore((s) => s.addSceneCard);
+  const updateSceneSnapshotByPath = useCanvasStore(
+    (s) => s.updateSceneSnapshotByPath,
+  );
+  const removeSelected = useCanvasStore((s) => s.removeSelected);
+  const duplicateSelected = useCanvasStore((s) => s.duplicateSelected);
+  const addStroke = useCanvasStore((s) => s.addStroke);
+  const addText = useCanvasStore((s) => s.addText);
+  const addImage = useCanvasStore((s) => s.addImage);
+  const tool = useCanvasStore((s) => s.tool);
+  const setTool = useCanvasStore((s) => s.setTool);
+  const drawColor = useCanvasStore((s) => s.drawColor);
+  const setDrawColor = useCanvasStore((s) => s.setDrawColor);
+  const drawWidth = useCanvasStore((s) => s.drawWidth);
+  const setDrawWidth = useCanvasStore((s) => s.setDrawWidth);
+  const selectMany = useCanvasStore((s) => s.selectMany);
   const rootFolder = useAppStore((s) => s.rootFolder);
   const activeFilePath = useAppStore((s) => s.activeFilePath);
   const activeView = useAppStore((s) => s.activeView);
@@ -78,6 +74,8 @@ export function CanvasView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const spaceDown = useRef(false);
   const panning = useRef<{ startX: number; startY: number } | null>(null);
+  const panFrame = useRef<number | null>(null);
+  const pendingPan = useRef({ dx: 0, dy: 0 });
 
   // Stroke em progresso (live) — estado local pra não re-render a store a
   // cada pixel. Commitamos no `mouseup`.
@@ -104,6 +102,26 @@ export function CanvasView() {
       ? Math.round(value / canvasGridSize) * canvasGridSize
       : value;
 
+  const schedulePanBy = (dx: number, dy: number) => {
+    pendingPan.current.dx += dx;
+    pendingPan.current.dy += dy;
+    if (panFrame.current != null) return;
+    panFrame.current = requestAnimationFrame(() => {
+      panFrame.current = null;
+      const { dx, dy } = pendingPan.current;
+      pendingPan.current = { dx: 0, dy: 0 };
+      if (dx || dy) panBy(dx, dy);
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (panFrame.current != null) cancelAnimationFrame(panFrame.current);
+      panFrame.current = null;
+      pendingPan.current = { dx: 0, dy: 0 };
+    };
+  }, []);
+
   useEffect(() => {
     if (activeView !== "canvas") return;
     setTool(canvasDefaultTool);
@@ -129,7 +147,7 @@ export function CanvasView() {
       if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) > 30) {
         zoomAt(e.clientX, e.clientY, e.deltaY);
       } else {
-        panBy(-e.deltaX, -e.deltaY);
+        schedulePanBy(-e.deltaX, -e.deltaY);
       }
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -452,7 +470,7 @@ export function CanvasView() {
     startDrag({
       onMove: (ev) => {
         if (!panning.current) return;
-        panBy(
+        schedulePanBy(
           ev.clientX - panning.current.startX,
           ev.clientY - panning.current.startY,
         );
@@ -771,7 +789,6 @@ export function CanvasView() {
 
       <CanvasToolbar />
       <CanvasSidePanel />
-      <SelectionOverlay />
 
       {/* World container */}
       <div
@@ -799,23 +816,20 @@ export function CanvasView() {
           liveStroke={liveStroke}
         />
 
-        {images.map((img) => (
-          <ImageNode key={img.id} image={img} />
-        ))}
+        <CanvasImagesLayer />
+        <CanvasCardsLayer />
 
-        {cards.map((c) => (
-          <Card key={c.id} card={c} />
-        ))}
+        <ArrowLayer
+          worldWidth={10000}
+          worldHeight={10000}
+          frozenPreviewPoint={
+            emptyLinkMenu
+              ? { x: emptyLinkMenu.worldX, y: emptyLinkMenu.worldY }
+              : null
+          }
+        />
 
-        <ArrowLayer worldWidth={10000} worldHeight={10000} />
-
-        {texts.map((t) => (
-          <FloatingText
-            key={t.id}
-            text={t}
-            autoEdit={justCreatedTextId === t.id}
-          />
-        ))}
+        <CanvasTextsLayer justCreatedTextId={justCreatedTextId} />
       </div>
 
       {marquee && (
@@ -898,3 +912,44 @@ export function CanvasView() {
     </div>
   );
 }
+
+const CanvasImagesLayer = memo(function CanvasImagesLayer() {
+  const images = useCanvasStore((s) => s.images);
+  return (
+    <>
+      {images.map((img) => (
+        <ImageNode key={img.id} image={img} />
+      ))}
+    </>
+  );
+});
+
+const CanvasCardsLayer = memo(function CanvasCardsLayer() {
+  const cards = useCanvasStore((s) => s.cards);
+  return (
+    <>
+      {cards.map((card) => (
+        <Card key={card.id} card={card} />
+      ))}
+    </>
+  );
+});
+
+const CanvasTextsLayer = memo(function CanvasTextsLayer({
+  justCreatedTextId,
+}: {
+  justCreatedTextId: string | null;
+}) {
+  const texts = useCanvasStore((s) => s.texts);
+  return (
+    <>
+      {texts.map((text) => (
+        <FloatingText
+          key={text.id}
+          text={text}
+          autoEdit={justCreatedTextId === text.id}
+        />
+      ))}
+    </>
+  );
+});

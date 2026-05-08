@@ -48,9 +48,9 @@ export function ConnectionDots({
 }) {
   const alwaysShow = isLinkSource || isLinkCandidate || isSelected;
   const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
-  const dotSize = 12 / zoom;
-  const border = 2 / zoom;
-  const mask = 3 / zoom;
+  const dotSize = 10 / zoom;
+  const border = 1.8 / zoom;
+  const mask = 1.5 / zoom;
 
   return (
     <>
@@ -84,7 +84,7 @@ export function ConnectionDots({
               background: activeSource ? "var(--accent)" : "var(--bg-panel)",
               border: `${border}px solid var(--accent)`,
               cursor: "crosshair",
-              zIndex: 30,
+              zIndex: 40,
               boxShadow: `0 0 0 ${mask}px var(--bg-app), 0 ${1 / zoom}px ${2 / zoom}px rgba(0,0,0,0.18)`,
             }}
           />

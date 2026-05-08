@@ -204,8 +204,8 @@ function StrokeConnectionDots({
   onPick: (side: CardSide) => void;
 }) {
   const alwaysShow = isLinkSource || isLinkCandidate || isSelected;
-  const radius = 6 / zoom;
-  const strokeWidth = 2 / zoom;
+  const radius = 5 / zoom;
+  const strokeWidth = 1.8 / zoom;
   const sides: { side: CardSide; x: number; y: number; title: string }[] = [
     { side: "top", x: rect.x + rect.w / 2, y: rect.y, title: "Conectar pelo topo" },
     { side: "right", x: rect.x + rect.w, y: rect.y + rect.h / 2, title: "Conectar pela direita" },

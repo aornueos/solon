@@ -47,14 +47,14 @@ const CANVAS_TEXT_FONT =
 type ResizeDir = "n" | "e" | "s" | "w" | "ne" | "nw" | "se" | "sw";
 
 const RESIZE_HANDLES: { dir: ResizeDir; cursor: string; title: string }[] = [
-  { dir: "nw", cursor: "nwse-resize", title: "Redimensionar (Ctrl escala fonte)" },
-  { dir: "n", cursor: "ns-resize", title: "Redimensionar altura" },
-  { dir: "ne", cursor: "nesw-resize", title: "Redimensionar (Ctrl escala fonte)" },
-  { dir: "e", cursor: "ew-resize", title: "Redimensionar largura" },
-  { dir: "se", cursor: "nwse-resize", title: "Redimensionar (Ctrl escala fonte)" },
-  { dir: "s", cursor: "ns-resize", title: "Redimensionar altura" },
-  { dir: "sw", cursor: "nesw-resize", title: "Redimensionar (Ctrl escala fonte)" },
-  { dir: "w", cursor: "ew-resize", title: "Redimensionar largura" },
+  { dir: "nw", cursor: "nwse-resize", title: "Escalar texto (Ctrl ajusta caixa)" },
+  { dir: "n", cursor: "ns-resize", title: "Escalar texto (Ctrl ajusta altura)" },
+  { dir: "ne", cursor: "nesw-resize", title: "Escalar texto (Ctrl ajusta caixa)" },
+  { dir: "e", cursor: "ew-resize", title: "Escalar texto (Ctrl ajusta largura)" },
+  { dir: "se", cursor: "nwse-resize", title: "Escalar texto (Ctrl ajusta caixa)" },
+  { dir: "s", cursor: "ns-resize", title: "Escalar texto (Ctrl ajusta altura)" },
+  { dir: "sw", cursor: "nesw-resize", title: "Escalar texto (Ctrl ajusta caixa)" },
+  { dir: "w", cursor: "ew-resize", title: "Escalar texto (Ctrl ajusta largura)" },
 ];
 
 export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props) {
@@ -227,6 +227,23 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     if (isGroupDrag) {
       const snapshot = snapshotSelection();
       const orig = { startX: e.clientX, startY: e.clientY };
+      let frame: number | null = null;
+      let pendingDelta: { dx: number; dy: number } | null = null;
+      const flushMove = () => {
+        frame = null;
+        if (!pendingDelta) return;
+        translateSelection(snapshot, pendingDelta.dx, pendingDelta.dy);
+        pendingDelta = null;
+      };
+      const scheduleMove = (dx: number, dy: number) => {
+        pendingDelta = { dx, dy };
+        if (frame == null) frame = requestAnimationFrame(flushMove);
+      };
+      const cancelMove = () => {
+        if (frame != null) cancelAnimationFrame(frame);
+        frame = null;
+        pendingDelta = null;
+      };
       pushHistory();
       dragState.current = {
         startX: orig.startX,
@@ -242,12 +259,17 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
           if (dragState.current && (Math.abs(dx) > 1 || Math.abs(dy) > 1)) {
             dragState.current.moved = true;
           }
-          translateSelection(snapshot, dx, dy);
+          scheduleMove(dx, dy);
         },
-        onEnd: () => {
+        onEnd: (ev) => {
+          cancelMove();
+          const dx = (ev.clientX - orig.startX) / viewport.zoom;
+          const dy = (ev.clientY - orig.startY) / viewport.zoom;
+          translateSelection(snapshot, dx, dy);
           dragState.current = null;
         },
         onCancel: () => {
+          cancelMove();
           dragState.current = null;
           translateSelection(snapshot, 0, 0);
         },
@@ -266,6 +288,23 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       moved: false,
     };
     dragState.current = orig;
+    let frame: number | null = null;
+    let pendingPatch: Partial<CanvasText> | null = null;
+    const flushMove = () => {
+      frame = null;
+      if (!pendingPatch) return;
+      updateText(text.id, pendingPatch);
+      pendingPatch = null;
+    };
+    const scheduleMove = (patch: Partial<CanvasText>) => {
+      pendingPatch = patch;
+      if (frame == null) frame = requestAnimationFrame(flushMove);
+    };
+    const cancelMove = () => {
+      if (frame != null) cancelAnimationFrame(frame);
+      frame = null;
+      pendingPatch = null;
+    };
 
     startDrag({
       onMove: (ev) => {
@@ -273,15 +312,23 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
         const dx = (ev.clientX - orig.startX) / viewport.zoom;
         const dy = (ev.clientY - orig.startY) / viewport.zoom;
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) dragState.current.moved = true;
-        updateText(text.id, {
+        scheduleMove({
           x: snap(orig.origX + dx),
           y: snap(orig.origY + dy),
         });
       },
-      onEnd: () => {
+      onEnd: (ev) => {
+        cancelMove();
+        const dx = (ev.clientX - orig.startX) / viewport.zoom;
+        const dy = (ev.clientY - orig.startY) / viewport.zoom;
+        updateText(text.id, {
+          x: snap(orig.origX + dx),
+          y: snap(orig.origY + dy),
+        });
         dragState.current = null;
       },
       onCancel: () => {
+        cancelMove();
         dragState.current = null;
         updateText(text.id, { x: orig.origX, y: orig.origY });
       },
@@ -315,8 +362,10 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       storedW: text.width,
       storedH: text.height,
     };
-    const minW = 60;
-    const minH = Math.max(28, text.size * 1.35);
+    const minBoxW = 60;
+    const minBoxH = Math.max(28, text.size * 1.35);
+    const minScaleW = 24;
+    const minScaleH = Math.max(14, MIN_TEXT_SIZE * 1.35);
     const maxW = 2000;
     const maxH = 1600;
     let frame: number | null = null;
@@ -340,79 +389,100 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       pendingPatch = null;
     };
 
-    startDrag({
-      onMove: (ev) => {
-        const dx = (ev.clientX - startX) / viewport.zoom;
-        const dy = (ev.clientY - startY) / viewport.zoom;
+    const computeResizePatch = (
+      clientX: number,
+      clientY: number,
+      boxOnly: boolean,
+    ): Partial<CanvasText> => {
+      const dx = (clientX - startX) / viewport.zoom;
+      const dy = (clientY - startY) / viewport.zoom;
+      const minW = boxOnly ? minBoxW : minScaleW;
+      const minH = boxOnly ? minBoxH : minScaleH;
 
-        let x = orig.x;
-        let y = orig.y;
-        let w = orig.w;
-        let h = orig.h;
+      let x = orig.x;
+      let y = orig.y;
+      let w = orig.w;
+      let h = orig.h;
 
-        if (dir.includes("e")) w = orig.w + dx;
-        if (dir.includes("s")) h = orig.h + dy;
-        if (dir.includes("w")) {
-          w = orig.w - dx;
-          x = orig.x + dx;
-        }
-        if (dir.includes("n")) {
-          h = orig.h - dy;
-          y = orig.y + dy;
-        }
+      if (dir.includes("e")) w = orig.w + dx;
+      if (dir.includes("s")) h = orig.h + dy;
+      if (dir.includes("w")) {
+        w = orig.w - dx;
+        x = orig.x + dx;
+      }
+      if (dir.includes("n")) {
+        h = orig.h - dy;
+        y = orig.y + dy;
+      }
 
-        if (w < minW) {
-          if (dir.includes("w")) x = orig.x + orig.w - minW;
-          w = minW;
-        }
-        if (h < minH) {
-          if (dir.includes("n")) y = orig.y + orig.h - minH;
-          h = minH;
-        }
+      if (w < minW) {
+        if (dir.includes("w")) x = orig.x + orig.w - minW;
+        w = minW;
+      }
+      if (h < minH) {
+        if (dir.includes("n")) y = orig.y + orig.h - minH;
+        h = minH;
+      }
 
-        w = Math.min(maxW, w);
-        h = Math.min(maxH, h);
+      w = Math.min(maxW, w);
+      h = Math.min(maxH, h);
 
-        const next: Partial<CanvasText> = {
+      if (boxOnly) {
+        return {
           x: Math.round(x),
           y: Math.round(y),
           width: Math.round(w),
           height: Math.round(h),
         };
+      }
 
-        if (ev.ctrlKey || ev.metaKey) {
-          const scaleX = w / orig.w;
-          const scaleY = h / orig.h;
-          const scale =
-            dir === "e" || dir === "w"
+      const scaleX = w / orig.w;
+      const scaleY = h / orig.h;
+      const scale =
+        dir === "e" || dir === "w"
+          ? scaleX
+          : dir === "n" || dir === "s"
+            ? scaleY
+            : Math.abs(scaleX - 1) >= Math.abs(scaleY - 1)
               ? scaleX
-              : dir === "n" || dir === "s"
-                ? scaleY
-                : Math.max(scaleX, scaleY);
-          const scaledW = clamp(Math.round(orig.w * scale), minW, maxW);
-          const scaledH = clamp(Math.round(orig.h * scale), minH, maxH);
-          next.x = dir.includes("w")
-            ? Math.round(orig.x + orig.w - scaledW)
-            : Math.round(orig.x);
-          next.y = dir.includes("n")
-            ? Math.round(orig.y + orig.h - scaledH)
-            : Math.round(orig.y);
-          next.width = scaledW;
-          next.height = scaledH;
-          next.size = clamp(
-            Math.round(orig.size * scale),
-            MIN_TEXT_SIZE,
-            MAX_TEXT_SIZE,
-          );
-        }
+              : scaleY;
+      const nextSize = clamp(
+        Math.round(orig.size * scale),
+        MIN_TEXT_SIZE,
+        MAX_TEXT_SIZE,
+      );
+      const scaledW = clamp(Math.round(orig.w * scale), minBoxW, maxW);
+      const scaledH = clamp(
+        Math.round(orig.h * scale),
+        Math.max(20, Math.ceil(nextSize * 1.25)),
+        maxH,
+      );
 
-        scheduleResize(next);
+      return {
+        x: dir.includes("w")
+          ? Math.round(orig.x + orig.w - scaledW)
+          : Math.round(orig.x),
+        y: dir.includes("n")
+          ? Math.round(orig.y + orig.h - scaledH)
+          : Math.round(orig.y),
+        width: scaledW,
+        height: scaledH,
+        size: nextSize,
+      };
+    };
+
+    startDrag({
+      onMove: (ev) => {
+        scheduleResize(
+          computeResizePatch(ev.clientX, ev.clientY, ev.ctrlKey || ev.metaKey),
+        );
       },
-      onEnd: () => {
-        if (frame != null) {
-          cancelAnimationFrame(frame);
-          flushResize();
-        }
+      onEnd: (ev) => {
+        cancelPendingResize();
+        updateText(
+          text.id,
+          computeResizePatch(ev.clientX, ev.clientY, ev.ctrlKey || ev.metaKey),
+        );
       },
       onCancel: () => {
         cancelPendingResize();
@@ -444,13 +514,13 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     overflow: "visible",
     ...(isSelected
       ? {
-          outline: "1px solid var(--selection-ring)",
-          outlineOffset: "2px",
+          outline: `${1 / viewport.zoom}px solid var(--accent)`,
+          outlineOffset: `${1 / viewport.zoom}px`,
         }
       : isInGroup
         ? {
-            outline: "1px dashed var(--selection-ring)",
-            outlineOffset: "2px",
+            outline: `${1 / viewport.zoom}px dashed var(--selection-ring)`,
+            outlineOffset: `${1 / viewport.zoom}px`,
           }
         : null),
   };
@@ -469,14 +539,15 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     fontFamily: CANVAS_TEXT_FONT,
     letterSpacing: 0,
     whiteSpace: "pre-wrap",
-    wordBreak: "break-word",
+    wordBreak: "normal",
+    overflowWrap: "anywhere",
     overflow: editing ? "auto" : "visible",
     padding: text.highlight ? "1px 4px" : 0,
     background: text.highlight || "transparent",
     borderRadius: text.highlight ? 2 : 0,
   };
 
-  const renderedLines = displayText.split("\n").filter((line) => line.trim());
+  const renderedLines = displayText.split("\n");
 
   return (
     <div
@@ -828,6 +899,7 @@ function TextPreview({
         margin: 0,
         paddingLeft: "1.15em",
         listStylePosition: "outside",
+        listStyleType: "disc",
       }}
     >
       {(lines.length ? lines : [" "]).map((line, index) => (
@@ -901,34 +973,41 @@ function ResizeHandle({
   zoom: number;
   onMouseDown: (e: React.MouseEvent) => void;
 }) {
-  const size = 8 / zoom;
-  const long = 24 / zoom;
-  const half = size / 2;
   const isCorner = dir.length === 2;
+  const cornerSize = 7 / zoom;
+  const sideLong = 22 / zoom;
+  const sideShort = 4 / zoom;
+  const halfCorner = cornerSize / 2;
+  const inset = 7 / zoom;
 
   const style: React.CSSProperties = {
     position: "absolute",
-    width: isCorner ? size : dir === "n" || dir === "s" ? long : size,
-    height: isCorner ? size : dir === "e" || dir === "w" ? long : size,
+    width: isCorner ? cornerSize : dir === "n" || dir === "s" ? sideLong : sideShort,
+    height: isCorner ? cornerSize : dir === "e" || dir === "w" ? sideLong : sideShort,
     background: "var(--accent)",
-    border: `${1 / zoom}px solid var(--bg-panel)`,
+    border: isCorner ? `${1 / zoom}px solid var(--bg-panel)` : "none",
     borderRadius: 999,
     boxShadow: "var(--shadow-sm)",
     cursor,
-    zIndex: 10,
+    opacity: isCorner ? 0.95 : 0.72,
+    zIndex: 12,
   };
 
-  if (dir.includes("n")) style.top = -half;
-  if (dir.includes("s")) style.bottom = -half;
-  if (dir.includes("w")) style.left = -half;
-  if (dir.includes("e")) style.right = -half;
+  if (isCorner && dir.includes("n")) style.top = -halfCorner;
+  if (isCorner && dir.includes("s")) style.bottom = -halfCorner;
+  if (isCorner && dir.includes("w")) style.left = -halfCorner;
+  if (isCorner && dir.includes("e")) style.right = -halfCorner;
   if (dir === "n" || dir === "s") {
     style.left = "50%";
     style.transform = "translateX(-50%)";
+    if (dir === "n") style.top = inset;
+    else style.bottom = inset;
   }
   if (dir === "e" || dir === "w") {
     style.top = "50%";
     style.transform = "translateY(-50%)";
+    if (dir === "e") style.right = inset;
+    else style.left = inset;
   }
 
   return (

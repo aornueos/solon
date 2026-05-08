@@ -127,6 +127,23 @@ export const Card = memo(function Card({ card }: Props) {
       // Snapshot das posicoes originais de TODOS os itens do grupo.
       const snapshot = snapshotSelection();
       const orig = { startX: e.clientX, startY: e.clientY };
+      let frame: number | null = null;
+      let pendingDelta: { dx: number; dy: number } | null = null;
+      const flushMove = () => {
+        frame = null;
+        if (!pendingDelta) return;
+        translateSelection(snapshot, pendingDelta.dx, pendingDelta.dy);
+        pendingDelta = null;
+      };
+      const scheduleMove = (dx: number, dy: number) => {
+        pendingDelta = { dx, dy };
+        if (frame == null) frame = requestAnimationFrame(flushMove);
+      };
+      const cancelMove = () => {
+        if (frame != null) cancelAnimationFrame(frame);
+        frame = null;
+        pendingDelta = null;
+      };
       // History push antes do drag — Ctrl+Z volta a posicao do grupo
       // inteira pre-drag de uma vez.
       pushHistory();
@@ -139,12 +156,18 @@ export const Card = memo(function Card({ card }: Props) {
           const zoom = useCanvasStore.getState().viewport.zoom || 1;
           const dx = (ev.clientX - orig.startX) / zoom;
           const dy = (ev.clientY - orig.startY) / zoom;
-          translateSelection(snapshot, dx, dy);
+          scheduleMove(dx, dy);
         },
-        onEnd: () => {
+        onEnd: (ev) => {
+          cancelMove();
+          const zoom = useCanvasStore.getState().viewport.zoom || 1;
+          const dx = (ev.clientX - orig.startX) / zoom;
+          const dy = (ev.clientY - orig.startY) / zoom;
+          translateSelection(snapshot, dx, dy);
           dragState.current = null;
         },
         onCancel: () => {
+          cancelMove();
           dragState.current = null;
           translateSelection(snapshot, 0, 0);
         },
@@ -164,6 +187,23 @@ export const Card = memo(function Card({ card }: Props) {
       origY: card.y,
     };
     dragState.current = orig;
+    let frame: number | null = null;
+    let pendingPatch: Partial<CanvasCard> | null = null;
+    const flushMove = () => {
+      frame = null;
+      if (!pendingPatch) return;
+      updateCard(card.id, pendingPatch);
+      pendingPatch = null;
+    };
+    const scheduleMove = (patch: Partial<CanvasCard>) => {
+      pendingPatch = patch;
+      if (frame == null) frame = requestAnimationFrame(flushMove);
+    };
+    const cancelMove = () => {
+      if (frame != null) cancelAnimationFrame(frame);
+      frame = null;
+      pendingPatch = null;
+    };
 
     startDrag({
       onMove: (ev) => {
@@ -171,17 +211,26 @@ export const Card = memo(function Card({ card }: Props) {
         const zoom = useCanvasStore.getState().viewport.zoom || 1;
         const dx = (ev.clientX - orig.startX) / zoom;
         const dy = (ev.clientY - orig.startY) / zoom;
-        updateCard(card.id, {
+        scheduleMove({
           x: snap(orig.origX + dx),
           y: snap(orig.origY + dy),
         });
       },
-      onEnd: () => {
+      onEnd: (ev) => {
+        cancelMove();
+        const zoom = useCanvasStore.getState().viewport.zoom || 1;
+        const dx = (ev.clientX - orig.startX) / zoom;
+        const dy = (ev.clientY - orig.startY) / zoom;
+        updateCard(card.id, {
+          x: snap(orig.origX + dx),
+          y: snap(orig.origY + dy),
+        });
         dragState.current = null;
       },
       onCancel: () => {
         // Blur/Esc durante o drag: devolve o card pra posição original pra
         // não deixar o usuário com "arrastou um pouco e sumiu de vista".
+        cancelMove();
         dragState.current = null;
         updateCard(card.id, { x: orig.origX, y: orig.origY });
       },
@@ -458,9 +507,9 @@ function ConnectionDots({
   onPick: (side: CardSide) => void;
 }) {
   const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
-  const dotSize = 12 / zoom;
-  const border = 2 / zoom;
-  const mask = 3 / zoom;
+  const dotSize = 10 / zoom;
+  const border = 1.8 / zoom;
+  const mask = 1.5 / zoom;
   // Posicionamento em CSS: cada dot fica centrado no midpoint do seu lado,
   // usando translate(-50%,-50%) pra o centro do círculo coincidir com a
   // borda do card. Assim o dot "monta" a borda como num Miro clássico.
@@ -530,7 +579,7 @@ function ConnectionDots({
               border: `${border}px solid var(--accent)`,
               cursor: "crosshair",
               // zIndex acima do resize handle e da barra de ações
-              zIndex: 30,
+              zIndex: 40,
               boxShadow: `0 0 0 ${mask}px var(--bg-app), 0 ${1 / zoom}px ${2 / zoom}px rgba(0,0,0,0.18)`,
             }}
           />
@@ -731,17 +780,42 @@ function ResizeHandle({ card }: { card: CanvasCard }) {
     const startY = e.clientY;
     const origW = card.w;
     const origH = card.h;
+    let frame: number | null = null;
+    let pendingPatch: Partial<CanvasCard> | null = null;
+    const flushResize = () => {
+      frame = null;
+      if (!pendingPatch) return;
+      updateCard(card.id, pendingPatch);
+      pendingPatch = null;
+    };
+    const scheduleResize = (patch: Partial<CanvasCard>) => {
+      pendingPatch = patch;
+      if (frame == null) frame = requestAnimationFrame(flushResize);
+    };
+    const cancelResizeFrame = () => {
+      if (frame != null) cancelAnimationFrame(frame);
+      frame = null;
+      pendingPatch = null;
+    };
+    const computePatch = (clientX: number, clientY: number): Partial<CanvasCard> => {
+      const zoom = useCanvasStore.getState().viewport.zoom || 1;
+      const dw = (clientX - startX) / zoom;
+      const dh = (clientY - startY) / zoom;
+      return {
+        w: Math.max(120, origW + dw),
+        h: Math.max(60, origH + dh),
+      };
+    };
     startDrag({
       onMove: (ev) => {
-        const zoom = useCanvasStore.getState().viewport.zoom || 1;
-        const dw = (ev.clientX - startX) / zoom;
-        const dh = (ev.clientY - startY) / zoom;
-        updateCard(card.id, {
-          w: Math.max(120, origW + dw),
-          h: Math.max(60, origH + dh),
-        });
+        scheduleResize(computePatch(ev.clientX, ev.clientY));
+      },
+      onEnd: (ev) => {
+        cancelResizeFrame();
+        updateCard(card.id, computePatch(ev.clientX, ev.clientY));
       },
       onCancel: () => {
+        cancelResizeFrame();
         // Reverte se a janela perder foco durante o resize
         updateCard(card.id, { w: origW, h: origH });
       },

@@ -31,9 +31,11 @@ const textRectInline = (t: CanvasText) => textRect(t);
 export const ArrowLayer = memo(function ArrowLayer({
   worldWidth,
   worldHeight,
+  frozenPreviewPoint,
 }: {
   worldWidth: number;
   worldHeight: number;
+  frozenPreviewPoint?: { x: number; y: number } | null;
 }) {
   const cards = useCanvasStore((s) => s.cards);
   const arrows = useCanvasStore((s) => s.arrows);
@@ -82,30 +84,49 @@ export const ArrowLayer = memo(function ArrowLayer({
       setPreviewWorld(null);
       return;
     }
+    if (frozenPreviewPoint) return;
+
+    let frame: number | null = null;
     let last: { x: number; y: number } | null = null;
+    let pending: { x: number; y: number } | null = null;
+
+    const commitPreview = (next: { x: number; y: number }) => {
+      last = next;
+      setPreviewWorld(next);
+    };
+    const flushPreview = () => {
+      frame = null;
+      if (!pending) return;
+      commitPreview(pending);
+      pending = null;
+    };
+    const surface = document.querySelector(".canvas-surface") as HTMLElement | null;
+    if (!surface) return;
+    const surfaceRect = surface.getBoundingClientRect();
 
     const onMove = (e: PointerEvent) => {
-      const surface = document.querySelector(
-        ".canvas-surface",
-      ) as HTMLElement | null;
-      if (!surface) return;
-      const rect = surface.getBoundingClientRect();
       const { viewport: vp } = useCanvasStore.getState();
       const next = {
-        x: (e.clientX - rect.left - vp.x) / vp.zoom,
-        y: (e.clientY - rect.top - vp.y) / vp.zoom,
+        x: (e.clientX - surfaceRect.left - vp.x) / vp.zoom,
+        y: (e.clientY - surfaceRect.top - vp.y) / vp.zoom,
       };
       if (last && Math.hypot(next.x - last.x, next.y - last.y) < 0.75 / vp.zoom) {
         return;
       }
-      last = next;
-      setPreviewWorld(next);
+      pending = next;
+      if (!last) {
+        flushPreview();
+        return;
+      }
+      if (frame == null) frame = requestAnimationFrame(flushPreview);
     };
     document.addEventListener("pointermove", onMove);
     return () => {
+      if (frame != null) cancelAnimationFrame(frame);
       document.removeEventListener("pointermove", onMove);
     };
-  }, [linkingFromId]);
+  }, [frozenPreviewPoint, linkingFromId]);
+  const effectivePreviewWorld = frozenPreviewPoint ?? previewWorld;
   const dragRef = useRef<{
     id: string;
     startClientX: number;
@@ -128,6 +149,23 @@ export const ArrowLayer = memo(function ArrowLayer({
       origDy: args.origDy,
     };
     dragRef.current = orig;
+    let frame: number | null = null;
+    let pendingBend: { dx: number; dy: number } | null = null;
+    const flushBend = () => {
+      frame = null;
+      if (!pendingBend) return;
+      setArrowBend(orig.id, pendingBend);
+      pendingBend = null;
+    };
+    const scheduleBend = (bend: { dx: number; dy: number }) => {
+      pendingBend = bend;
+      if (frame == null) frame = requestAnimationFrame(flushBend);
+    };
+    const cancelBendFrame = () => {
+      if (frame != null) cancelAnimationFrame(frame);
+      frame = null;
+      pendingBend = null;
+    };
 
     startDrag({
       onMove: (ev) => {
@@ -135,15 +173,24 @@ export const ArrowLayer = memo(function ArrowLayer({
         const z = useCanvasStore.getState().viewport.zoom;
         const dxScreen = ev.clientX - orig.startClientX;
         const dyScreen = ev.clientY - orig.startClientY;
-        setArrowBend(orig.id, {
+        scheduleBend({
           dx: orig.origDx + dxScreen / z,
           dy: orig.origDy + dyScreen / z,
         });
       },
-      onEnd: () => {
+      onEnd: (ev) => {
+        cancelBendFrame();
+        const z = useCanvasStore.getState().viewport.zoom;
+        const dxScreen = ev.clientX - orig.startClientX;
+        const dyScreen = ev.clientY - orig.startClientY;
+        setArrowBend(orig.id, {
+          dx: orig.origDx + dxScreen / z,
+          dy: orig.origDy + dyScreen / z,
+        });
         dragRef.current = null;
       },
       onCancel: () => {
+        cancelBendFrame();
         dragRef.current = null;
         // Reverte o bend pra posição original ao abortar
         setArrowBend(
@@ -318,13 +365,13 @@ export const ArrowLayer = memo(function ArrowLayer({
           origem virado pro cursor e extruda o primeiro control point pra
           manter o mesmo "look" da seta final. */}
       {linkingFromId &&
-        previewWorld &&
+        effectivePreviewWorld &&
         (() => {
           const src = rectById.get(linkingFromId);
           if (!src) return null;
           const { p1, cp1, cp2, p2 } = routeArrowToPoint(
             src,
-            previewWorld,
+            effectivePreviewWorld,
             linkingFromSide ?? undefined,
           );
           const d = `M ${p1.x} ${p1.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${p2.x} ${p2.y}`;
