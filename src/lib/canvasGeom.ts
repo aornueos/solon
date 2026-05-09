@@ -1,5 +1,6 @@
 import type { CanvasStroke, CanvasText } from "../types/canvas";
 import { useCanvasStore } from "../store/useCanvasStore";
+import { EDITOR_FONT_FAMILIES, useAppStore } from "../store/useAppStore";
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
@@ -8,8 +9,15 @@ export type Rect = { x: number; y: number; w: number; h: number };
  * pra evitar criar elemento canvas a cada bbox de texto.
  */
 let measureCtx: CanvasRenderingContext2D | null | undefined;
-const CANVAS_TEXT_FONT =
-  '"Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+
+function getCanvasTextFontFamily(): string {
+  const editorFontFamily = useAppStore.getState().editorFontFamily;
+  return (
+    EDITOR_FONT_FAMILIES.find((option) => option.value === editorFontFamily)?.css ??
+    EDITOR_FONT_FAMILIES[0].css
+  );
+}
+
 function getMeasureCtx(): CanvasRenderingContext2D | null {
   if (measureCtx !== undefined) return measureCtx;
   if (typeof document === "undefined") {
@@ -39,7 +47,7 @@ export function textRect(t: CanvasText): Rect {
   };
 
   if (ctx) {
-    ctx.font = `${t.bold ? "700 " : "500 "}${t.size}px ${CANVAS_TEXT_FONT}`;
+    ctx.font = `${t.bold ? "700 " : "500 "}${t.size}px ${getCanvasTextFontFamily()}`;
   }
 
   for (const line of lines) {

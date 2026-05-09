@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useCanvasStore } from "../../store/useCanvasStore";
+import { useAppStore } from "../../store/useAppStore";
 import { startDrag } from "../../lib/drag";
 import { CanvasText, CardSide } from "../../types/canvas";
 import { strokeRect, textRect } from "../../lib/canvasGeom";
@@ -52,6 +53,7 @@ export const ArrowLayer = memo(function ArrowLayer({
   const tool = useCanvasStore((s) => s.tool);
   const linkingFromId = useCanvasStore((s) => s.linkingFromId);
   const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
+  const editorFontFamily = useAppStore((s) => s.editorFontFamily);
   // Mapa de id → Rect cobrindo cards, texts e images. Antes a gente
   // mapeava so cards, entao setas com endpoint em texto/imagem viravam
   // null e desapareciam silenciosamente. `getEntityRect` resolve por
@@ -67,7 +69,7 @@ export const ArrowLayer = memo(function ArrowLayer({
       if (rect) map.set(st.id, rect);
     }
     return map;
-  }, [cards, images, strokes, texts]);
+  }, [cards, editorFontFamily, images, strokes, texts]);
 
   // Preview pointilhado enquanto o usuário está "linkando" — sai do card
   // de origem até o cursor. Sem isso o usuário clica e vai cego até o

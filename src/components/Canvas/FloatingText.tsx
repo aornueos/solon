@@ -2,7 +2,7 @@ import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CanvasText, DRAW_COLORS } from "../../types/canvas";
 import { useCanvasStore } from "../../store/useCanvasStore";
-import { useAppStore } from "../../store/useAppStore";
+import { EDITOR_FONT_FAMILIES, useAppStore } from "../../store/useAppStore";
 import { startDrag } from "../../lib/drag";
 import { textRect } from "../../lib/canvasGeom";
 import {
@@ -41,8 +41,6 @@ const HIGHLIGHT_COLORS: { label: string; value: string }[] = [
 const TEXT_SIZES = [12, 14, 18, 24, 32, 48] as const;
 const MIN_TEXT_SIZE = 8;
 const MAX_TEXT_SIZE = 160;
-const CANVAS_TEXT_FONT =
-  '"Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
 
 type ResizeDir = "n" | "e" | "s" | "w" | "ne" | "nw" | "se" | "sw";
 
@@ -76,6 +74,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   const openPrompt = useAppStore((s) => s.openPrompt);
   const canvasSnapToGrid = useAppStore((s) => s.canvasSnapToGrid);
   const canvasGridSize = useAppStore((s) => s.canvasGridSize);
+  const editorFontFamily = useAppStore((s) => s.editorFontFamily);
 
   const isSelected = selectedId === text.id;
   const isInGroup = selectedId !== text.id && selectedIds.has(text.id);
@@ -105,6 +104,9 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
 
   const displayText = editing ? draftText : text.text;
   const displayModel = { ...text, text: displayText };
+  const canvasTextFont =
+    EDITOR_FONT_FAMILIES.find((option) => option.value === editorFontFamily)
+      ?.css ?? EDITOR_FONT_FAMILIES[0].css;
 
   const naturalRect = textRect({
     ...displayModel,
@@ -536,7 +538,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     textDecoration: text.underline ? "underline" : "none",
     textAlign: text.align ?? "left",
     lineHeight: 1.18,
-    fontFamily: CANVAS_TEXT_FONT,
+    fontFamily: canvasTextFont,
     letterSpacing: 0,
     whiteSpace: "pre-wrap",
     wordBreak: "normal",
