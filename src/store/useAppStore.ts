@@ -123,6 +123,16 @@ export type UpdateStatus =
   | { kind: "ready"; info: UpdateInfo }
   | { kind: "error"; message: string };
 
+/** Aba aberta — pointer pro arquivo. O buffer (`fileBody`/`sceneMeta`)
+ *  vive na store no nivel raiz pro arquivo ATIVO; trocar de aba flusha
+ *  o save da ativa anterior e re-le' o conteudo da nova. Manter buffers
+ *  em memoria pra todas as abas seria caro pra arquivos grandes, e o
+ *  feature flag aqui e' "minimalista". */
+export interface OpenTab {
+  path: string;
+  name: string;
+}
+
 interface AppState {
   // Arquivo ativo
   activeFilePath: string | null;
@@ -131,6 +141,8 @@ interface AppState {
   fileBody: string;
   /** Metadados parseados do frontmatter. Editável via Inspector. */
   sceneMeta: SceneMeta;
+  /** Abas abertas. A aba ativa e' aquela cujo `path === activeFilePath`. */
+  openTabs: OpenTab[];
 
   // Pastas abertas
   rootFolder: string | null;
@@ -238,6 +250,17 @@ interface AppState {
 
   // Actions
   setActiveFile: (path: string, name: string, body: string, meta: SceneMeta) => void;
+  /** Adiciona aba se ainda nao existe. Idempotente — chamado por `openFile`
+   *  toda vez. Persiste a lista em localStorage. */
+  addTab: (path: string, name: string) => void;
+  /** Fecha aba pelo path. Se era a ativa, retorna o path da proxima/anterior
+   *  pra que o caller chame `openFile` (precisa de I/O — store nao faz). */
+  closeTab: (path: string) => string | null;
+  /** Atualiza path/name de uma aba apos rename ou move. */
+  renameTab: (oldPath: string, newPath: string, newName: string) => void;
+  /** Renomeia em massa quando uma pasta foi movida/renomeada — todos os
+   *  paths que comecam com `oldPrefix` sao reescritos. */
+  rebaseTabs: (oldPrefix: string, newPrefix: string) => void;
   setFileBody: (body: string) => void;
   setSceneMeta: (meta: SceneMeta) => void;
   patchSceneMeta: (patch: Partial<SceneMeta>) => void;
@@ -312,6 +335,34 @@ interface AppState {
 }
 
 const THEME_KEY = "solon:theme";
+const OPEN_TABS_KEY = "solon:openTabs";
+
+function loadOpenTabs(): OpenTab[] {
+  try {
+    const raw = localStorage.getItem(OPEN_TABS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (t): t is OpenTab =>
+          t && typeof t.path === "string" && typeof t.name === "string",
+      )
+      // Defensivo: localStorage pode acumular duplicatas se houve crash
+      // entre dois saves sem dedup. Sanitiza no load.
+      .filter((t, i, arr) => arr.findIndex((x) => x.path === t.path) === i);
+  } catch {
+    return [];
+  }
+}
+
+function saveOpenTabs(tabs: OpenTab[]): void {
+  try {
+    localStorage.setItem(OPEN_TABS_KEY, JSON.stringify(tabs));
+  } catch {
+    /* storage cheio — ignora */
+  }
+}
 function loadTheme(): "light" | "dark" {
   try {
     const v = localStorage.getItem(THEME_KEY);
@@ -540,6 +591,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeFileName: null,
   fileBody: "",
   sceneMeta: {},
+  openTabs: loadOpenTabs(),
   rootFolder: null,
   fileTree: [],
   sidebarOrder: { version: 1, folders: {} },
@@ -629,6 +681,66 @@ export const useAppStore = create<AppState>((set) => ({
       sceneMeta: meta,
     });
   },
+
+  addTab: (path, name) =>
+    set((s) => {
+      if (s.openTabs.some((t) => t.path === path)) return s;
+      const next = [...s.openTabs, { path, name }];
+      saveOpenTabs(next);
+      return { openTabs: next };
+    }),
+
+  closeTab: (path) => {
+    let nextActive: string | null = null;
+    set((s) => {
+      const idx = s.openTabs.findIndex((t) => t.path === path);
+      if (idx === -1) return s;
+      const next = s.openTabs.filter((_, i) => i !== idx);
+      saveOpenTabs(next);
+      // Se a aba fechada era a ativa, descobre quem assume o foco —
+      // proxima a' direita; se nao houver, a' esquerda; se nada, null.
+      // Caller faz o openFile com `nextActive`.
+      if (s.activeFilePath === path) {
+        nextActive =
+          next[idx]?.path ?? next[idx - 1]?.path ?? next[next.length - 1]?.path ?? null;
+      } else {
+        nextActive = s.activeFilePath;
+      }
+      return { openTabs: next };
+    });
+    return nextActive;
+  },
+
+  renameTab: (oldPath, newPath, newName) =>
+    set((s) => {
+      const idx = s.openTabs.findIndex((t) => t.path === oldPath);
+      if (idx === -1) return s;
+      const next = s.openTabs.slice();
+      next[idx] = { path: newPath, name: newName };
+      saveOpenTabs(next);
+      return { openTabs: next };
+    }),
+
+  rebaseTabs: (oldPrefix, newPrefix) =>
+    set((s) => {
+      const oldNorm = oldPrefix.replace(/\\/g, "/").replace(/\/+$/, "");
+      let changed = false;
+      const next = s.openTabs.map((t) => {
+        const p = t.path.replace(/\\/g, "/");
+        if (p !== oldNorm && !p.startsWith(`${oldNorm}/`)) return t;
+        const sep =
+          newPrefix.includes("\\") && !newPrefix.includes("/") ? "\\" : "/";
+        const rel = p === oldNorm ? "" : p.slice(oldNorm.length + 1);
+        const nextPath = rel
+          ? `${newPrefix}${sep}${rel.replace(/[\\/]/g, sep)}`
+          : newPrefix;
+        changed = true;
+        return { path: nextPath, name: t.name };
+      });
+      if (!changed) return s;
+      saveOpenTabs(next);
+      return { openTabs: next };
+    }),
 
   setFileBody: (body) => set({ fileBody: body }),
 

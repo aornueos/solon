@@ -43,7 +43,14 @@ interface ContextMenuState {
 }
 
 export function Sidebar() {
-  const { fileTree, rootFolder, activeFilePath, toggleFolder } = useAppStore();
+  // Seletores granulares: assinar `useAppStore()` cru fazia o Sidebar
+  // re-renderizar TODA arvore de arquivos a cada keystroke (porque o store
+  // tem fileBody/headings/saveStatus/wordCount mudando constantemente).
+  // Em projetos com muitas pastas/arquivos isso e' o ofensor #1 de lag.
+  const fileTree = useAppStore((s) => s.fileTree);
+  const rootFolder = useAppStore((s) => s.rootFolder);
+  const activeFilePath = useAppStore((s) => s.activeFilePath);
+  const toggleFolder = useAppStore((s) => s.toggleFolder);
   const openPrompt = useAppStore((s) => s.openPrompt);
   const openConfirm = useAppStore((s) => s.openConfirm);
   const { openFolder, refresh, createFile, createFolder, renameNode, deleteNode, reorderItem, moveItem } =
@@ -704,8 +711,12 @@ function FileTree({
 
   // `siblingNames` e' o snapshot da ordem atual desta pasta — passado
   // pro reorder pra que o JSON saiba como inicializar essa pasta caso
-  // ainda nao tinha custom order.
+  // ainda nao tinha custom order. `siblingPaths` (paths absolutos) e'
+  // computado UMA vez por render do FileTree, nao por iteracao do
+  // .map — antes era `nodes.map((n) => n.path)` dentro de cada linha,
+  // criando arrays redundantes O(N) por nivel.
   const siblingNames = nodes.map((n) => n.name);
+  const siblingPaths = nodes.map((n) => n.path);
 
   return (
     <>
@@ -728,7 +739,7 @@ function FileTree({
             dragPathRef={dragPathRef}
             dragOverPath={dragOverPath}
             dragOverFolder={dragOverFolder}
-            siblingPaths={nodes.map((n) => n.path)}
+            siblingPaths={siblingPaths}
             onDragStart={onDragStart}
             onDragOver={onDragOver}
             onDragOverFolder={onDragOverFolder}

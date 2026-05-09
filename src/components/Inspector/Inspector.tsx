@@ -9,14 +9,15 @@ import clsx from "clsx";
  * Qualquer alteração cai no store e é persistida pelo useAutoSave.
  */
 export function Inspector() {
-  const {
-    activeFilePath,
-    activeFileName,
-    sceneMeta,
-    patchSceneMeta,
-    wordCount,
-    toggleInspector,
-  } = useAppStore();
+  // Seletores granulares: assinar `useAppStore()` cru re-renderizava o
+  // Inspector inteiro (e todos os campos de input dentro) a cada
+  // keystroke do editor — fileBody muda no store em cada tecla.
+  const activeFilePath = useAppStore((s) => s.activeFilePath);
+  const activeFileName = useAppStore((s) => s.activeFileName);
+  const sceneMeta = useAppStore((s) => s.sceneMeta);
+  const patchSceneMeta = useAppStore((s) => s.patchSceneMeta);
+  const wordCount = useAppStore((s) => s.wordCount);
+  const toggleInspector = useAppStore((s) => s.toggleInspector);
 
   const shellStyle: React.CSSProperties = {
     background: "var(--bg-panel-2)",

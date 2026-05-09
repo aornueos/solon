@@ -19,10 +19,23 @@ export const Card = memo(function Card({ card }: Props) {
   const bringToFront = useCanvasStore((s) => s.bringToFront);
   const select = useCanvasStore((s) => s.select);
   const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
-  const selectedId = useCanvasStore((s) => s.selectedId);
-  const selectedIds = useCanvasStore((s) => s.selectedIds);
-  const linkingFromId = useCanvasStore((s) => s.linkingFromId);
-  const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
+  // Seletores DERIVADOS (booleans/primitivos) em vez de selectedId/selectedIds
+  // crus. Antes, assinar `selectedIds: Set<string>` fazia *todos* os cards
+  // re-renderizarem em qualquer mudanca de selecao (Set sempre nova ref).
+  // Agora cada Card so' re-renderiza quando o status DELE muda — pra 100
+  // cards, selecionar um card vai de 100 re-renders pra 2 (o anterior +
+  // o novo). Mesmo principio pra linkingFromId.
+  const isSelected = useCanvasStore((s) => s.selectedId === card.id);
+  const isInGroup = useCanvasStore(
+    (s) => s.selectedId !== card.id && s.selectedIds.has(card.id),
+  );
+  const isLinkSource = useCanvasStore((s) => s.linkingFromId === card.id);
+  const isLinkCandidate = useCanvasStore(
+    (s) => s.linkingFromId !== null && s.linkingFromId !== card.id,
+  );
+  const linkingFromSide = useCanvasStore((s) =>
+    s.linkingFromId === card.id ? s.linkingFromSide : null,
+  );
   const beginLink = useCanvasStore((s) => s.beginLink);
   const completeLink = useCanvasStore((s) => s.completeLink);
   const cancelLink = useCanvasStore((s) => s.cancelLink);
@@ -41,10 +54,6 @@ export const Card = memo(function Card({ card }: Props) {
       : value;
 
   const isScene = card.kind === "scene";
-  const isSelected = selectedId === card.id;
-  const isInGroup = selectedId !== card.id && selectedIds.has(card.id);
-  const isLinkSource = linkingFromId === card.id;
-  const isLinkCandidate = linkingFromId !== null && linkingFromId !== card.id;
 
   const dragState = useRef<{
     startX: number;
@@ -68,6 +77,10 @@ export const Card = memo(function Card({ card }: Props) {
   const onMouseDown = (e: React.MouseEvent) => {
     if (editing) return;
     const target = e.target as HTMLElement;
+    // Lemos linkingFromId via getState pra evitar subscription — esse valor
+    // muda durante o linking e fazia todo Card re-renderizar a cada mouse
+    // move durante a operacao.
+    const linkingFromId = useCanvasStore.getState().linkingFromId;
 
     // Arrow mode tem prioridade sobre todos os guards: clicar em QUALQUER
     // pedaço do card (inclusive barra de ações, handle de resize, overlay
@@ -303,7 +316,7 @@ export const Card = memo(function Card({ card }: Props) {
       data-canvas-entity-id={card.id}
       className={clsx(
         "rounded-md border transition-shadow group",
-        linkingFromId || tool === "arrow"
+        isLinkSource || isLinkCandidate || tool === "arrow"
           ? "cursor-crosshair"
           : tool === "eraser"
           ? "cursor-cell"
@@ -379,9 +392,10 @@ export const Card = memo(function Card({ card }: Props) {
             // clicado num card diferente do de origem. Antes ele só chamava
             // beginLink, o que fazia usuário "clicar e não acontecer nada"
             // quando partia do Link2 para conectar via barra de ações.
-            if (linkingFromId && linkingFromId !== card.id) {
+            const fromId = useCanvasStore.getState().linkingFromId;
+            if (fromId && fromId !== card.id) {
               completeLink(card.id);
-            } else if (linkingFromId === card.id) {
+            } else if (fromId === card.id) {
               // Clicar no próprio card de origem cancela o linking.
               cancelLink();
             } else {
@@ -472,7 +486,8 @@ export const Card = memo(function Card({ card }: Props) {
           linkingFromSide={linkingFromSide}
           isSelected={isSelected}
           onPick={(side) => {
-            if (linkingFromId && linkingFromId !== card.id) {
+            const fromId = useCanvasStore.getState().linkingFromId;
+            if (fromId && fromId !== card.id) {
               completeLink(card.id, side);
             } else {
               // Sem linking em progresso OU estou no próprio card de origem

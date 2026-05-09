@@ -166,27 +166,42 @@ async function searchFiles(files: FileNode[], query: string): Promise<SearchResu
   const { readTextFile } = await import("@tauri-apps/plugin-fs");
   const normalized = normalize(query);
   const results: SearchResult[] = [];
-  for (const file of files) {
-    if (results.length >= 80) break;
-    try {
-      const raw = await readTextFile(file.path);
+  // Paraleliza leitura em chunks. Antes era serie pura — projeto com
+  // 200 arquivos travava o dialog uns 8-12s. Chunk de 16 da' boa
+  // sobreposicao IPC sem saturar. Para cedo se atingiu 80 matches
+  // (cap visual do dialog).
+  const CHUNK = 16;
+  outer: for (let i = 0; i < files.length; i += CHUNK) {
+    const slice = files.slice(i, i + CHUNK);
+    const reads = await Promise.all(
+      slice.map(async (file) => {
+        try {
+          const raw = await readTextFile(file.path);
+          return { file, raw };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    for (const entry of reads) {
+      if (!entry) continue;
+      const { file, raw } = entry;
       const { body, meta } = parseDocument(raw);
       const searchable = [meta.synopsis, meta.pov, meta.location, body]
         .filter(Boolean)
         .join("\n");
       const lines = searchable.split(/\r?\n/);
-      for (let i = 0; i < lines.length && results.length < 80; i += 1) {
-        const line = lines[i].trim();
+      for (let j = 0; j < lines.length && results.length < 80; j += 1) {
+        const line = lines[j].trim();
         if (!line || !normalize(line).includes(normalized)) continue;
         results.push({
           path: file.path,
           name: file.name,
-          line: i + 1,
+          line: j + 1,
           snippet: line.length > 180 ? `${line.slice(0, 177)}...` : line,
         });
       }
-    } catch {
-      /* arquivo externo removido entre tree e busca */
+      if (results.length >= 80) break outer;
     }
   }
   return results;

@@ -43,16 +43,14 @@ export const ArrowLayer = memo(function ArrowLayer({
   const texts = useCanvasStore((s) => s.texts);
   const strokes = useCanvasStore((s) => s.strokes);
   const images = useCanvasStore((s) => s.images);
-  const removeArrow = useCanvasStore((s) => s.removeArrow);
-  const selectedId = useCanvasStore((s) => s.selectedId);
-  const selectedIds = useCanvasStore((s) => s.selectedIds);
-  const select = useCanvasStore((s) => s.select);
-  const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
-  const setArrowBend = useCanvasStore((s) => s.setArrowBend);
-  const viewport = useCanvasStore((s) => s.viewport);
+  const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
   const tool = useCanvasStore((s) => s.tool);
   const linkingFromId = useCanvasStore((s) => s.linkingFromId);
   const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
+  // setArrowBend e' usado pelo handler de drag (`onBendMouseDown` definido
+  // aqui no top-level, passado como prop pro ArrowNode pra evitar
+  // re-criar funcao por seta). Action refs sao estaveis entre renders.
+  const setArrowBend = useCanvasStore((s) => s.setArrowBend);
   const editorFontFamily = useAppStore((s) => s.editorFontFamily);
   // Mapa de id → Rect cobrindo cards, texts e images. Antes a gente
   // mapeava so cards, entao setas com endpoint em texto/imagem viravam
@@ -208,7 +206,6 @@ export const ArrowLayer = memo(function ArrowLayer({
   // Larguras em world coords: dividimos por zoom pra manter o traço com
   // espessura visual constante, independente de pan/zoom. Sem isso, em
   // zoom-out (<1), 1.5 world px vira sub-pixel e a arrow some.
-  const zoom = viewport.zoom || 1;
   const baseStroke = 2 / zoom;
   const hitStroke = 16 / zoom;
   const handleR = 6 / zoom;
@@ -261,105 +258,19 @@ export const ArrowLayer = memo(function ArrowLayer({
         const from = rectById.get(a.from);
         const to = rectById.get(a.to);
         if (!from || !to) return null;
-        const isSel = selectedId === a.id;
-        // Grupo: seta capturada por marquee (ambos os cards endpoint dentro)
-        // mas nao e primary. Sem esse visual, setas em multi-selecao ficavam
-        // invisiveis ao olho — usuario nao sabia que Delete iria apaga-las.
-        const isInGroup = !isSel && selectedIds.has(a.id);
-
-        const { p1, cp1, cp2, p2 } = routeArrow(from, to, a.bend, {
-          fromSide: a.fromSide,
-          toSide: a.toSide,
-        });
-        const d = `M ${p1.x} ${p1.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${p2.x} ${p2.y}`;
-
-        const arrowStroke = Math.max(1, a.width ?? 2) / zoom;
-        const selectedStroke = Math.max(arrowStroke + 0.75 / zoom, 2.5 / zoom);
-
-        // Ponto médio da cubic bezier (t=0.5):
-        // B(0.5) = 0.125·P0 + 0.375·P1 + 0.375·P2 + 0.125·P3
-        const handleX =
-          0.125 * p1.x + 0.375 * cp1.x + 0.375 * cp2.x + 0.125 * p2.x;
-        const handleY =
-          0.125 * p1.y + 0.375 * cp1.y + 0.375 * cp2.y + 0.125 * p2.y;
-
         return (
-          <g
+          <ArrowNode
             key={a.id}
-            style={{
-              pointerEvents:
-                tool === "select" || tool === "eraser" ? "auto" : "none",
-            }}
-          >
-            {/* Hit area invisível */}
-            <path
-              d={d}
-              stroke="transparent"
-              strokeWidth={hitStroke}
-              fill="none"
-              style={{ cursor: tool === "eraser" ? "cell" : "pointer" }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (tool === "eraser") {
-                  removeArrow(a.id);
-                  return;
-                }
-                if (e.ctrlKey || e.metaKey) {
-                  toggleInSelection(a.id);
-                  return;
-                }
-                select(a.id);
-              }}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                removeArrow(a.id);
-              }}
-            />
-            <path
-              d={d}
-              strokeWidth={isSel ? selectedStroke : arrowStroke}
-              strokeLinecap="round"
-              fill="none"
-              markerEnd={`url(#${isSel ? "arrowhead-selected" : "arrowhead"})`}
-              style={{
-                pointerEvents: "none",
-                stroke: isSel
-                  ? "var(--accent)"
-                  : isInGroup
-                  ? "var(--selection-ring)"
-                  : "currentColor",
-                strokeDasharray: isInGroup ? "5 3" : undefined,
-              }}
-            />
-
-            {/* Handle de bend quando selecionado */}
-            {isSel && (
-              <circle
-                cx={handleX}
-                cy={handleY}
-                r={handleR}
-                strokeWidth={handleStroke}
-                style={{
-                  cursor: "grab",
-                  fill: "var(--bg-panel)",
-                  stroke: "var(--accent)",
-                }}
-                onMouseDown={(e) =>
-                  onBendMouseDown(e, {
-                    id: a.id,
-                    origDx: a.bend?.dx ?? 0,
-                    origDy: a.bend?.dy ?? 0,
-                  })
-                }
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  setArrowBend(a.id, null);
-                }}
-              >
-                <title>Arraste para encurvar · duplo clique para resetar</title>
-              </circle>
-            )}
-          </g>
+            arrow={a}
+            from={from}
+            to={to}
+            zoom={zoom}
+            tool={tool}
+            hitStroke={hitStroke}
+            handleR={handleR}
+            handleStroke={handleStroke}
+            onBendMouseDown={onBendMouseDown}
+          />
         );
       })}
 
@@ -395,6 +306,146 @@ export const ArrowLayer = memo(function ArrowLayer({
           );
         })()}
     </svg>
+  );
+});
+
+/**
+ * Render de uma seta individual. Memoizado por (arrow, from, to, zoom, tool):
+ * mudancas de selecao/linking sao absorvidas pelos seletores derivados
+ * abaixo (booleans), entao seleccionar UMA seta nao recomputa as outras
+ * — em canvas com muitas setas, antes era O(N) `routeArrow` por toggle.
+ */
+const ArrowNode = memo(function ArrowNode({
+  arrow: a,
+  from,
+  to,
+  zoom,
+  tool,
+  hitStroke,
+  handleR,
+  handleStroke,
+  onBendMouseDown,
+}: {
+  arrow: ReturnType<typeof useCanvasStore.getState>["arrows"][number];
+  from: Rect;
+  to: Rect;
+  zoom: number;
+  tool: ReturnType<typeof useCanvasStore.getState>["tool"];
+  hitStroke: number;
+  handleR: number;
+  handleStroke: number;
+  onBendMouseDown: (
+    e: React.MouseEvent,
+    args: { id: string; origDx: number; origDy: number },
+  ) => void;
+}) {
+  const isSel = useCanvasStore((s) => s.selectedId === a.id);
+  // Grupo: seta capturada por marquee (ambos os cards endpoint dentro)
+  // mas nao e primary. Sem esse visual, setas em multi-selecao ficavam
+  // invisiveis ao olho — usuario nao sabia que Delete iria apaga-las.
+  const isInGroup = useCanvasStore(
+    (s) => s.selectedId !== a.id && s.selectedIds.has(a.id),
+  );
+  const select = useCanvasStore((s) => s.select);
+  const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
+  const removeArrow = useCanvasStore((s) => s.removeArrow);
+  const setArrowBend = useCanvasStore((s) => s.setArrowBend);
+
+  const route = useMemo(
+    () =>
+      routeArrow(from, to, a.bend, {
+        fromSide: a.fromSide,
+        toSide: a.toSide,
+      }),
+    [from, to, a.bend, a.fromSide, a.toSide],
+  );
+  const { p1, cp1, cp2, p2 } = route;
+  const d = `M ${p1.x} ${p1.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${p2.x} ${p2.y}`;
+
+  const arrowStroke = Math.max(1, a.width ?? 2) / zoom;
+  const selectedStroke = Math.max(arrowStroke + 0.75 / zoom, 2.5 / zoom);
+
+  // Ponto médio da cubic bezier (t=0.5):
+  // B(0.5) = 0.125·P0 + 0.375·P1 + 0.375·P2 + 0.125·P3
+  const handleX = 0.125 * p1.x + 0.375 * cp1.x + 0.375 * cp2.x + 0.125 * p2.x;
+  const handleY = 0.125 * p1.y + 0.375 * cp1.y + 0.375 * cp2.y + 0.125 * p2.y;
+
+  return (
+    <g
+      style={{
+        pointerEvents:
+          tool === "select" || tool === "eraser" ? "auto" : "none",
+      }}
+    >
+      {/* Hit area invisível */}
+      <path
+        d={d}
+        stroke="transparent"
+        strokeWidth={hitStroke}
+        fill="none"
+        style={{ cursor: tool === "eraser" ? "cell" : "pointer" }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (tool === "eraser") {
+            removeArrow(a.id);
+            return;
+          }
+          if (e.ctrlKey || e.metaKey) {
+            toggleInSelection(a.id);
+            return;
+          }
+          select(a.id);
+        }}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          removeArrow(a.id);
+        }}
+      />
+      <path
+        d={d}
+        strokeWidth={isSel ? selectedStroke : arrowStroke}
+        strokeLinecap="round"
+        fill="none"
+        markerEnd={`url(#${isSel ? "arrowhead-selected" : "arrowhead"})`}
+        style={{
+          pointerEvents: "none",
+          stroke: isSel
+            ? "var(--accent)"
+            : isInGroup
+            ? "var(--selection-ring)"
+            : "currentColor",
+          strokeDasharray: isInGroup ? "5 3" : undefined,
+        }}
+      />
+
+      {/* Handle de bend quando selecionado */}
+      {isSel && (
+        <circle
+          cx={handleX}
+          cy={handleY}
+          r={handleR}
+          strokeWidth={handleStroke}
+          style={{
+            cursor: "grab",
+            fill: "var(--bg-panel)",
+            stroke: "var(--accent)",
+          }}
+          onMouseDown={(e) =>
+            onBendMouseDown(e, {
+              id: a.id,
+              origDx: a.bend?.dx ?? 0,
+              origDy: a.bend?.dy ?? 0,
+            })
+          }
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setArrowBend(a.id, null);
+          }}
+        >
+          <title>Arraste para encurvar · duplo clique para resetar</title>
+        </circle>
+      )}
+    </g>
   );
 });
 

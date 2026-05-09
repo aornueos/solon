@@ -28,7 +28,7 @@ export default function App() {
   const openCommandPalette = useAppStore((s) => s.openCommandPalette);
   const openGlobalSearch = useAppStore((s) => s.openGlobalSearch);
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
-  const { restoreLastFolder, refresh } = useFileSystem();
+  const { restoreLastFolder, refresh, openFile } = useFileSystem();
 
   // Aplica tema no <html data-theme="...">
   useEffect(() => {
@@ -69,11 +69,24 @@ export default function App() {
     return () => window.clearTimeout(t);
   }, [setUpdateStatus]);
 
-  // Refresca árvore quando a janela ganha foco (pega mudanças externas)
+  // Refresca árvore quando a janela ganha foco (pega mudanças externas).
+  // Debounce de 400ms pra absorver alt-tab rapido e clicks em sequencia
+  // que disparam multiplos `focus` no mesmo "evento" pra o user. Sem isso,
+  // alternar janelas N vezes em sequencia faz N reads do FS em paralelo.
   useEffect(() => {
-    const onFocus = () => refresh();
+    let timer: number | null = null;
+    const onFocus = () => {
+      if (timer != null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        refresh();
+      }, 400);
+    };
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    return () => {
+      if (timer != null) window.clearTimeout(timer);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [refresh]);
 
   // No app desktop, bloqueia os atalhos classicos de DevTools. No browser
@@ -144,6 +157,45 @@ export default function App() {
         e.preventDefault();
         openSettings();
       }
+      // Ctrl+W fecha aba ativa. Se nao houver aba ativa, no-op (browser
+      // fecharia a janela; nao queremos isso). Se a aba fechada era a
+      // unica, limpa o arquivo ativo.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "w") {
+        const { activeFilePath, closeTab, openTabs } = useAppStore.getState();
+        if (!activeFilePath) return;
+        e.preventDefault();
+        const next = closeTab(activeFilePath);
+        if (next) {
+          const tab = useAppStore.getState().openTabs.find((t) => t.path === next);
+          if (tab) void openFile(tab.path, tab.name);
+        } else if (openTabs.length <= 1) {
+          // Era a unica aba: limpa o arquivo ativo (mesmo comportamento
+          // do botao ✕ na ultima aba).
+          useAppStore.setState({
+            activeFilePath: null,
+            activeFileName: null,
+            fileBody: "",
+            sceneMeta: {},
+            headings: [],
+            wordCount: 0,
+            charCount: 0,
+          });
+        }
+      }
+      // Ctrl+Tab e Ctrl+Shift+Tab ciclam entre abas. Nao usa Ctrl+PageUp/Down
+      // pra nao colidir com scroll de paginacao em outros contextos.
+      if ((e.ctrlKey || e.metaKey) && e.key === "Tab") {
+        const { openTabs, activeFilePath } = useAppStore.getState();
+        if (openTabs.length < 2) return;
+        e.preventDefault();
+        const idx = openTabs.findIndex((t) => t.path === activeFilePath);
+        const dir = e.shiftKey ? -1 : 1;
+        const nextIdx = (idx + dir + openTabs.length) % openTabs.length;
+        const next = openTabs[nextIdx];
+        if (next && next.path !== activeFilePath) {
+          void openFile(next.path, next.name);
+        }
+      }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
@@ -158,6 +210,7 @@ export default function App() {
     openCommandPalette,
     openGlobalSearch,
     openLocalHistory,
+    openFile,
   ]);
 
   return <AppLayout />;

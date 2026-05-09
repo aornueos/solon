@@ -4,6 +4,7 @@ import { Sidebar } from "../Sidebar/Sidebar";
 import { Outline } from "../Outline/Outline";
 import { Inspector } from "../Inspector/Inspector";
 import { Titlebar } from "./Titlebar";
+import { TabBar } from "./TabBar";
 import { StatusBar } from "./StatusBar";
 import { ToastLayer } from "./ToastLayer";
 import { DialogLayer } from "./DialogLayer";
@@ -102,12 +103,18 @@ export function AppLayout() {
 
         {/* Área principal — Editor ou Canvas */}
         <div
-          className="flex-1 min-w-0 overflow-hidden"
+          className="flex-1 min-w-0 overflow-hidden flex flex-col"
           style={{ background: "var(--bg-app)" }}
         >
-          <Suspense fallback={<ViewLoading />}>
-            {inHome ? <HomePage /> : inCanvas ? <CanvasView /> : <Editor />}
-          </Suspense>
+          {/* TabBar so' aparece fora da home — na landing nao faz sentido,
+              e ela ja' tem chrome proprio. Em focus mode tambem some pra
+              maximizar a area de escrita. */}
+          {!inHome && !focusMode && <TabBar />}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <Suspense fallback={<ViewLoading />}>
+              {inHome ? <HomePage /> : inCanvas ? <CanvasView /> : <Editor />}
+            </Suspense>
+          </div>
         </div>
 
         {/* Painel direito: Inspector e/ou Outline */}

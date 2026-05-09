@@ -92,23 +92,24 @@ function useWindowControls() {
 }
 
 export function Titlebar() {
-  const {
-    activeFileName,
-    sceneMeta,
-    isSidebarOpen,
-    isOutlineOpen,
-    isInspectorOpen,
-    focusMode,
-    activeView,
-    setActiveView,
-    toggleSidebar,
-    toggleOutline,
-    toggleInspector,
-    toggleFocusMode,
-    theme,
-    toggleTheme,
-    openSettings,
-  } = useAppStore();
+  // Seletores granulares — `useAppStore()` cru re-renderizava a Titlebar
+  // (e calculava o lookup de SCENE_STATUSES) a cada keystroke por causa
+  // de fileBody/wordCount/etc na mesma store.
+  const activeFileName = useAppStore((s) => s.activeFileName);
+  const sceneMeta = useAppStore((s) => s.sceneMeta);
+  const isSidebarOpen = useAppStore((s) => s.isSidebarOpen);
+  const isOutlineOpen = useAppStore((s) => s.isOutlineOpen);
+  const isInspectorOpen = useAppStore((s) => s.isInspectorOpen);
+  const focusMode = useAppStore((s) => s.focusMode);
+  const activeView = useAppStore((s) => s.activeView);
+  const setActiveView = useAppStore((s) => s.setActiveView);
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
+  const toggleOutline = useAppStore((s) => s.toggleOutline);
+  const toggleInspector = useAppStore((s) => s.toggleInspector);
+  const toggleFocusMode = useAppStore((s) => s.toggleFocusMode);
+  const theme = useAppStore((s) => s.theme);
+  const toggleTheme = useAppStore((s) => s.toggleTheme);
+  const openSettings = useAppStore((s) => s.openSettings);
 
   const status = SCENE_STATUSES.find((s) => s.value === sceneMeta.status);
   const { available, isMaximized, minimize, toggleMaximize, close } =

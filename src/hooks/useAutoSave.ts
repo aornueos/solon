@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAppStore } from "../store/useAppStore";
 import { serializeDocument } from "../lib/frontmatter";
+import { flushEditor } from "../lib/editorRef";
 import { useFileSystem } from "./useFileSystem";
 
 const DEBOUNCE_MS = 1200;
@@ -25,6 +26,10 @@ export function useAutoSave() {
         clearTimeout(timer);
         timer = null;
       }
+      // Flush sync do trabalho pendente do Editor (turndown + setFileBody).
+      // Sem isso, Ctrl+S logo apos digitar gravaria a versao 180ms
+      // atrasada — o user perderia as ultimas teclas.
+      flushEditor();
       const s = useAppStore.getState();
       if (!s.activeFilePath) return false;
       const content = serializeDocument(s.sceneMeta, s.fileBody);
@@ -55,6 +60,9 @@ export function useAutoSave() {
       // Troca de arquivo: flusha pendência do arquivo anterior (mesmo
       // com auto-save desligado — trocar arquivo SEM salvar perderia o
       // trabalho silenciosamente, o que e' pior que ignorar a pref).
+      // Nota: o Editor.tsx ja chama flushEditor() internamente no useEffect
+      // de troca de path, entao quando este subscribe roda o `prev.fileBody`
+      // ja' contem o body atualizado do arquivo anterior.
       if (state.activeFilePath !== prev.activeFilePath) {
         const shouldFlushPrevious =
           !!prev.activeFilePath &&

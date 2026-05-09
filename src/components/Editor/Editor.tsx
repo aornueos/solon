@@ -35,7 +35,7 @@ import {
 } from "../../store/useAppStore";
 import { EditorToolbar } from "./EditorToolbar";
 import { markdownToHtml, htmlToMarkdown } from "./markdownBridge";
-import { setCurrentEditor } from "../../lib/editorRef";
+import { setCurrentEditor, setEditorFlush } from "../../lib/editorRef";
 import { ensureSpellchecker } from "../../lib/spellcheck";
 import { FindBar } from "./FindBar";
 import { SpellcheckExtension } from "./SpellcheckExtension";
@@ -62,6 +62,23 @@ export function Editor() {
 
   const isLoadingRef = useRef(false);
   const lastLoadedPathRef = useRef<string | null>(null);
+  // Debounce do trabalho pesado em `onUpdate` (extractHeadings, getText,
+  // getHTML, htmlToMarkdown). Esses passos custam ms em docs grandes e
+  // disparavam por keystroke — em cap. de 8k palavras a digitacao
+  // visivelmente atrasava. 180ms e' um sweet spot: invisivel ao user mas
+  // coalesce burstos de digitacao em uma unica passada. O auto-save tem
+  // seu proprio debounce de 1.2s acima disso, entao nao mexemos nele.
+  const updateTimerRef = useRef<number | null>(null);
+  // `flushUpdate` roda o trabalho pendente *agora* (sem esperar debounce).
+  // Chamado em 3 lugares:
+  //   1. Quando o debounce de 180ms estoura (caminho normal).
+  //   2. Antes de trocar `activeFilePath` — senao o body do arquivo antigo
+  //      pendente seria descartado quando o setContent do novo rodar.
+  //   3. Em Ctrl+S (via flushEditor() chamado pelo useAutoSave) — senao o
+  //      save iria gravar a versao 180ms atrasada.
+  // Definida fora do escopo da useEditor pra que possa ser registrada via
+  // setEditorFlush logo apos a criacao do editor.
+  const flushUpdateRef = useRef<(() => void) | null>(null);
   const [findOpen, setFindOpen] = useState(false);
   const [findInitialQuery, setFindInitialQuery] = useState("");
   // Ref do wrapper scrollavel — usado pra anexar wheel listener nativo
@@ -128,18 +145,58 @@ export function Editor() {
     },
     onUpdate: ({ editor }) => {
       if (isLoadingRef.current) return;
-
-      extractHeadings(editor, setHeadings);
-
-      const text = editor.getText();
-      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-      setWordCount(words, text.length);
-
-      // Sincroniza body com store — useAutoSave grava depois.
-      const md = htmlToMarkdown(editor.getHTML());
-      setFileBody(md);
+      // Coalesce todo o trabalho pesado num unico debounce. Antes,
+      // digitar uma frase de 30 letras disparava 30x:
+      //   - extractHeadings (descend O(n) do doc inteiro)
+      //   - editor.getText() + split (O(n))
+      //   - editor.getHTML() + htmlToMarkdown (turndown — *caro*)
+      //   - setFileBody (cascade de re-renders na arvore)
+      // Marca dirty IMEDIATAMENTE pra StatusBar piscar "Editado" sem
+      // esperar o debounce; o resto pode esperar 180ms.
+      const s = useAppStore.getState();
+      if (s.saveStatus !== "saving" && s.saveStatus !== "dirty") {
+        s.setSaveStatus("dirty");
+      }
+      if (updateTimerRef.current != null) {
+        window.clearTimeout(updateTimerRef.current);
+      }
+      updateTimerRef.current = window.setTimeout(() => {
+        updateTimerRef.current = null;
+        if (isLoadingRef.current || !editor) return;
+        extractHeadings(editor, setHeadings);
+        const text = editor.getText();
+        const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+        setWordCount(words, text.length);
+        const md = htmlToMarkdown(editor.getHTML());
+        setFileBody(md);
+      }, 180);
     },
   });
+
+  // Mantem flushUpdateRef apontando pra uma funcao que cancela o timer
+  // pendente e roda o trabalho agora. Chamado quando o user troca de
+  // arquivo (via useEffect de load) e em Ctrl+S (via flushEditor() do
+  // useAutoSave).
+  flushUpdateRef.current = () => {
+    if (updateTimerRef.current != null) {
+      window.clearTimeout(updateTimerRef.current);
+      updateTimerRef.current = null;
+    }
+    if (isLoadingRef.current || !editor) return;
+    extractHeadings(editor, setHeadings);
+    const text = editor.getText();
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    setWordCount(words, text.length);
+    const md = htmlToMarkdown(editor.getHTML());
+    setFileBody(md);
+  };
+
+  // Registra o flush global pra que useAutoSave (Ctrl+S) e qualquer
+  // outro caller fora-do-React possam pedir um flush sync.
+  useEffect(() => {
+    setEditorFlush(() => flushUpdateRef.current?.());
+    return () => setEditorFlush(null);
+  }, []);
 
   // Carrega conteúdo quando troca o arquivo ativo. `fileBody` não entra nas
   // deps — se entrasse, cada keystroke (que atualiza fileBody via onUpdate)
@@ -152,6 +209,10 @@ export function Editor() {
       return;
     }
     if (lastLoadedPathRef.current === activeFilePath) return;
+    // Flush pendencias do arquivo ANTERIOR antes de hidrate o novo —
+    // senao o turndown debounced rodaria depois do setContent novo e
+    // gravaria o body do antigo no fileBody do novo.
+    flushUpdateRef.current?.();
     lastLoadedPathRef.current = activeFilePath;
 
     isLoadingRef.current = true;

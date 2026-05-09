@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { CanvasStroke, CardSide } from "../../types/canvas";
 import { strokeRect } from "../../lib/canvasGeom";
@@ -10,6 +10,11 @@ import { startCanvasLinkDrag } from "../../lib/canvasLinkDrag";
  *
  * Recebe `liveStroke` opcional: o traço que está sendo desenhado *agora*
  * (antes de ser commitado na store). Evita re-commit a cada pixel.
+ *
+ * Otimizacao: cada stroke vira um `<StrokeNode>` memoizado. Sem isso,
+ * qualquer mudanca de selecao/zoom recomputa `pointsToPath` para todos
+ * strokes (O(N · pontos) por frame). Strokes longos com 1000+ pontos
+ * dominavam o frame budget durante pan/zoom.
  */
 export const StrokeLayer = memo(function StrokeLayer({
   worldWidth,
@@ -21,17 +26,7 @@ export const StrokeLayer = memo(function StrokeLayer({
   liveStroke?: CanvasStroke | null;
 }) {
   const strokes = useCanvasStore((s) => s.strokes);
-  const selectedId = useCanvasStore((s) => s.selectedId);
-  const selectedIds = useCanvasStore((s) => s.selectedIds);
-  const select = useCanvasStore((s) => s.select);
-  const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
   const tool = useCanvasStore((s) => s.tool);
-  const eraseById = useCanvasStore((s) => s.eraseById);
-  const linkingFromId = useCanvasStore((s) => s.linkingFromId);
-  const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
-  const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
-  const beginLink = useCanvasStore((s) => s.beginLink);
-  const completeLink = useCanvasStore((s) => s.completeLink);
 
   return (
     <svg
@@ -45,116 +40,9 @@ export const StrokeLayer = memo(function StrokeLayer({
         overflow: "visible",
       }}
     >
-      {strokes.map((s) => {
-        const isSel = selectedId === s.id;
-        // Grupo: stroke esta em selectedIds mas nao e o primary.
-        // Desenhamos um halo mais fino e com a cor de selection-ring pra
-        // diferenciar visualmente do primary.
-        const isInGroup = !isSel && selectedIds.has(s.id);
-        const isLinkSource = linkingFromId === s.id;
-        const isLinkCandidate = linkingFromId !== null && linkingFromId !== s.id;
-        const bounds = strokeRect(s);
-        const d = pointsToPath(s.points);
-        if (!d) return null;
-        // Cor de render theme-aware: vazio ("Auto") ou o legado "#2a2420"
-        // (Tinta sepia escuro, default antigo) viram var(--text-primary).
-        // Mesma logica do FloatingText — strokes criados em tema claro
-        // continuam legiveis ao trocar pra dark. Cores deliberadas
-        // (sangue, indigo, marcador, floresta) sao preservadas.
-        const strokeColor =
-          !s.color || s.color === "#2a2420"
-            ? "var(--text-primary)"
-            : s.color;
-        return (
-          <g
-            key={s.id}
-            className="group"
-            data-canvas-entity-id={s.id}
-            style={{
-              pointerEvents:
-                tool === "select" || tool === "eraser" ? "auto" : "none",
-            }}
-          >
-            {/* Hit area gorda (transparente) pra facilitar seleção/borracha */}
-            <path
-              d={d}
-              stroke="transparent"
-              strokeWidth={Math.max(12, s.width + 8)}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ cursor: tool === "eraser" ? "cell" : "pointer" }}
-              onMouseDown={(e) => {
-                if (tool === "eraser") {
-                  e.stopPropagation();
-                  eraseById(s.id);
-                  return;
-                }
-                if (tool !== "select") return;
-                e.stopPropagation();
-                if (e.ctrlKey || e.metaKey) {
-                  toggleInSelection(s.id);
-                  return;
-                }
-                select(s.id);
-              }}
-            />
-            <path
-              d={d}
-              stroke={strokeColor}
-              strokeWidth={s.width}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={isSel || isInGroup ? 0.7 : 1}
-              style={{ pointerEvents: "none" }}
-            />
-            {isSel && (
-              <path
-                d={d}
-                stroke="var(--accent)"
-                strokeWidth={s.width + 4}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity={0.25}
-                style={{ pointerEvents: "none" }}
-              />
-            )}
-            {isInGroup && (
-              <path
-                d={d}
-                stroke="var(--selection-ring)"
-                strokeWidth={s.width + 3}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity={0.35}
-                strokeDasharray="4 3"
-                style={{ pointerEvents: "none" }}
-              />
-            )}
-            {bounds && tool !== "eraser" && (
-              <StrokeConnectionDots
-                entityId={s.id}
-                rect={bounds}
-                isLinkSource={isLinkSource}
-                isLinkCandidate={isLinkCandidate}
-                linkingFromSide={linkingFromSide}
-                zoom={zoom}
-                isSelected={isSel}
-                onPick={(side) => {
-                  if (linkingFromId && linkingFromId !== s.id) {
-                    completeLink(s.id, side);
-                  } else {
-                    beginLink(s.id, side);
-                  }
-                }}
-              />
-            )}
-          </g>
-        );
-      })}
+      {strokes.map((s) => (
+        <StrokeNode key={s.id} stroke={s} tool={tool} />
+      ))}
 
       {liveStroke && liveStroke.points.length >= 2 && (
         <path
@@ -172,6 +60,140 @@ export const StrokeLayer = memo(function StrokeLayer({
         />
       )}
     </svg>
+  );
+});
+
+/**
+ * Um stroke individual. Memoizado por (stroke, tool). Subscreve apenas
+ * seletores DERIVADOS (booleans) — assim selecionar/deselecionar outro
+ * stroke nao re-renderiza este. O path `d` e' memoizado por ref do
+ * array de pontos: enquanto o stroke nao for alterado, nao reconstroi.
+ */
+const StrokeNode = memo(function StrokeNode({
+  stroke: s,
+  tool,
+}: {
+  stroke: CanvasStroke;
+  tool: ReturnType<typeof useCanvasStore.getState>["tool"];
+}) {
+  const isSel = useCanvasStore((st) => st.selectedId === s.id);
+  const isInGroup = useCanvasStore(
+    (st) => st.selectedId !== s.id && st.selectedIds.has(s.id),
+  );
+  const isLinkSource = useCanvasStore((st) => st.linkingFromId === s.id);
+  const isLinkCandidate = useCanvasStore(
+    (st) => st.linkingFromId !== null && st.linkingFromId !== s.id,
+  );
+  const linkingFromSide = useCanvasStore((st) =>
+    st.linkingFromId === s.id ? st.linkingFromSide : null,
+  );
+  const zoom = useCanvasStore((st) => st.viewport.zoom || 1);
+  const select = useCanvasStore((st) => st.select);
+  const toggleInSelection = useCanvasStore((st) => st.toggleInSelection);
+  const eraseById = useCanvasStore((st) => st.eraseById);
+  const beginLink = useCanvasStore((st) => st.beginLink);
+  const completeLink = useCanvasStore((st) => st.completeLink);
+
+  const d = useMemo(() => pointsToPath(s.points), [s.points]);
+  const bounds = useMemo(() => strokeRect(s), [s]);
+  if (!d) return null;
+
+  // Cor de render theme-aware: vazio ("Auto") ou o legado "#2a2420"
+  // (Tinta sepia escuro, default antigo) viram var(--text-primary).
+  // Mesma logica do FloatingText — strokes criados em tema claro
+  // continuam legiveis ao trocar pra dark. Cores deliberadas
+  // (sangue, indigo, marcador, floresta) sao preservadas.
+  const strokeColor =
+    !s.color || s.color === "#2a2420" ? "var(--text-primary)" : s.color;
+
+  return (
+    <g
+      className="group"
+      data-canvas-entity-id={s.id}
+      style={{
+        pointerEvents:
+          tool === "select" || tool === "eraser" ? "auto" : "none",
+      }}
+    >
+      {/* Hit area gorda (transparente) pra facilitar seleção/borracha */}
+      <path
+        d={d}
+        stroke="transparent"
+        strokeWidth={Math.max(12, s.width + 8)}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ cursor: tool === "eraser" ? "cell" : "pointer" }}
+        onMouseDown={(e) => {
+          if (tool === "eraser") {
+            e.stopPropagation();
+            eraseById(s.id);
+            return;
+          }
+          if (tool !== "select") return;
+          e.stopPropagation();
+          if (e.ctrlKey || e.metaKey) {
+            toggleInSelection(s.id);
+            return;
+          }
+          select(s.id);
+        }}
+      />
+      <path
+        d={d}
+        stroke={strokeColor}
+        strokeWidth={s.width}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={isSel || isInGroup ? 0.7 : 1}
+        style={{ pointerEvents: "none" }}
+      />
+      {isSel && (
+        <path
+          d={d}
+          stroke="var(--accent)"
+          strokeWidth={s.width + 4}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={0.25}
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+      {isInGroup && (
+        <path
+          d={d}
+          stroke="var(--selection-ring)"
+          strokeWidth={s.width + 3}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={0.35}
+          strokeDasharray="4 3"
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+      {bounds && tool !== "eraser" && (
+        <StrokeConnectionDots
+          entityId={s.id}
+          rect={bounds}
+          isLinkSource={isLinkSource}
+          isLinkCandidate={isLinkCandidate}
+          linkingFromSide={linkingFromSide}
+          zoom={zoom}
+          isSelected={isSel}
+          onPick={(side) => {
+            const fromId = useCanvasStore.getState().linkingFromId;
+            if (fromId && fromId !== s.id) {
+              completeLink(s.id, side);
+            } else {
+              beginLink(s.id, side);
+            }
+          }}
+        />
+      )}
+    </g>
   );
 });
 

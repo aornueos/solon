@@ -69,17 +69,31 @@ export function HomePage() {
     (async () => {
       try {
         const { readTextFile } = await import("@tauri-apps/plugin-fs");
+        // Paraleliza em chunks de 16 — antes era serie pura (await por
+        // arquivo), o que em projetos com 100 arquivos somava ~5s de
+        // espera ate o numero "calculando…" virar palavras. Chunk de 16
+        // evita disparar 500 IPC simultaneos (Tauri tem queue interna
+        // mas nao queremos saturar).
+        const CHUNK = 16;
         let total = 0;
-        for (const f of allFiles) {
+        for (let i = 0; i < allFiles.length; i += CHUNK) {
           if (cancelled) return;
-          try {
-            const content = await readTextFile(f.path);
-            const { body } = parseDocument(content);
-            const trimmed = body.trim();
-            if (trimmed) total += trimmed.split(/\s+/).length;
-          } catch {
-            // Arquivo ilegivel — pula sem quebrar a varredura inteira.
-          }
+          const slice = allFiles.slice(i, i + CHUNK);
+          const results = await Promise.all(
+            slice.map(async (f) => {
+              try {
+                const content = await readTextFile(f.path);
+                const { body } = parseDocument(content);
+                const trimmed = body.trim();
+                return trimmed ? trimmed.split(/\s+/).length : 0;
+              } catch {
+                // Arquivo ilegivel — pula sem quebrar o batch.
+                return 0;
+              }
+            }),
+          );
+          if (cancelled) return;
+          for (const n of results) total += n;
         }
         if (!cancelled) {
           setProjectStats({ wordCount: total, fileCount: allFiles.length });

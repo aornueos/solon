@@ -4,6 +4,7 @@ import { useCanvasStore } from "../store/useCanvasStore";
 import { parseDocument, serializeDocument } from "../lib/frontmatter";
 import { renameCanvasSidecar, deleteCanvasSidecar } from "../lib/canvas";
 import { createSnapshotBeforeWrite } from "../lib/localHistory";
+import { flushEditor } from "../lib/editorRef";
 import {
   applyOrder,
   loadOrder,
@@ -78,14 +79,17 @@ function findNodeType(nodes: FileNode[], path: string): FileNode["type"] | null 
 }
 
 export function useFileSystem() {
-  const {
-    rootFolder,
-    activeFilePath,
-    setRootFolder,
-    setFileTree,
-    setActiveFile,
-    setSidebarOrder,
-  } = useAppStore();
+  // Seletores granulares: `useAppStore()` cru re-rodava ESTE hook (e
+  // recriava todos os useCallbacks abaixo) a cada keystroke. Como
+  // varios componentes consomem este hook (Sidebar, HomePage, StatusBar,
+  // CommandPalette, TabBar, App), o blast radius era enorme — invalidar
+  // os callbacks invalidava todos os useEffects/useMemo dependentes.
+  const rootFolder = useAppStore((s) => s.rootFolder);
+  const activeFilePath = useAppStore((s) => s.activeFilePath);
+  const setRootFolder = useAppStore((s) => s.setRootFolder);
+  const setFileTree = useAppStore((s) => s.setFileTree);
+  const setActiveFile = useAppStore((s) => s.setActiveFile);
+  const setSidebarOrder = useAppStore((s) => s.setSidebarOrder);
 
   const openFolder = useCallback(async () => {
     if (isTauri) {
@@ -139,12 +143,21 @@ export function useFileSystem() {
 
   const openFile = useCallback(
     async (path: string, name: string) => {
+      // Flush sync de qualquer trabalho pendente do Editor antes de trocar
+      // de arquivo. Sem isso, o turndown debounced (180ms) rodaria depois
+      // do setActiveFile e o setFileBody do antigo gravaria por cima do
+      // body do novo. Tem que rodar ANTES da mudanca da store pq depende
+      // de prev.fileBody no subscribe do useAutoSave.
+      flushEditor();
       if (isTauri) {
         try {
           const { readTextFile } = await import("@tauri-apps/plugin-fs");
           const content = await readTextFile(path);
           const { meta, body } = parseDocument(content);
           setActiveFile(path, name, body, meta);
+          // Aba acompanha o arquivo aberto. Idempotente — se a aba ja
+          // existe, addTab e' no-op (so foca via setActiveFile acima).
+          useAppStore.getState().addTab(path, name);
         } catch (err) {
           console.error("Erro ao abrir arquivo:", err);
           useAppStore
@@ -169,6 +182,7 @@ export function useFileSystem() {
           `# ${name.replace(".md", "")}\n`;
         const { meta, body } = parseDocument(content);
         setActiveFile(path, name, body, meta);
+        useAppStore.getState().addTab(path, name);
       }
     },
     [setActiveFile]
@@ -255,6 +269,7 @@ export function useFileSystem() {
             const { meta, body } = parseDocument(content);
             const name = lastFile.split(/[\\/]/).pop() ?? lastFile;
             useAppStore.getState().setActiveFile(lastFile, name, body, meta);
+            useAppStore.getState().addTab(lastFile, name);
           } else {
             localStorage.removeItem("solon:lastFile");
           }
@@ -262,10 +277,22 @@ export function useFileSystem() {
           localStorage.removeItem("solon:lastFile");
         }
       }
+      // Sanitiza abas restauradas do localStorage: arquivos que sumiram
+      // do disco entre sessoes nao devem entupir a barra. Em paralelo
+      // pra nao serializar 10 stat() calls.
+      const tabs = useAppStore.getState().openTabs;
+      if (tabs.length > 0) {
+        const checks = await Promise.all(
+          tabs.map(async (t) => ({ tab: t, exists: await exists(t.path) })),
+        );
+        for (const { tab, exists: ok } of checks) {
+          if (!ok) useAppStore.getState().closeTab(tab.path);
+        }
+      }
     } catch (err) {
       console.error("Erro ao restaurar pasta:", err);
     }
-  }, [setRootFolder, setFileTree]);
+  }, [setRootFolder, setFileTree, setSidebarOrder]);
 
   const createFile = useCallback(
     async (parentDir: string, name: string) => {
@@ -376,6 +403,13 @@ export function useFileSystem() {
         } else {
           useCanvasStore.getState().rewireScenePath(oldPath, newPath);
         }
+        // Atualiza abas abertas: arquivo renomeado vai pra renameTab;
+        // pasta renomeada usa rebaseTabs (todos os filhos abertos).
+        if (isFolder) {
+          useAppStore.getState().rebaseTabs(oldPath, newPath);
+        } else {
+          useAppStore.getState().renameTab(oldPath, newPath, baseName(newPath));
+        }
         // Atualiza a ordem manual: troca oldName por newName em qualquer
         // pasta que listava o item. Sem isso, depois do rename o item
         // sumiria do "ordenado" e iria pro fim da pasta como "novo".
@@ -443,17 +477,32 @@ export function useFileSystem() {
           }
         }
         await refresh();
+        // Tira da lista de abas qualquer arquivo dentro do que foi
+        // removido. Em delete de pasta, isso pode ser varios paths de uma
+        // vez — iteramos a lista atual.
+        const tabsBefore = useAppStore.getState().openTabs;
+        for (const t of tabsBefore) {
+          if (isSameOrDescendant(t.path, path)) {
+            useAppStore.getState().closeTab(t.path);
+          }
+        }
         if (activeFilePath && isSameOrDescendant(activeFilePath, path)) {
-          // Limpa arquivo ativo se foi removido
-          useAppStore.setState({
-            activeFilePath: null,
-            activeFileName: null,
-            fileBody: "",
-            sceneMeta: {},
-            headings: [],
-            wordCount: 0,
-            charCount: 0,
-          });
+          // Limpa arquivo ativo se foi removido. Se ainda ha abas, ativa
+          // a primeira disponivel.
+          const remaining = useAppStore.getState().openTabs[0];
+          if (remaining) {
+            await openFile(remaining.path, remaining.name);
+          } else {
+            useAppStore.setState({
+              activeFilePath: null,
+              activeFileName: null,
+              fileBody: "",
+              sceneMeta: {},
+              headings: [],
+              wordCount: 0,
+              charCount: 0,
+            });
+          }
         }
       } catch (err) {
         console.error("Erro ao excluir:", err);
@@ -462,7 +511,7 @@ export function useFileSystem() {
           .pushToast("error", `Erro ao excluir: ${describeError(err)}`);
       }
     },
-    [refresh, activeFilePath]
+    [refresh, activeFilePath, openFile]
   );
 
   /**
@@ -587,6 +636,13 @@ export function useFileSystem() {
         } else {
           await renameCanvasSidecar(sourcePath, newPath);
           useCanvasStore.getState().rewireScenePath(sourcePath, newPath);
+        }
+        // Abas: arquivo movido = rename de path (nome mantem); pasta
+        // movida = rebase de todos os filhos abertos.
+        if (sourceIsFolder) {
+          useAppStore.getState().rebaseTabs(sourcePath, newPath);
+        } else {
+          useAppStore.getState().renameTab(sourcePath, newPath, name);
         }
         // Remove do sidebarOrder do parent ANTIGO (nao chamamos
         // renameInOrder porque o nome nao mudou — so' a pasta).

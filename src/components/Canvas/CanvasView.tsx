@@ -414,23 +414,30 @@ export function CanvasView() {
     };
   };
 
+  // Bug antigo: o useEffect estava sem array de dependencias, entao
+  // re-registrava o listener a cada render do CanvasView (que acontece
+  // a cada pan/zoom/seleção). `screenToWorld` e `snap` sao closures sobre
+  // viewport/canvasSnapToGrid/canvasGridSize — usamos getState pra ler
+  // o viewport mais recente sem precisar do listener depender dele.
   useEffect(() => {
     const onEmptyLink = (event: Event) => {
       const { clientX, clientY } = (event as CustomEvent<CanvasEmptyLinkDetail>).detail;
       const el = containerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const point = screenToWorld(clientX, clientY);
+      const vp = useCanvasStore.getState().viewport;
+      const wx = (clientX - rect.left - vp.x) / vp.zoom;
+      const wy = (clientY - rect.top - vp.y) / vp.zoom;
       setEmptyLinkMenu({
         screenX: clientX - rect.left,
         screenY: clientY - rect.top,
-        worldX: snap(point.x),
-        worldY: snap(point.y),
+        worldX: snap(wx),
+        worldY: snap(wy),
       });
     };
     window.addEventListener(CANVAS_EMPTY_LINK_EVENT, onEmptyLink);
     return () => window.removeEventListener(CANVAS_EMPTY_LINK_EVENT, onEmptyLink);
-  });
+  }, [canvasSnapToGrid, canvasGridSize]);
 
   const createLinkedItem = (kind: "text" | "card") => {
     if (!emptyLinkMenu) return;
@@ -647,9 +654,12 @@ export function CanvasView() {
         // — "se os dois nós entraram na seleção, a aresta veio junto". Evita
         // o problema de marquee sobre espaço vazio entre cards distantes
         // acidentalmente selecionar a seta que passa por cima.
+        // Mapa por id pra evitar O(arrows · cards) — antes era find() por
+        // arrow. Em canvas com 200 cards e 100 arrows, virava 20k lookups.
+        const cardById = new Map(cards.map((c) => [c.id, c]));
         for (const a of arrows) {
-          const fromCard = cards.find((c) => c.id === a.from);
-          const toCard = cards.find((c) => c.id === a.to);
+          const fromCard = cardById.get(a.from);
+          const toCard = cardById.get(a.to);
           if (!fromCard || !toCard) continue;
           const fromHit = hit(fromCard.x, fromCard.y, fromCard.w, fromCard.h);
           const toHit = hit(toCard.x, toCard.y, toCard.w, toCard.h);
