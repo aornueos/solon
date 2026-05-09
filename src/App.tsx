@@ -6,6 +6,7 @@ import { useAutoSave } from "./hooks/useAutoSave";
 import { useCanvasPersistence } from "./hooks/useCanvasPersistence";
 import { useSceneCardSync } from "./hooks/useSceneCardSync";
 import { checkForUpdate } from "./lib/updater";
+import { flushEditor } from "./lib/editorRef";
 
 const isTauriRuntime = (): boolean =>
   typeof window !== "undefined" &&
@@ -28,7 +29,7 @@ export default function App() {
   const openCommandPalette = useAppStore((s) => s.openCommandPalette);
   const openGlobalSearch = useAppStore((s) => s.openGlobalSearch);
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
-  const { restoreLastFolder, refresh, openFile } = useFileSystem();
+  const { restoreLastFolder, refresh, openFile, createUntitled } = useFileSystem();
 
   // Aplica tema no <html data-theme="...">
   useEffect(() => {
@@ -157,6 +158,14 @@ export default function App() {
         e.preventDefault();
         openSettings();
       }
+      // Ctrl+T cria nova nota "Sem titulo" na raiz do projeto e abre
+      // como aba ativa. Convencao classica de browsers/editores. Sem
+      // pasta aberta, mostra toast (createUntitled cuida).
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        void createUntitled();
+        return;
+      }
       // Ctrl+W fecha aba ativa. Se nao houver aba ativa, no-op (browser
       // fecharia a janela; nao queremos isso). Se a aba fechada era a
       // unica, limpa o arquivo ativo.
@@ -170,7 +179,10 @@ export default function App() {
           if (tab) void openFile(tab.path, tab.name);
         } else if (openTabs.length <= 1) {
           // Era a unica aba: limpa o arquivo ativo (mesmo comportamento
-          // do botao ✕ na ultima aba).
+          // do botao ✕ na ultima aba). Flush ANTES de zerar pra que
+          // useAutoSave persista a ultima janela de digitacao no arquivo
+          // que esta saindo de foco.
+          flushEditor();
           useAppStore.setState({
             activeFilePath: null,
             activeFileName: null,
@@ -211,6 +223,7 @@ export default function App() {
     openGlobalSearch,
     openLocalHistory,
     openFile,
+    createUntitled,
   ]);
 
   return <AppLayout />;

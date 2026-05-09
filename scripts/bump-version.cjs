@@ -24,6 +24,7 @@ const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..");
 const PKG = path.join(ROOT, "package.json");
+const PKG_LOCK = path.join(ROOT, "package-lock.json");
 const CARGO = path.join(ROOT, "src-tauri", "Cargo.toml");
 const TAURI_CONF = path.join(ROOT, "src-tauri", "tauri.conf.json");
 
@@ -50,6 +51,22 @@ pkg.version = next;
 // Mantem a indentacao + newline final que o npm gosta de preservar.
 fs.writeFileSync(PKG, JSON.stringify(pkg, null, 2) + "\n");
 console.log("  ✓ package.json");
+
+// ─── package-lock.json ───
+// `npm install` regenera o lock com a version do package.json, mas nao
+// queremos forcar `npm install` (lento + pode criar diff em deps que nao
+// queriamos tocar). Editamos as 2 entradas de version literal: a raiz
+// (linha ~3) e o "self" entry em packages[""] (linha ~9). Caminhos sao
+// estaveis no lockfileVersion 3.
+if (fs.existsSync(PKG_LOCK)) {
+  const lock = JSON.parse(fs.readFileSync(PKG_LOCK, "utf-8"));
+  lock.version = next;
+  if (lock.packages && lock.packages[""]) {
+    lock.packages[""].version = next;
+  }
+  fs.writeFileSync(PKG_LOCK, JSON.stringify(lock, null, 2) + "\n");
+  console.log("  ✓ package-lock.json");
+}
 
 // ─── Cargo.toml ───
 let cargoText = fs.readFileSync(CARGO, "utf-8");

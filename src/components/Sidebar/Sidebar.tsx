@@ -342,6 +342,7 @@ function FileTreeRow({
   depth,
   isActive,
   onOpen,
+  onOpenInBackground,
   onContextMenu,
   dragPath,
   dragPathRef,
@@ -359,6 +360,7 @@ function FileTreeRow({
   depth: number;
   isActive: boolean;
   onOpen: () => void;
+  onOpenInBackground: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
   dragPath: string | null;
   dragPathRef: React.MutableRefObject<string | null>;
@@ -598,6 +600,16 @@ function FileTreeRow({
         }
         onOpen();
       }}
+      onAuxClick={(e) => {
+        // Middle-click em arquivo abre nova aba SEM tirar o foco do
+        // arquivo atual. Convencao herdada de browsers (Ctrl+click ou
+        // mouse-do-meio = "abrir em nova aba em background").
+        if (e.button !== 1) return;
+        if (node.type !== "file") return;
+        e.preventDefault();
+        e.stopPropagation();
+        onOpenInBackground();
+      }}
       onKeyDown={(e) => {
         if (e.key !== "Enter" && e.key !== " ") return;
         e.preventDefault();
@@ -729,6 +741,13 @@ function FileTree({
             onOpen={() => {
               if (node.type === "folder") onToggle(node.path);
               else openFile(node.path, node.name);
+            }}
+            onOpenInBackground={() => {
+              // Middle-click em arquivo abre nova aba SEM tirar o foco
+              // do arquivo atual. Convencao de browser. Pasta nao tem
+              // analogo (sem dois "expandidos" simultaneos).
+              if (node.type !== "file") return;
+              useAppStore.getState().addTab(node.path, node.name);
             }}
             onContextMenu={(e) => {
               e.preventDefault();

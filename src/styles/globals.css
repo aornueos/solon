@@ -143,6 +143,27 @@
 }
 
 /* ─────────────────────────────────────────
+   TabBar — abas dos arquivos abertos
+───────────────────────────────────────── */
+/* Hover via CSS (em vez de inline onMouseEnter/Leave) para evitar
+   re-render por mouse move e dar feedback instantaneo. A aba ATIVA tem
+   bg-app explicito inline; o seletor abaixo so' afeta as inativas. */
+.solon-tab:not(.solon-tab--active):hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.solon-tab__close:hover {
+  background: var(--bg-hover);
+  opacity: 1 !important;
+  color: var(--text-primary) !important;
+}
+/* Scrollbar horizontal da TabBar fica mais discreta (2px) — raramente
+   precisa rolar e a barra default de 6px no rodape da aba parece
+   "rasgo" no design. */
+.solon-tab + *::-webkit-scrollbar,
+[role="tablist"]::-webkit-scrollbar { height: 2px; }
+
+/* ─────────────────────────────────────────
    Editor ProseMirror
 ───────────────────────────────────────── */
 

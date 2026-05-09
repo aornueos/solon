@@ -209,10 +209,22 @@ export function Editor() {
       return;
     }
     if (lastLoadedPathRef.current === activeFilePath) return;
-    // Flush pendencias do arquivo ANTERIOR antes de hidrate o novo —
-    // senao o turndown debounced rodaria depois do setContent novo e
-    // gravaria o body do antigo no fileBody do novo.
-    flushUpdateRef.current?.();
+    // CUIDADO: NAO chamar flushUpdateRef aqui. Quando este effect roda,
+    // `activeFilePath` ja' mudou pro arquivo NOVO, mas o editor ainda
+    // tem o conteudo do arquivo ANTIGO. Se a gente flushasse, o turndown
+    // do conteudo antigo viraria fileBody DO NOVO arquivo — e logo
+    // abaixo a gente le esse fileBody pra o setContent. Resultado:
+    // editor mostraria o conteudo antigo, autosave gravaria o antigo
+    // por cima do novo, *apagando o arquivo*. Bug catastrofico.
+    // O flush correto e' feito em `useFileSystem.openFile` ANTES do
+    // setActiveFile mudar a store — ai o editor ainda casa com o path
+    // antigo.
+    // Cancela timer pendente pra que ele nao dispare em cima do
+    // setContent abaixo.
+    if (updateTimerRef.current != null) {
+      window.clearTimeout(updateTimerRef.current);
+      updateTimerRef.current = null;
+    }
     lastLoadedPathRef.current = activeFilePath;
 
     isLoadingRef.current = true;

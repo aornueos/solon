@@ -687,6 +687,45 @@ export function useFileSystem() {
     [refresh, rootFolder, activeFilePath, setActiveFile, setSidebarOrder, saveFile],
   );
 
+  /**
+   * Cria um arquivo "Sem titulo.md" (com sufixo numerico em colisao) na
+   * raiz do projeto e abre na aba ativa. Usado pelo atalho Ctrl+T.
+   *
+   * Decisao: cria de fato no disco em vez de buffer untitled em memoria.
+   * Buffers untitled exigiriam infraestrutura nova (estado nao-persistido,
+   * dialogo de "salvar onde?" no fechamento) sem ganho real pra escrita
+   * — um arquivo .md em branco eh barato e funciona como ponto de partida.
+   */
+  const createUntitled = useCallback(async () => {
+    if (!rootFolder) {
+      useAppStore
+        .getState()
+        .pushToast("info", "Abra uma pasta antes de criar uma nota.");
+      return;
+    }
+    if (!isTauri) return;
+    try {
+      const { exists, writeTextFile } = await import("@tauri-apps/plugin-fs");
+      const base = "Sem título";
+      let name = `${base}.md`;
+      let n = 1;
+      while (await exists(joinPath(rootFolder, name))) {
+        n += 1;
+        name = `${base} ${n}.md`;
+        if (n > 999) break; // sanity guard — quase impossivel mas evita loop
+      }
+      const full = joinPath(rootFolder, name);
+      await writeTextFile(full, "");
+      await refresh();
+      await openFile(full, name);
+    } catch (err) {
+      console.error("Erro ao criar nota sem titulo:", err);
+      useAppStore
+        .getState()
+        .pushToast("error", `Erro ao criar nota: ${describeError(err)}`);
+    }
+  }, [rootFolder, refresh, openFile]);
+
   return {
     openFolder,
     openFile,
@@ -694,6 +733,7 @@ export function useFileSystem() {
     refresh,
     restoreLastFolder,
     createFile,
+    createUntitled,
     createFolder,
     renameNode,
     deleteNode,

@@ -106,10 +106,12 @@ export function AppLayout() {
           className="flex-1 min-w-0 overflow-hidden flex flex-col"
           style={{ background: "var(--bg-app)" }}
         >
-          {/* TabBar so' aparece fora da home — na landing nao faz sentido,
-              e ela ja' tem chrome proprio. Em focus mode tambem some pra
-              maximizar a area de escrita. */}
-          {!inHome && !focusMode && <TabBar />}
+          {/* TabBar aparece fora da home — na landing nao faz sentido,
+              e ela ja' tem chrome proprio. Em focus mode permanece: o
+              user pediu pra ela ficar aberta porque navegar entre abas
+              e parte do fluxo de escrita; eh menos chrome do que tirar
+              a navegacao. */}
+          {!inHome && <TabBar />}
           <div className="flex-1 min-h-0 overflow-hidden">
             <Suspense fallback={<ViewLoading />}>
               {inHome ? <HomePage /> : inCanvas ? <CanvasView /> : <Editor />}
