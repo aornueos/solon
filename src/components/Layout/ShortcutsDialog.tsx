@@ -51,6 +51,10 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "Ctrl + Z / Ctrl + Y", label: "Desfazer / Refazer" },
       { keys: "Ctrl + B / I / Shift+S", label: "Negrito / Itálico / Tachado" },
       { keys: "Ctrl + Scroll", label: "Zoom do texto" },
+      { keys: "Tab (em heading)", label: "Demote — H2 vira H3" },
+      { keys: "Shift + Tab (em heading)", label: "Promote — H3 vira H2" },
+      { keys: "Tab (em parágrafo)", label: "Indenta primeira linha (estilo romance)" },
+      { keys: "Ctrl + Shift + E", label: "Exportar para PDF" },
     ],
   },
   {

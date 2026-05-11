@@ -26,6 +26,7 @@ import Highlight from "@tiptap/extension-highlight";
 import { IndentExtension } from "./IndentExtension";
 import { ListExitExtension } from "./ListExitExtension";
 import { SmartDashesExtension } from "./SmartDashesExtension";
+import { HeadingNavExtension } from "./HeadingNavExtension";
 import {
   EDITOR_INDENT_SIZES,
   EDITOR_FONT_FAMILIES,
@@ -106,6 +107,11 @@ export function Editor() {
       CharacterCount,
       SpellcheckExtension,
       FindHighlightExtension,
+      // Ordem: HeadingNav ANTES de IndentExtension. Ambos respondem a
+      // Tab/Shift+Tab; TipTap testa em ordem e o primeiro que retornar
+      // `true` consome o evento. HeadingNav so' age se cursor esta em
+      // heading; senao retorna false e o Indent assume.
+      HeadingNavExtension,
       IndentExtension,
       ListExitExtension,
       SmartDashesExtension,
@@ -504,15 +510,27 @@ function extractHeadings(
   setHeadings: (h: any[]) => void
 ) {
   if (!editor) return;
-  const headings: { level: number; text: string; pos: number }[] = [];
+  const raw: { level: number; text: string; pos: number }[] = [];
   editor.state.doc.descendants((node, pos) => {
     if (node.type.name === "heading") {
-      headings.push({
+      raw.push({
         level: node.attrs.level,
         text: node.textContent,
         pos,
       });
     }
+  });
+  // Pos passo 2: pra cada heading, mede a secao ate o proximo heading
+  // (ou ate o fim do doc) e conta palavras. Sem isso o Outline mostraria
+  // so' o titulo — com a contagem, o user ve a "massa" de cada secao e
+  // identifica onde escrever mais. textBetween extrai so o texto plano
+  // entre as posicoes (ignora a estrutura de blocos — perfeito pra contar).
+  const docSize = editor.state.doc.content.size;
+  const headings = raw.map((h, idx) => {
+    const endPos = idx + 1 < raw.length ? raw[idx + 1].pos : docSize;
+    const text = editor.state.doc.textBetween(h.pos, endPos, "\n", " ").trim();
+    const words = text ? text.split(/\s+/).length : 0;
+    return { ...h, endPos, wordCount: words };
   });
   setHeadings(headings);
 }

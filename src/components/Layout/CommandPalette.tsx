@@ -18,6 +18,7 @@ import {
   ListTree,
   Info,
   Plus,
+  FileDown,
 } from "lucide-react";
 import { useAppStore, FileNode } from "../../store/useAppStore";
 import { useCanvasStore } from "../../store/useCanvasStore";
@@ -56,6 +57,8 @@ export function CommandPalette() {
   const openSettings = useAppStore((s) => s.openSettings);
   const openGlobalSearch = useAppStore((s) => s.openGlobalSearch);
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
+  const openExport = useAppStore((s) => s.openExport);
+  const openShortcuts = useAppStore((s) => s.openShortcuts);
   const setTool = useCanvasStore((s) => s.setTool);
   const addCard = useCanvasStore((s) => s.addCard);
   const { openFile, openFolder } = useFileSystem();
@@ -174,6 +177,20 @@ export function CommandPalette() {
         run: openLocalHistory,
       },
       {
+        id: "export-pdf",
+        label: "Exportar para PDF",
+        hint: "Ctrl+Shift+E",
+        icon: <FileDown size={15} />,
+        run: openExport,
+      },
+      {
+        id: "shortcuts",
+        label: "Atalhos de teclado",
+        hint: "Ctrl+/",
+        icon: <Info size={15} />,
+        run: openShortcuts,
+      },
+      {
         id: "canvas-card",
         label: "Canvas: novo card",
         hint: "N",
@@ -200,6 +217,8 @@ export function CommandPalette() {
       openFolder,
       openGlobalSearch,
       openLocalHistory,
+      openExport,
+      openShortcuts,
       openSettings,
       setActiveView,
       setTool,

@@ -14,7 +14,14 @@ export interface FileNode {
 export interface HeadingItem {
   level: number;
   text: string;
+  /** Posicao do heading no doc (1-indexed, igual `state.doc`). */
   pos: number;
+  /** Posicao do *proximo* heading (ou doc.content.size se for o ultimo).
+   *  Usado pra delimitar a secao em reorder/word-count. */
+  endPos: number;
+  /** Contagem de palavras DA SECAO (heading inclusivo até o proximo
+   *  heading exclusivo). Calculado em extractHeadings. */
+  wordCount: number;
 }
 
 export interface Toast {
@@ -234,6 +241,8 @@ interface AppState {
   showCommandPalette: boolean;
   /** Cheatsheet de atalhos (Ctrl+/). */
   showShortcuts: boolean;
+  /** Dialog de export (PDF). */
+  showExport: boolean;
   /** Tag ativa de filtro na Sidebar. Quando settada, a Sidebar exibe
    *  apenas arquivos cujo frontmatter inclui essa tag (lista flat,
    *  fora da arvore de pastas). null = sem filtro. */
@@ -369,6 +378,8 @@ interface AppState {
   closeShortcuts: () => void;
   setActiveTagFilter: (tag: string | null) => void;
   setTagIndex: (index: Map<string, string[]> | null) => void;
+  openExport: () => void;
+  closeExport: () => void;
   /** Reset de todas as preferencias pro default (zoom 100%, theme light,
    *  auto-save on, etc). Usado pelo botao "Restaurar padroes". */
   resetSettings: () => void;
@@ -704,6 +715,7 @@ export const useAppStore = create<AppState>((set) => ({
   showSettings: false,
   showCommandPalette: false,
   showShortcuts: false,
+  showExport: false,
   activeTagFilter: null,
   tagIndex: null,
   activeContextMenu: null,
@@ -1023,6 +1035,8 @@ export const useAppStore = create<AppState>((set) => ({
   closeShortcuts: () => set({ showShortcuts: false }),
   setActiveTagFilter: (tag) => set({ activeTagFilter: tag }),
   setTagIndex: (idx) => set({ tagIndex: idx }),
+  openExport: () => set({ showExport: true }),
+  closeExport: () => set({ showExport: false }),
   resetSettings: () => {
     // Apaga todas as chaves de pref do localStorage e reseta o state pros
     // defaults. Theme nao entra aqui — e' uma pref "vivendo" no proprio

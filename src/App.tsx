@@ -31,6 +31,7 @@ export default function App() {
   const openGlobalSearch = useAppStore((s) => s.openGlobalSearch);
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
   const openShortcuts = useAppStore((s) => s.openShortcuts);
+  const openExport = useAppStore((s) => s.openExport);
   const { restoreLastFolder, refresh, openFile, createUntitled } = useFileSystem();
 
   // Aplica tema no <html data-theme="...">
@@ -170,6 +171,16 @@ export default function App() {
         e.preventDefault();
         openShortcuts();
       }
+      // Ctrl+Shift+E abre dialog de export pra PDF — convencao herdada
+      // de editores de texto que tem "Export" no menu Arquivo.
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "e"
+      ) {
+        e.preventDefault();
+        openExport();
+      }
       // Ctrl+T cria nova nota "Sem titulo" na raiz do projeto e abre
       // como aba ativa. Convencao classica de browsers/editores. Sem
       // pasta aberta, mostra toast (createUntitled cuida).
@@ -235,6 +246,7 @@ export default function App() {
     openGlobalSearch,
     openLocalHistory,
     openShortcuts,
+    openExport,
     openFile,
     createUntitled,
   ]);

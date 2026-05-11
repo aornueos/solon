@@ -12,6 +12,7 @@ import { UpdateNotesDialog } from "./UpdateNotesDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { RecoveryDialog } from "./RecoveryDialog";
 import { ShortcutsDialog } from "./ShortcutsDialog";
+import { ExportDialog } from "./ExportDialog";
 import { CommandPalette } from "./CommandPalette";
 import { GlobalSearchDialog } from "./GlobalSearchDialog";
 import { LocalHistoryDialog } from "./LocalHistoryDialog";
@@ -167,6 +168,7 @@ export function AppLayout() {
       <SettingsDialog />
       <RecoveryDialog />
       <ShortcutsDialog open={showShortcuts} onClose={closeShortcuts} />
+      <ExportDialog />
       <ContextMenuLayer />
       <ContextMenuProvider />
     </div>
