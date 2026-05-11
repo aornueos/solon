@@ -5,12 +5,29 @@
 # como assets do GitHub Release, e gera o `latest.json` que o plugin
 # updater le pra detectar nova versao.
 #
-# Setup necessario uma vez:
+# Setup do UPDATER (Ed25519) — necessario uma vez:
 #   1. Gerar keypair: `npx tauri signer generate -w ~/.tauri/solon.key`
 #   2. Cole a public key em src-tauri/tauri.conf.json (campo `pubkey`)
 #   3. Adicione 2 secrets no repo (Settings > Secrets and variables > Actions):
 #        TAURI_SIGNING_PRIVATE_KEY            -> conteudo do solon.key
 #        TAURI_SIGNING_PRIVATE_KEY_PASSWORD   -> senha definida na geracao
+#
+# Code signing WINDOWS (Authenticode — opcional, elimina o SmartScreen
+# "editor desconhecido"). Sem o setup abaixo, o step de import e' no-op
+# e os builds saem nao-assinados (comportamento default).
+#   1. Compre cert OV/EV num CA (SSL.com, Sectigo, etc) -> arquivo .pfx
+#   2. Base64-encode o .pfx (PowerShell):
+#        $b = [IO.File]::ReadAllBytes("solon.pfx")
+#        [Convert]::ToBase64String($b) | Set-Clipboard
+#   3. Extraia o thumbprint (SHA-1 do cert publico):
+#        Get-PfxData -FilePath solon.pfx -Password (Read-Host -AsSecureString) `
+#          | Select -Expand EndEntityCertificates | Select Thumbprint
+#   4. Adicione 2 secrets no repo:
+#        WINDOWS_CERTIFICATE             -> o base64 do passo 2
+#        WINDOWS_CERTIFICATE_PASSWORD    -> senha do .pfx
+#   5. Em src-tauri/tauri.conf.json, dentro de `bundle.windows`, adicione:
+#        "certificateThumbprint": "<o thumbprint do passo 3>"
+#   6. Commit + tag + push. Aguarde a Action; o `.msi` sai assinado.
 #
 # Ciclo de release:
 #   git tag v0.6.0
@@ -72,6 +89,43 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      # Code signing Windows (Authenticode). Decodifica o .pfx do secret,
+      # importa no cert store CurrentUser\My do runner e apaga o arquivo.
+      # Quando `tauri build` rodar em seguida, signtool.exe acha o cert
+      # pelo `certificateThumbprint` configurado em tauri.conf.json e
+      # assina o .msi/.exe automaticamente.
+      #
+      # No-op se WINDOWS_CERTIFICATE nao estiver setado — assim builds
+      # sem cert configurado continuam funcionando (saem nao-assinados).
+      - name: Import Windows code signing certificate
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        env:
+          CERT_B64: ${{ secrets.WINDOWS_CERTIFICATE }}
+          CERT_PWD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:CERT_B64) {
+            Write-Host "WINDOWS_CERTIFICATE nao configurado — pulando code signing."
+            exit 0
+          }
+          # Decodifica o base64 do secret pro disco do runner.
+          $bytes = [Convert]::FromBase64String($env:CERT_B64)
+          $pfxPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, $bytes)
+
+          # Importa no cert store CurrentUser\My. O signtool (chamado
+          # pelo Tauri) acha o cert por thumbprint dentro desse store.
+          $pwd = ConvertTo-SecureString -String $env:CERT_PWD -AsPlainText -Force
+          Import-PfxCertificate `
+            -FilePath $pfxPath `
+            -CertStoreLocation Cert:\CurrentUser\My `
+            -Password $pwd | Out-Null
+
+          # Limpa o .pfx do disco — minimiza janela de exposicao da chave
+          # privada. O cert ja esta no store; o arquivo nao e mais util.
+          Remove-Item $pfxPath -Force
+          Write-Host "Certificado importado no store CurrentUser\My."
 
       - name: Build & release
         uses: tauri-apps/tauri-action@v0

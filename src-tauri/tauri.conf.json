@@ -37,7 +37,12 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.sectigo.com",
+      "tsp": false
+    }
   },
   "plugins": {
     "updater": {
