@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { SCENE_STATUSES, SceneStatus } from "../../types/scene";
-import { X } from "lucide-react";
+import { X, History } from "lucide-react";
 import clsx from "clsx";
 
 /**
@@ -18,6 +18,8 @@ export function Inspector() {
   const patchSceneMeta = useAppStore((s) => s.patchSceneMeta);
   const wordCount = useAppStore((s) => s.wordCount);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
+  const openLocalHistory = useAppStore((s) => s.openLocalHistory);
+  const localHistoryEnabled = useAppStore((s) => s.localHistoryEnabled);
 
   const shellStyle: React.CSSProperties = {
     background: "var(--bg-panel-2)",
@@ -198,6 +200,32 @@ export function Inspector() {
             }
           />
         </Field>
+
+        {/* Histórico local — botão pra abrir o dialog. Antes so' via
+            Ctrl+Alt+H (escondido); agora visivel pra que o user saiba
+            que pode voltar a versoes anteriores. Hint mostra quando a
+            preferencia esta desligada nas Settings. */}
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={openLocalHistory}
+            disabled={!localHistoryEnabled}
+            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[0.78rem] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              background: "var(--bg-panel)",
+              border: "1px solid var(--border)",
+              color: "var(--text-secondary)",
+            }}
+            title={
+              localHistoryEnabled
+                ? "Versões salvas automaticamente antes de cada gravação (Ctrl+Alt+H)"
+                : "Histórico local está desativado em Preferências"
+            }
+          >
+            <History size={12} />
+            <span>Histórico local</span>
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -133,6 +133,22 @@ export interface OpenTab {
   name: string;
 }
 
+/** Draft de crash recovery (vindo do lib/crashRecovery). Espelhado aqui
+ *  pra evitar import circular na store. */
+export interface RecoveryDraftEntry {
+  path: string;
+  content: string;
+  savedAt: number;
+}
+
+/** Entrada do histórico de arquivos recém abertos (LRU bound, exibido
+ *  na HomePage). Persistido em localStorage. */
+export interface RecentFile {
+  path: string;
+  name: string;
+  openedAt: number;
+}
+
 interface AppState {
   // Arquivo ativo
   activeFilePath: string | null;
@@ -143,6 +159,13 @@ interface AppState {
   sceneMeta: SceneMeta;
   /** Abas abertas. A aba ativa e' aquela cujo `path === activeFilePath`. */
   openTabs: OpenTab[];
+  /** Drafts de crash recovery pendentes — settados no boot quando
+   *  `scanRecoveryDrafts` encontra divergencias. Dispara o
+   *  `RecoveryDialog` no AppLayout enquanto for nao-vazio. */
+  pendingRecoveryDrafts: RecoveryDraftEntry[];
+  /** Lista LRU de arquivos recém-abertos. Persiste em localStorage,
+   *  cap em RECENT_FILES_MAX. Exibido na HomePage abaixo do CTA. */
+  recentFiles: RecentFile[];
 
   // Pastas abertas
   rootFolder: string | null;
@@ -209,6 +232,17 @@ interface AppState {
   showSettings: boolean;
   /** Paleta de comandos rapida (Ctrl+K). */
   showCommandPalette: boolean;
+  /** Cheatsheet de atalhos (Ctrl+/). */
+  showShortcuts: boolean;
+  /** Tag ativa de filtro na Sidebar. Quando settada, a Sidebar exibe
+   *  apenas arquivos cujo frontmatter inclui essa tag (lista flat,
+   *  fora da arvore de pastas). null = sem filtro. */
+  activeTagFilter: string | null;
+  /** Cache do index de tags (path -> tags[]). Populado pelo
+   *  TagFilterPopover quando o user abre o popover, consumido pela
+   *  Sidebar pra montar a view filtrada sem re-indexar. null =
+   *  ainda nao indexado nesta sessao. */
+  tagIndex: Map<string, string[]> | null;
   /** Context menu ativo (custom, substitui o nativo do WebView). */
   activeContextMenu: ActiveContextMenu | null;
   /** Liga/desliga spellcheck visual (red underlines) no editor. */
@@ -261,6 +295,17 @@ interface AppState {
   /** Renomeia em massa quando uma pasta foi movida/renomeada — todos os
    *  paths que comecam com `oldPrefix` sao reescritos. */
   rebaseTabs: (oldPrefix: string, newPrefix: string) => void;
+  /** Settar drafts pendentes — usado pelo `restoreLastFolder` apos
+   *  varredura de recovery. UI consome via RecoveryDialog. */
+  setPendingRecoveryDrafts: (drafts: RecoveryDraftEntry[]) => void;
+  /** Limpa a lista (apos user decidir — aceitar ou descartar). */
+  clearPendingRecoveryDrafts: () => void;
+  /** Registra um arquivo no LRU de recents. Idempotente: se o path ja
+   *  esta na lista, sobe pro topo. Cap em RECENT_FILES_MAX. */
+  pushRecentFile: (path: string, name: string) => void;
+  /** Remove um arquivo do LRU — usado em delete/rename pra nao deixar
+   *  entry orfa. */
+  removeRecentFile: (path: string) => void;
   setFileBody: (body: string) => void;
   setSceneMeta: (meta: SceneMeta) => void;
   patchSceneMeta: (patch: Partial<SceneMeta>) => void;
@@ -320,6 +365,10 @@ interface AppState {
   closeSettings: () => void;
   openCommandPalette: () => void;
   closeCommandPalette: () => void;
+  openShortcuts: () => void;
+  closeShortcuts: () => void;
+  setActiveTagFilter: (tag: string | null) => void;
+  setTagIndex: (index: Map<string, string[]> | null) => void;
   /** Reset de todas as preferencias pro default (zoom 100%, theme light,
    *  auto-save on, etc). Usado pelo botao "Restaurar padroes". */
   resetSettings: () => void;
@@ -336,6 +385,36 @@ interface AppState {
 
 const THEME_KEY = "solon:theme";
 const OPEN_TABS_KEY = "solon:openTabs";
+const RECENT_FILES_KEY = "solon:recentFiles";
+const RECENT_FILES_MAX = 8;
+
+function loadRecentFiles(): RecentFile[] {
+  try {
+    const raw = localStorage.getItem(RECENT_FILES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (r): r is RecentFile =>
+          r &&
+          typeof r.path === "string" &&
+          typeof r.name === "string" &&
+          typeof r.openedAt === "number",
+      )
+      .slice(0, RECENT_FILES_MAX);
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentFiles(files: RecentFile[]): void {
+  try {
+    localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(files));
+  } catch {
+    /* storage cheio — ignora */
+  }
+}
 
 function loadOpenTabs(): OpenTab[] {
   try {
@@ -592,6 +671,8 @@ export const useAppStore = create<AppState>((set) => ({
   fileBody: "",
   sceneMeta: {},
   openTabs: loadOpenTabs(),
+  pendingRecoveryDrafts: [],
+  recentFiles: loadRecentFiles(),
   rootFolder: null,
   fileTree: [],
   sidebarOrder: { version: 1, folders: {} },
@@ -622,6 +703,9 @@ export const useAppStore = create<AppState>((set) => ({
   autoCheckUpdates: loadBoolPref(AUTO_CHECK_UPDATES_KEY, DEFAULT_AUTO_CHECK_UPDATES),
   showSettings: false,
   showCommandPalette: false,
+  showShortcuts: false,
+  activeTagFilter: null,
+  tagIndex: null,
   activeContextMenu: null,
   spellcheckEnabled: loadBoolPref(SPELLCHECK_KEY, DEFAULT_SPELLCHECK),
   editorMaxWidth: loadEditorMaxWidth(),
@@ -740,6 +824,29 @@ export const useAppStore = create<AppState>((set) => ({
       if (!changed) return s;
       saveOpenTabs(next);
       return { openTabs: next };
+    }),
+
+  setPendingRecoveryDrafts: (drafts) => set({ pendingRecoveryDrafts: drafts }),
+  clearPendingRecoveryDrafts: () => set({ pendingRecoveryDrafts: [] }),
+
+  pushRecentFile: (path, name) =>
+    set((s) => {
+      const entry: RecentFile = { path, name, openedAt: Date.now() };
+      const next = [
+        entry,
+        ...s.recentFiles.filter((r) => r.path !== path),
+      ].slice(0, RECENT_FILES_MAX);
+      saveRecentFiles(next);
+      return { recentFiles: next };
+    }),
+
+  removeRecentFile: (path) =>
+    set((s) => {
+      const idx = s.recentFiles.findIndex((r) => r.path === path);
+      if (idx === -1) return s;
+      const next = s.recentFiles.filter((r) => r.path !== path);
+      saveRecentFiles(next);
+      return { recentFiles: next };
     }),
 
   setFileBody: (body) => set({ fileBody: body }),
@@ -912,6 +1019,10 @@ export const useAppStore = create<AppState>((set) => ({
   closeSettings: () => set({ showSettings: false }),
   openCommandPalette: () => set({ showCommandPalette: true }),
   closeCommandPalette: () => set({ showCommandPalette: false }),
+  openShortcuts: () => set({ showShortcuts: true }),
+  closeShortcuts: () => set({ showShortcuts: false }),
+  setActiveTagFilter: (tag) => set({ activeTagFilter: tag }),
+  setTagIndex: (idx) => set({ tagIndex: idx }),
   resetSettings: () => {
     // Apaga todas as chaves de pref do localStorage e reseta o state pros
     // defaults. Theme nao entra aqui — e' uma pref "vivendo" no proprio

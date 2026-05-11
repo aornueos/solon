@@ -8,12 +8,16 @@ import {
   RefreshCw,
   Pencil,
   Trash2,
+  Copy,
+  Tag as TagIcon,
+  X as XIcon,
 } from "lucide-react";
 import { useAppStore, FileNode } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { startDrag } from "../../lib/drag";
 import { canMoveIntoFolder } from "../../lib/sidebarDrop";
 import { SCENE_DND_MIME } from "../../types/canvas";
+import { TagFilterPopover } from "./TagFilterPopover";
 import clsx from "clsx";
 
 const SIDEBAR_DND_MIME = "application/x-solon-sidebar-node";
@@ -53,7 +57,12 @@ export function Sidebar() {
   const toggleFolder = useAppStore((s) => s.toggleFolder);
   const openPrompt = useAppStore((s) => s.openPrompt);
   const openConfirm = useAppStore((s) => s.openConfirm);
-  const { openFolder, refresh, createFile, createFolder, renameNode, deleteNode, reorderItem, moveItem } =
+  const activeTagFilter = useAppStore((s) => s.activeTagFilter);
+  const setActiveTagFilter = useAppStore((s) => s.setActiveTagFilter);
+  const tagIndex = useAppStore((s) => s.tagIndex);
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const tagBtnRef = useRef<HTMLButtonElement | null>(null);
+  const { openFolder, refresh, createFile, createFolder, renameNode, deleteNode, reorderItem, moveItem, duplicateFile } =
     useFileSystem();
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   /**
@@ -208,6 +217,28 @@ export function Sidebar() {
               >
                 <FolderPlus size={13} />
               </HeaderBtn>
+              <button
+                ref={tagBtnRef}
+                onClick={() => setTagPopoverOpen((v) => !v)}
+                title="Filtrar por tag"
+                className="p-1 rounded transition-colors"
+                style={{
+                  color: activeTagFilter
+                    ? "var(--accent)"
+                    : "var(--text-muted)",
+                  background: tagPopoverOpen ? "var(--bg-hover)" : "transparent",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "var(--bg-hover)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = tagPopoverOpen
+                    ? "var(--bg-hover)"
+                    : "transparent")
+                }
+              >
+                <TagIcon size={13} />
+              </button>
               <HeaderBtn onClick={() => refresh()} title="Atualizar">
                 <RefreshCw size={13} />
               </HeaderBtn>
@@ -219,7 +250,41 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Árvore de arquivos */}
+      {/* Chip de filtro ativo — sticky no topo da lista quando ha tag. */}
+      {activeTagFilter && (
+        <div
+          className="flex items-center justify-between gap-2 px-3 py-1.5"
+          style={{
+            background: "var(--bg-hover)",
+            borderBottom: "1px solid var(--border-subtle)",
+          }}
+        >
+          <span
+            className="inline-flex items-center gap-1.5 text-[0.72rem] truncate"
+            style={{ color: "var(--accent)" }}
+          >
+            <TagIcon size={11} />
+            <span className="truncate">{activeTagFilter}</span>
+          </span>
+          <button
+            onClick={() => setActiveTagFilter(null)}
+            title="Limpar filtro"
+            className="p-0.5 rounded"
+            style={{ color: "var(--text-muted)" }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLElement).style.color =
+                "var(--text-primary)")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLElement).style.color = "var(--text-muted)")
+            }
+          >
+            <XIcon size={11} />
+          </button>
+        </div>
+      )}
+
+      {/* Árvore de arquivos (ou lista filtrada por tag) */}
       <div
         className="flex-1 overflow-y-auto py-1"
         role={fileTree.length > 0 ? "tree" : undefined}
@@ -258,6 +323,13 @@ export function Sidebar() {
               Abrir pasta
             </button>
           </div>
+        ) : activeTagFilter ? (
+          <FilteredFileList
+            tag={activeTagFilter}
+            tagIndex={tagIndex}
+            tree={fileTree}
+            activeFilePath={activeFilePath}
+          />
         ) : (
           <FileTree
             nodes={fileTree}
@@ -285,6 +357,14 @@ export function Sidebar() {
         )}
       </div>
 
+      {/* Popover de filtro por tag */}
+      {tagPopoverOpen && (
+        <TagFilterPopover
+          anchor={tagBtnRef.current}
+          onClose={() => setTagPopoverOpen(false)}
+        />
+      )}
+
       {/* Menu de contexto */}
       {menu && (
         <ContextMenu
@@ -294,6 +374,10 @@ export function Sidebar() {
           onNewFolder={handleNewFolder}
           onRename={handleRename}
           onDelete={handleDelete}
+          onDuplicate={(node) => {
+            setMenu(null);
+            void duplicateFile(node.path);
+          }}
           rootFolder={rootFolder}
         />
       )}
@@ -803,6 +887,7 @@ function ContextMenu({
   onNewFolder,
   onRename,
   onDelete,
+  onDuplicate,
   rootFolder,
 }: {
   menu: ContextMenuState;
@@ -811,6 +896,7 @@ function ContextMenu({
   onNewFolder: (parentDir: string) => void;
   onRename: (node: FileNode) => void;
   onDelete: (node: FileNode) => void;
+  onDuplicate?: (node: FileNode) => void;
   rootFolder: string | null;
 }) {
   const { node } = menu;
@@ -853,6 +939,11 @@ function ContextMenu({
       danger: true,
     });
   } else {
+    items.push({
+      label: "Duplicar",
+      icon: <Copy size={12} />,
+      action: () => onDuplicate?.(node),
+    });
     items.push({
       label: "Renomear",
       icon: <Pencil size={12} />,
@@ -927,4 +1018,90 @@ function ContextMenuItem({
       {label}
     </button>
   );
+}
+
+/**
+ * Lista flat de arquivos que tem a tag ativa. Substitui a arvore de
+ * pastas quando ha filtro — abandonar a estrutura hierarquica simplifica
+ * implementacao e o resultado UX faz sentido: "estou navegando por tag,
+ * nao por organizacao fisica do disco".
+ *
+ * tagIndex pode ser null se o user nunca abriu o popover (ex: aplicou
+ * filtro via CommandPalette futuro). Nesse caso mostra uma mensagem
+ * sugerindo abrir o popover (que indexa).
+ */
+function FilteredFileList({
+  tag,
+  tagIndex,
+  tree,
+  activeFilePath,
+}: {
+  tag: string;
+  tagIndex: Map<string, string[]> | null;
+  tree: FileNode[];
+  activeFilePath: string | null;
+}) {
+  const { openFile } = useFileSystem();
+  if (!tagIndex) {
+    return (
+      <div className="px-3 py-4 text-center text-[0.75rem] italic" style={{ color: "var(--text-muted)" }}>
+        Abra o filtro de tags pra indexar.
+      </div>
+    );
+  }
+  const lower = tag.toLowerCase();
+  const matchPaths = new Set<string>();
+  for (const [path, tags] of tagIndex) {
+    if (tags.some((t) => t.toLowerCase() === lower)) matchPaths.add(path);
+  }
+  // Mantemos a ordem da arvore (alfabetica + folders first), so' filtramos.
+  const allFiles = flattenForList(tree).filter((f) => matchPaths.has(f.path));
+  if (allFiles.length === 0) {
+    return (
+      <div className="px-3 py-4 text-center text-[0.75rem] italic" style={{ color: "var(--text-muted)" }}>
+        Nenhum arquivo com esta tag.
+      </div>
+    );
+  }
+  return (
+    <ul className="py-0.5">
+      {allFiles.map((f) => {
+        const isActive = activeFilePath === f.path;
+        const display = f.name.replace(/\.(md|txt)$/i, "");
+        return (
+          <li key={f.path}>
+            <button
+              onClick={() => openFile(f.path, f.name)}
+              className="w-full flex items-center gap-1.5 px-3 py-1 text-left text-[0.8125rem] transition-colors truncate"
+              style={{
+                background: isActive ? "var(--bg-hover)" : "transparent",
+                color: isActive ? "var(--accent)" : "var(--text-primary)",
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive)
+                  (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive)
+                  (e.currentTarget as HTMLElement).style.background = "transparent";
+              }}
+              title={f.path}
+            >
+              <File size={11} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+              <span className="truncate">{display}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function flattenForList(nodes: FileNode[]): FileNode[] {
+  const out: FileNode[] = [];
+  for (const n of nodes) {
+    if (n.type === "file") out.push(n);
+    if (n.children) out.push(...flattenForList(n.children));
+  }
+  return out;
 }

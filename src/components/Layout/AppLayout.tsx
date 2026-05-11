@@ -10,6 +10,8 @@ import { ToastLayer } from "./ToastLayer";
 import { DialogLayer } from "./DialogLayer";
 import { UpdateNotesDialog } from "./UpdateNotesDialog";
 import { SettingsDialog } from "./SettingsDialog";
+import { RecoveryDialog } from "./RecoveryDialog";
+import { ShortcutsDialog } from "./ShortcutsDialog";
 import { CommandPalette } from "./CommandPalette";
 import { GlobalSearchDialog } from "./GlobalSearchDialog";
 import { LocalHistoryDialog } from "./LocalHistoryDialog";
@@ -30,6 +32,8 @@ const HomePage = lazy(() =>
 export function AppLayout() {
   // Seletores granulares evitam re-render do AppLayout a cada keystroke
   // (o fileBody e headings também vivem nessa store e mudam constantemente).
+  const showShortcuts = useAppStore((s) => s.showShortcuts);
+  const closeShortcuts = useAppStore((s) => s.closeShortcuts);
   const isSidebarOpen = useAppStore((s) => s.isSidebarOpen);
   const isOutlineOpen = useAppStore((s) => s.isOutlineOpen);
   const isInspectorOpen = useAppStore((s) => s.isInspectorOpen);
@@ -161,6 +165,8 @@ export function AppLayout() {
       <LocalHistoryDialog />
       <UpdateNotesDialog />
       <SettingsDialog />
+      <RecoveryDialog />
+      <ShortcutsDialog open={showShortcuts} onClose={closeShortcuts} />
       <ContextMenuLayer />
       <ContextMenuProvider />
     </div>

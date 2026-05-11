@@ -3,6 +3,7 @@ import { AppLayout } from "./components/Layout/AppLayout";
 import { useAppStore } from "./store/useAppStore";
 import { useFileSystem } from "./hooks/useFileSystem";
 import { useAutoSave } from "./hooks/useAutoSave";
+import { useCrashRecovery } from "./hooks/useCrashRecovery";
 import { useCanvasPersistence } from "./hooks/useCanvasPersistence";
 import { useSceneCardSync } from "./hooks/useSceneCardSync";
 import { checkForUpdate } from "./lib/updater";
@@ -29,6 +30,7 @@ export default function App() {
   const openCommandPalette = useAppStore((s) => s.openCommandPalette);
   const openGlobalSearch = useAppStore((s) => s.openGlobalSearch);
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
+  const openShortcuts = useAppStore((s) => s.openShortcuts);
   const { restoreLastFolder, refresh, openFile, createUntitled } = useFileSystem();
 
   // Aplica tema no <html data-theme="...">
@@ -37,6 +39,7 @@ export default function App() {
   }, [theme]);
 
   useAutoSave();
+  useCrashRecovery();
   useCanvasPersistence();
   useSceneCardSync();
 
@@ -158,6 +161,15 @@ export default function App() {
         e.preventDefault();
         openSettings();
       }
+      // Ctrl+/ abre cheatsheet de atalhos. Padrao herdado de
+      // Slack/GitHub/Notion (US keyboards). `e.key === "/"` cobre
+      // o caso normal; em layouts pt-BR ABNT2, "?" tambem casa como
+      // alternativa pq o "/" exige Shift+Q. Mantemos ambos pra cobrir
+      // os dois casos sem ergonomia ruim.
+      if ((e.ctrlKey || e.metaKey) && (e.key === "/" || e.key === "?")) {
+        e.preventDefault();
+        openShortcuts();
+      }
       // Ctrl+T cria nova nota "Sem titulo" na raiz do projeto e abre
       // como aba ativa. Convencao classica de browsers/editores. Sem
       // pasta aberta, mostra toast (createUntitled cuida).
@@ -222,6 +234,7 @@ export default function App() {
     openCommandPalette,
     openGlobalSearch,
     openLocalHistory,
+    openShortcuts,
     openFile,
     createUntitled,
   ]);

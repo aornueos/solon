@@ -5,6 +5,7 @@ import { parseDocument, serializeDocument } from "../lib/frontmatter";
 import { renameCanvasSidecar, deleteCanvasSidecar } from "../lib/canvas";
 import { createSnapshotBeforeWrite } from "../lib/localHistory";
 import { flushEditor } from "../lib/editorRef";
+import { scanRecoveryDrafts } from "../lib/crashRecovery";
 import {
   applyOrder,
   loadOrder,
@@ -158,6 +159,7 @@ export function useFileSystem() {
           // Aba acompanha o arquivo aberto. Idempotente — se a aba ja
           // existe, addTab e' no-op (so foca via setActiveFile acima).
           useAppStore.getState().addTab(path, name);
+          useAppStore.getState().pushRecentFile(path, name);
         } catch (err) {
           console.error("Erro ao abrir arquivo:", err);
           useAppStore
@@ -183,6 +185,7 @@ export function useFileSystem() {
         const { meta, body } = parseDocument(content);
         setActiveFile(path, name, body, meta);
         useAppStore.getState().addTab(path, name);
+        useAppStore.getState().pushRecentFile(path, name);
       }
     },
     [setActiveFile]
@@ -192,7 +195,9 @@ export function useFileSystem() {
     async (path: string, content: string) => {
       if (isTauri) {
         try {
-          const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+          const { writeTextFile, rename, remove, exists } = await import(
+            "@tauri-apps/plugin-fs"
+          );
           const { rootFolder, localHistoryEnabled } = useAppStore.getState();
           if (localHistoryEnabled) {
             await createSnapshotBeforeWrite({
@@ -201,7 +206,57 @@ export function useFileSystem() {
               nextContent: content,
             });
           }
-          await writeTextFile(path, content);
+          // Escrita atomica: grava em `<path>.solon-tmp`, depois rename
+          // por cima do original. Se o processo crashar no meio, o
+          // original fica intacto e o `.solon-tmp` orfao pode ser
+          // descartado no proximo boot (ou ignorado — fica no FS sem
+          // mal).
+          //
+          // ANTES: `writeTextFile(path, content)` direto. Em crash
+          // durante a escrita o arquivo ficava truncado pela metade —
+          // pior cenario de data loss possivel (parece que salvou, mas
+          // metade do livro virou \0).
+          //
+          // O `rename` do plugin-fs faz syscall atomica no mesmo
+          // filesystem (todos os casos comuns: salvar onde ja' tem o
+          // .md). Cross-filesystem cai em copy+delete que nao e
+          // atomico, mas isso so' ocorre se o user mover o projeto pra
+          // disco diferente durante a sessao — caso raro e nao-critico.
+          const tmpPath = `${path}.solon-tmp`;
+          try {
+            // Limpa qualquer tmp orfao de uma sessao anterior — `rename`
+            // alguns SOs falha se o destino ja existe (Windows nao
+            // sobrescreve por default).
+            if (await exists(tmpPath)) {
+              await remove(tmpPath);
+            }
+          } catch {
+            /* tmp limpa best-effort */
+          }
+          await writeTextFile(tmpPath, content);
+          try {
+            await rename(tmpPath, path);
+          } catch (renameErr) {
+            // Fallback: se o rename falhar (FS readonly, antivirus
+            // lockou, etc), tenta escrita direta. Volta ao
+            // comportamento antigo — nao atomico mas a chance de crash
+            // entre as 2 chamadas e' baixa.
+            await writeTextFile(path, content);
+            try {
+              await remove(tmpPath);
+            } catch {
+              /* deixa o tmp; nao bloqueia o save */
+            }
+            console.warn("[save] rename atomico falhou, fallback direto:", renameErr);
+          }
+          // Apos save bem-sucedido, limpa o draft de crash recovery (se
+          // houver). O ciclo de "draft → save" fecha aqui.
+          try {
+            const { clearRecoveryDraft } = await import("../lib/crashRecovery");
+            await clearRecoveryDraft(rootFolder, path);
+          } catch {
+            /* recovery e' best-effort — falhas silenciosas */
+          }
         } catch (err) {
           console.error("Erro ao salvar arquivo:", err);
           // Save falha silenciosa = usuário acha que salvou e perde o
@@ -289,6 +344,21 @@ export function useFileSystem() {
           if (!ok) useAppStore.getState().closeTab(tab.path);
         }
       }
+
+      // Crash recovery: varre .solon/.recovery em busca de drafts cujo
+      // conteudo diverge do que esta no disco. Se houver, abre o dialog
+      // perguntando se o user quer recuperar. Roda apos restore do
+      // arquivo ativo pra que o dialog apareca por cima do estado
+      // estavel da app.
+      void scanRecoveryDrafts(last)
+        .then((drafts) => {
+          if (drafts.length > 0) {
+            useAppStore.getState().setPendingRecoveryDrafts(drafts);
+          }
+        })
+        .catch(() => {
+          /* recovery e' best-effort */
+        });
     } catch (err) {
       console.error("Erro ao restaurar pasta:", err);
     }
@@ -334,6 +404,56 @@ export function useFileSystem() {
       }
     },
     [refresh, openFile]
+  );
+
+  /**
+   * Duplica um arquivo `.md`/`.txt`. Nome do novo: `<base> (copia).<ext>`
+   * com sufixo numerico em colisao. Mesmo diretorio do original. Abre na
+   * aba ativa apos copiar — convencao "Duplicate" do macOS Finder.
+   *
+   * NAO copia o sidecar de canvas (`.canvas.json`) — duplicar canvases
+   * confundiria scene cards que apontam pra arquivo unico. Quem
+   * precisar do canvas tambem, copia manualmente via FS.
+   */
+  const duplicateFile = useCallback(
+    async (sourcePath: string) => {
+      if (!isTauri) return;
+      try {
+        const { readTextFile, writeTextFile, exists } = await import(
+          "@tauri-apps/plugin-fs"
+        );
+        if (!(await exists(sourcePath))) {
+          useAppStore
+            .getState()
+            .pushToast("error", "Arquivo de origem não existe mais.");
+          return;
+        }
+        const content = await readTextFile(sourcePath);
+        const parent = parentOf(sourcePath);
+        const sourceName = baseName(sourcePath);
+        const m = sourceName.match(/^(.*?)(\.(md|txt))?$/i);
+        const base = m?.[1] ?? sourceName;
+        const ext = m?.[2] ?? ".md";
+        // Procura nome livre: "base (copia).ext" → "base (copia 2).ext" ...
+        let candidate = `${base} (cópia)${ext}`;
+        let n = 2;
+        while (await exists(joinPath(parent, candidate))) {
+          candidate = `${base} (cópia ${n})${ext}`;
+          n += 1;
+          if (n > 999) break;
+        }
+        const newPath = joinPath(parent, candidate);
+        await writeTextFile(newPath, content);
+        await refresh();
+        await openFile(newPath, candidate);
+      } catch (err) {
+        console.error("Erro ao duplicar arquivo:", err);
+        useAppStore
+          .getState()
+          .pushToast("error", `Erro ao duplicar: ${describeError(err)}`);
+      }
+    },
+    [refresh, openFile],
   );
 
   const createFolder = useCallback(
@@ -484,6 +604,13 @@ export function useFileSystem() {
         for (const t of tabsBefore) {
           if (isSameOrDescendant(t.path, path)) {
             useAppStore.getState().closeTab(t.path);
+          }
+        }
+        // Mesmo tratamento pra recents — entries orfas confundem a Home.
+        const recentsBefore = useAppStore.getState().recentFiles;
+        for (const r of recentsBefore) {
+          if (isSameOrDescendant(r.path, path)) {
+            useAppStore.getState().removeRecentFile(r.path);
           }
         }
         if (activeFilePath && isSameOrDescendant(activeFilePath, path)) {
@@ -734,6 +861,7 @@ export function useFileSystem() {
     restoreLastFolder,
     createFile,
     createUntitled,
+    duplicateFile,
     createFolder,
     renameNode,
     deleteNode,

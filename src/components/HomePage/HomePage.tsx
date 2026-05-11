@@ -1,4 +1,4 @@
-import { ArrowRight, FolderOpen } from "lucide-react";
+import { ArrowRight, FolderOpen, FileText } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useAppStore, FileNode } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
@@ -31,7 +31,8 @@ export function HomePage() {
   const setActiveView = useAppStore((s) => s.setActiveView);
   const openPrompt = useAppStore((s) => s.openPrompt);
   const pushToast = useAppStore((s) => s.pushToast);
-  const { openFolder, createFile } = useFileSystem();
+  const recentFiles = useAppStore((s) => s.recentFiles);
+  const { openFolder, createFile, openFile } = useFileSystem();
 
   const allFiles = useMemo(() => flattenFiles(fileTree), [fileTree]);
   const folderName = useMemo(() => {
@@ -140,15 +141,27 @@ export function HomePage() {
           <UpdateBanner />
 
           {rootFolder ? (
-            <ProjectHero
-              folderName={folderName}
-              rootFolder={rootFolder}
-              stats={projectStats}
-              continueLabel={continueLabel}
-              onContinue={goEditor}
-              onNewFile={onNewFile}
-              onOpenFolder={openFolder}
-            />
+            <>
+              <ProjectHero
+                folderName={folderName}
+                rootFolder={rootFolder}
+                stats={projectStats}
+                continueLabel={continueLabel}
+                onContinue={goEditor}
+                onNewFile={onNewFile}
+                onOpenFolder={openFolder}
+              />
+              {recentFiles.length > 0 && (
+                <RecentsList
+                  files={recentFiles}
+                  rootFolder={rootFolder}
+                  onOpen={(path, name) => {
+                    void openFile(path, name);
+                    setActiveView("editor");
+                  }}
+                />
+              )}
+            </>
           ) : (
             <EmptyHero onOpenFolder={openFolder} />
           )}
@@ -311,6 +324,73 @@ function EmptyHero({ onOpenFolder }: { onOpenFolder: () => void }) {
         />
       </button>
     </>
+  );
+}
+
+/**
+ * Lista discreta dos últimos arquivos abertos. So' aparece quando ha
+ * 1+ recents — em projeto novo, fica oculta. Filtra entries cujo path
+ * nao começa com o rootFolder atual (recents de projetos anteriores
+ * nao deveriam vazar pra um projeto diferente). Cap visual em 5 entries
+ * mesmo que a store guarde ate 8 — Home prefere respiro.
+ */
+function RecentsList({
+  files,
+  rootFolder,
+  onOpen,
+}: {
+  files: { path: string; name: string }[];
+  rootFolder: string;
+  onOpen: (path: string, name: string) => void;
+}) {
+  const root = rootFolder.replace(/\\/g, "/").replace(/\/+$/, "");
+  const scoped = files
+    .filter((f) => {
+      const p = f.path.replace(/\\/g, "/");
+      return p === root || p.startsWith(`${root}/`);
+    })
+    .slice(0, 5);
+  if (scoped.length === 0) return null;
+
+  return (
+    <div className="mt-12 w-full max-w-md">
+      <div
+        className="text-[0.65rem] uppercase tracking-widest mb-2.5"
+        style={{ color: "var(--text-placeholder)" }}
+      >
+        Recentes
+      </div>
+      <ul className="space-y-0.5">
+        {scoped.map((f) => {
+          const display = f.name.replace(/\.(md|txt)$/i, "");
+          return (
+            <li key={f.path}>
+              <button
+                onClick={() => onOpen(f.path, f.name)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors hover:bg-opacity-50"
+                style={{
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "var(--bg-hover)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+                title={f.path}
+              >
+                <FileText
+                  size={12}
+                  style={{ color: "var(--text-placeholder)", flexShrink: 0 }}
+                />
+                <span className="truncate text-[0.78rem]">{display}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
