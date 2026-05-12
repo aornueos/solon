@@ -180,6 +180,19 @@ turndown.addRule("highlight", {
   },
 });
 
+turndown.addRule("editorImage", {
+  filter: "img",
+  replacement: (_, node) => {
+    const el = node as HTMLElement;
+    const src = el.getAttribute("data-solon-src") || el.getAttribute("src") || "";
+    if (!src) return "";
+    const alt = (el.getAttribute("alt") || "").replace(/]/g, "\\]");
+    const title = el.getAttribute("title");
+    const titlePart = title ? ` "${title.replace(/"/g, '\\"')}"` : "";
+    return `\n\n![${alt}](${src}${titlePart})\n\n`;
+  },
+});
+
 // Wikilinks `[[name]]` — quando a mark "wikilink" do TipTap esta
 // presente, o HTML tem `<a class="wikilink">name</a>` (ou
 // `data-wikilink="true"`). Capturamos antes do default link rule pra
@@ -230,6 +243,7 @@ const ALLOWED_TAGS = [
   // <mark> e' usado pelo Highlight extension. Sem isso o grifo
   // colorido seria stripado no save/load roundtrip.
   "mark",
+  "img",
   // <a> pra wikilinks (mark `[[name]]`). Roundtrip emite back pra
   // `[[name]]`; durante a edicao o WikilinkExtension reconhece o
   // <a.wikilink>.
@@ -262,6 +276,10 @@ const ALLOWED_ATTR = [
   // a wikilink toda — `class` e' o seletor real).
   "class",
   "data-wikilink",
+  "data-solon-src",
+  "src",
+  "alt",
+  "title",
   "role",
 ];
 
@@ -277,7 +295,7 @@ function sanitizeEditorHtml(html: string): string {
     ALLOWED_ATTR,
     // `style` saiu do FORBID porque virou whitelist (suporta text-align
     // e highlight color). Mantemos os outros vetores classicos de XSS.
-    FORBID_ATTR: ["srcdoc", "href", "src", "onerror", "onload"],
+    FORBID_ATTR: ["srcdoc", "href", "onerror", "onload"],
   });
 }
 

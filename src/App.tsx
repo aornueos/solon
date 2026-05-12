@@ -8,6 +8,7 @@ import { useCanvasPersistence } from "./hooks/useCanvasPersistence";
 import { useSceneCardSync } from "./hooks/useSceneCardSync";
 import { checkForUpdate } from "./lib/updater";
 import { flushEditor } from "./lib/editorRef";
+import { requestedFileFromUrl } from "./lib/windows";
 
 const isTauriRuntime = (): boolean =>
   typeof window !== "undefined" &&
@@ -32,6 +33,7 @@ export default function App() {
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
   const openShortcuts = useAppStore((s) => s.openShortcuts);
   const openExport = useAppStore((s) => s.openExport);
+  const openScratchpad = useAppStore((s) => s.openScratchpad);
   const toggleReadingMode = useAppStore((s) => s.toggleReadingMode);
   const { restoreLastFolder, refresh, openFile, createUntitled } = useFileSystem();
 
@@ -47,8 +49,14 @@ export default function App() {
 
   // Restaura última pasta aberta
   useEffect(() => {
-    restoreLastFolder();
-  }, [restoreLastFolder]);
+    void restoreLastFolder().then(async () => {
+      const requested = requestedFileFromUrl();
+      if (!requested) return;
+      useAppStore.setState({ openTabs: [] });
+      await openFile(requested.path, requested.name);
+      setActiveView(requested.view);
+    });
+  }, [openFile, restoreLastFolder, setActiveView]);
 
   // Update check no boot, com defer pra nao concorrer com bootstrap (lendo
   // pasta, montando editor, etc). 5s e suficiente pra app sentir snappy.
@@ -246,6 +254,17 @@ export default function App() {
         void createUntitled();
         return;
       }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        openScratchpad();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        const tab = useAppStore.getState().reopenClosedTab();
+        if (tab) void openFile(tab.path, tab.name);
+        return;
+      }
       // Ctrl+W fecha aba ativa. Se nao houver aba ativa, no-op (browser
       // fecharia a janela; nao queremos isso). Se a aba fechada era a
       // unica, limpa o arquivo ativo.
@@ -304,6 +323,7 @@ export default function App() {
     openLocalHistory,
     openShortcuts,
     openExport,
+    openScratchpad,
     toggleReadingMode,
     openFile,
     createUntitled,

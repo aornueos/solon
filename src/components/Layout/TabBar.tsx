@@ -1,8 +1,10 @@
-import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { forwardRef, useEffect, useRef } from "react";
+import { Columns2, ExternalLink, PanelRight, X } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { flushEditor } from "../../lib/editorRef";
+import { readDraggedTab, TAB_DND_MIME } from "../../lib/tabs";
+import { openTabInNewWindow } from "../../lib/windows";
 import clsx from "clsx";
 
 /**
@@ -29,6 +31,9 @@ export function TabBar() {
   const activePath = useAppStore((s) => s.activeFilePath);
   const saveStatus = useAppStore((s) => s.saveStatus);
   const closeTab = useAppStore((s) => s.closeTab);
+  const reorderTab = useAppStore((s) => s.reorderTab);
+  const setSplitPane = useAppStore((s) => s.setSplitPane);
+  const openContextMenu = useAppStore((s) => s.openContextMenu);
   const setActiveView = useAppStore((s) => s.setActiveView);
   const { openFile } = useFileSystem();
 
@@ -76,6 +81,45 @@ export function TabBar() {
     }
   };
 
+  const detachToNewWindow = async (path: string, name: string) => {
+    try {
+      await openTabInNewWindow({ path, name });
+      onClose(path);
+    } catch (err) {
+      useAppStore
+        .getState()
+        .pushToast("error", `Não foi possível abrir nova janela: ${String(err)}`);
+    }
+  };
+
+  const onTabContextMenu = (e: React.MouseEvent, path: string, name: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openContextMenu(e.clientX, e.clientY, [
+      {
+        label: "Abrir em nova janela",
+        icon: <ExternalLink size={13} />,
+        onClick: () => void detachToNewWindow(path, name),
+      },
+      {
+        label: "Abrir como referência à direita",
+        icon: <Columns2 size={13} />,
+        onClick: () => setSplitPane({ kind: "reference", path, name }),
+      },
+      {
+        label: "Canvas no painel direito",
+        icon: <PanelRight size={13} />,
+        onClick: () => setSplitPane({ kind: "canvas" }),
+      },
+      { kind: "separator" },
+      {
+        label: "Fechar aba",
+        shortcut: "Ctrl+W",
+        onClick: () => onClose(path),
+      },
+    ]);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -103,8 +147,12 @@ export function TabBar() {
             fullName={tab.name}
             isActive={isActive}
             isDirty={isDirty}
+            path={tab.path}
             onActivate={() => onActivate(tab.path, tab.name)}
             onClose={() => onClose(tab.path)}
+            onReorder={(sourcePath) => reorderTab(sourcePath, tab.path)}
+            onDetach={() => void detachToNewWindow(tab.path, tab.name)}
+            onContextMenu={(e) => onTabContextMenu(e, tab.path, tab.name)}
           />
         );
       })}
@@ -112,28 +160,69 @@ export function TabBar() {
   );
 }
 
-function Tab({
-  ref,
-  displayName,
-  fullName,
-  isActive,
-  isDirty,
-  onActivate,
-  onClose,
-}: {
-  ref?: React.Ref<HTMLDivElement>;
+interface TabProps {
+  path: string;
   displayName: string;
   fullName: string;
   isActive: boolean;
   isDirty: boolean;
   onActivate: () => void;
   onClose: () => void;
-}) {
+  onReorder: (targetPath: string) => void;
+  onDetach: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+}
+
+const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
+  {
+  path,
+  displayName,
+  fullName,
+  isActive,
+  isDirty,
+  onActivate,
+  onClose,
+  onReorder,
+  onDetach,
+  onContextMenu,
+},
+  ref,
+) {
   return (
     <div
       ref={ref}
       role="tab"
       aria-selected={isActive}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData(
+          TAB_DND_MIME,
+          JSON.stringify({ path, name: fullName }),
+        );
+      }}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(TAB_DND_MIME)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={(e) => {
+        const tab = readDraggedTab(e.dataTransfer);
+        if (!tab || tab.path === path) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onReorder(tab.path);
+      }}
+      onDragEnd={(e) => {
+        const outside =
+          e.clientX < 0 ||
+          e.clientY < 0 ||
+          e.clientX > window.innerWidth ||
+          e.clientY > window.innerHeight;
+        if (outside) onDetach();
+      }}
+      onContextMenu={onContextMenu}
       onMouseDown={(e) => {
         // Middle-click (button=1) fecha a aba. Tratamos no mouseDown pra
         // capturar antes do click — onAuxClick teoricamente pega isso mas
@@ -237,7 +326,7 @@ function Tab({
       </button>
     </div>
   );
-}
+});
 
 /**
  * Strip da extensao .md/.txt do nome de exibicao da aba — fica mais

@@ -3,7 +3,7 @@ import { useAppStore } from "../../store/useAppStore";
 import { SCENE_STATUSES, SceneStatus } from "../../types/scene";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { buildBacklinkIndex, backlinksFor } from "../../lib/backlinks";
-import { X, History, FileText } from "lucide-react";
+import { X, History, FileText, PanelRightOpen } from "lucide-react";
 import clsx from "clsx";
 
 /**
@@ -20,6 +20,8 @@ export function Inspector() {
   const patchSceneMeta = useAppStore((s) => s.patchSceneMeta);
   const wordCount = useAppStore((s) => s.wordCount);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
+  const floatingInspector = useAppStore((s) => s.floatingInspector.enabled);
+  const setFloatingInspector = useAppStore((s) => s.setFloatingInspector);
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
   const localHistoryEnabled = useAppStore((s) => s.localHistoryEnabled);
   const fileTree = useAppStore((s) => s.fileTree);
@@ -58,7 +60,11 @@ export function Inspector() {
   if (!activeFilePath) {
     return (
       <div className="flex flex-col h-full" style={shellStyle}>
-        <Header onClose={toggleInspector} />
+        <Header
+          onClose={toggleInspector}
+          floating={floatingInspector}
+          onFloat={() => setFloatingInspector(!floatingInspector)}
+        />
         <div className="flex-1 flex items-center justify-center px-4 text-center">
           <p
             className="text-[0.75rem] leading-relaxed"
@@ -80,7 +86,11 @@ export function Inspector() {
       className="flex flex-col h-full overflow-hidden"
       style={shellStyle}
     >
-      <Header onClose={toggleInspector} />
+      <Header
+        onClose={toggleInspector}
+        floating={floatingInspector}
+        onFloat={() => setFloatingInspector(!floatingInspector)}
+      />
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {/* Nome da cena */}
@@ -299,7 +309,15 @@ export function Inspector() {
   );
 }
 
-function Header({ onClose }: { onClose: () => void }) {
+function Header({
+  onClose,
+  floating,
+  onFloat,
+}: {
+  onClose: () => void;
+  floating: boolean;
+  onFloat: () => void;
+}) {
   const [hovered, setHovered] = useState(false);
   return (
     <div
@@ -312,20 +330,31 @@ function Header({ onClose }: { onClose: () => void }) {
       >
         Cena
       </span>
-      <button
-        onClick={onClose}
-        title="Fechar Inspector (Ctrl+Alt+I)"
-        aria-label="Fechar Inspector"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        className="p-1 rounded transition-colors"
-        style={{
-          background: hovered ? "var(--bg-hover)" : "transparent",
-          color: hovered ? "var(--text-secondary)" : "var(--text-muted)",
-        }}
-      >
-        <X size={12} />
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={onFloat}
+          title={floating ? "Acoplar Inspector" : "Flutuar Inspector"}
+          aria-label={floating ? "Acoplar Inspector" : "Flutuar Inspector"}
+          className="p-1 rounded transition-colors"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <PanelRightOpen size={12} />
+        </button>
+        <button
+          onClick={onClose}
+          title="Fechar Inspector (Ctrl+Alt+I)"
+          aria-label="Fechar Inspector"
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          className="p-1 rounded transition-colors"
+          style={{
+            background: hovered ? "var(--bg-hover)" : "transparent",
+            color: hovered ? "var(--text-secondary)" : "var(--text-muted)",
+          }}
+        >
+          <X size={12} />
+        </button>
+      </div>
     </div>
   );
 }

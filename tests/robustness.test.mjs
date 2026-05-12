@@ -173,4 +173,18 @@ describe("editor markdown bridge", () => {
     const md = htmlToMarkdown("<p>Um</p><p><br></p><p>Dois</p>");
     assert.match(md, /Um\n\n<p><br><\/p>\n\nDois/);
   });
+
+  it("round-trips inline editor images through .solon assets", () => {
+    const md = htmlToMarkdown(
+      '<img src="blob:preview" data-solon-src=".solon/assets/ref.png" alt="Mapa">',
+    );
+    assert.match(md, /!\[Mapa\]\(\.solon\/assets\/ref\.png\)/);
+    assert.match(markdownToHtml(md), /<img[^>]+src="\.solon\/assets\/ref\.png"/);
+  });
+
+  it("keeps inline code markup loadable by the editor schema", () => {
+    const html = markdownToHtml("Use `atalho` aqui.");
+    assert.match(html, /<code>atalho<\/code>/);
+    assert.match(htmlToMarkdown(html), /`atalho`/);
+  });
 });

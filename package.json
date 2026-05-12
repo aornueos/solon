@@ -1,7 +1,7 @@
 {
   "name": "solon",
   "private": true,
-  "version": "0.8.1",
+  "version": "0.8.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -29,6 +29,7 @@
     "@tiptap/extension-bold": "^2.10.3",
     "@tiptap/extension-bullet-list": "^2.10.3",
     "@tiptap/extension-character-count": "^2.10.3",
+    "@tiptap/extension-code": "^2.27.2",
     "@tiptap/extension-code-block": "^2.10.3",
     "@tiptap/extension-document": "^2.10.3",
     "@tiptap/extension-heading": "^2.10.3",

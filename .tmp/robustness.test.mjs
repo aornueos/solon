@@ -23559,6 +23559,30 @@ turndown.addRule("highlight", {
     return `<mark>${content}</mark>`;
   }
 });
+turndown.addRule("editorImage", {
+  filter: "img",
+  replacement: (_, node) => {
+    const el = node;
+    const src = el.getAttribute("data-solon-src") || el.getAttribute("src") || "";
+    if (!src) return "";
+    const alt = (el.getAttribute("alt") || "").replace(/]/g, "\\]");
+    const title = el.getAttribute("title");
+    const titlePart = title ? ` "${title.replace(/"/g, '\\"')}"` : "";
+    return `
+
+![${alt}](${src}${titlePart})
+
+`;
+  }
+});
+turndown.addRule("wikilink", {
+  filter: (node) => {
+    if (node.nodeName !== "A") return false;
+    const el = node;
+    return el.classList.contains("wikilink") || el.getAttribute("data-wikilink") === "true";
+  },
+  replacement: (content) => `[[${content}]]`
+});
 for (const level of [1, 2, 3, 4, 5, 6]) {
   turndown.addRule(`heading${level}WithAlign`, {
     filter: (node) => {
@@ -23603,7 +23627,12 @@ var ALLOWED_TAGS = [
   "td",
   // <mark> e' usado pelo Highlight extension. Sem isso o grifo
   // colorido seria stripado no save/load roundtrip.
-  "mark"
+  "mark",
+  "img",
+  // <a> pra wikilinks (mark `[[name]]`). Roundtrip emite back pra
+  // `[[name]]`; durante a edicao o WikilinkExtension reconhece o
+  // <a.wikilink>.
+  "a"
 ];
 var ALLOWED_ATTR = [
   "colspan",
@@ -23611,7 +23640,19 @@ var ALLOWED_ATTR = [
   "colwidth",
   "align",
   "data-indent",
-  "style"
+  "style",
+  // Wikilink: o `class="wikilink"` + `data-wikilink="true"` viaja
+  // junto do <a>. `role` mantemos pra acessibilidade. `href` fica
+  // FORBID porque o click eh interceptado pelo Editor (javascript:
+  // void(0) eh tratado como vazio pra que DOMPurify nao bloqueie
+  // a wikilink toda — `class` e' o seletor real).
+  "class",
+  "data-wikilink",
+  "data-solon-src",
+  "src",
+  "alt",
+  "title",
+  "role"
 ];
 function sanitizeEditorHtml(html3) {
   const purifier = purify;
@@ -23623,12 +23664,19 @@ function sanitizeEditorHtml(html3) {
     ALLOWED_ATTR,
     // `style` saiu do FORBID porque virou whitelist (suporta text-align
     // e highlight color). Mantemos os outros vetores classicos de XSS.
-    FORBID_ATTR: ["srcdoc", "href", "src", "onerror", "onload"]
+    FORBID_ATTR: ["srcdoc", "href", "onerror", "onload"]
+  });
+}
+function injectWikilinks(md) {
+  return md.replace(/\[\[([^\]\n]+)\]\]/g, (_, target) => {
+    const safe = String(target).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    return `<a class="wikilink" data-wikilink="true" role="link">${safe}</a>`;
   });
 }
 function markdownToHtml(md) {
   if (!md) return "";
-  const rawHtml = marked.parse(md, { async: false });
+  const withWikilinks = injectWikilinks(md);
+  const rawHtml = marked.parse(withWikilinks, { async: false });
   const withIndent = rawHtml.replace(
     new RegExp(`<p([^>]*)>${EM_SPACE}`, "g"),
     '<p data-indent="true"$1>'
@@ -23783,6 +23831,18 @@ describe("editor markdown bridge", () => {
   it("preserves empty paragraphs represented with br", () => {
     const md = htmlToMarkdown("<p>Um</p><p><br></p><p>Dois</p>");
     assert.match(md, /Um\n\n<p><br><\/p>\n\nDois/);
+  });
+  it("round-trips inline editor images through .solon assets", () => {
+    const md = htmlToMarkdown(
+      '<img src="blob:preview" data-solon-src=".solon/assets/ref.png" alt="Mapa">'
+    );
+    assert.match(md, /!\[Mapa\]\(\.solon\/assets\/ref\.png\)/);
+    assert.match(markdownToHtml(md), /<img[^>]+src="\.solon\/assets\/ref\.png"/);
+  });
+  it("keeps inline code markup loadable by the editor schema", () => {
+    const html3 = markdownToHtml("Use `atalho` aqui.");
+    assert.match(html3, /<code>atalho<\/code>/);
+    assert.match(htmlToMarkdown(html3), /`atalho`/);
   });
 });
 /*! Bundled license information:

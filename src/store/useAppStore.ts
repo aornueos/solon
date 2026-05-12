@@ -143,6 +143,19 @@ export interface OpenTab {
   name: string;
 }
 
+export type SplitPaneState =
+  | { kind: "none" }
+  | { kind: "reference"; path: string; name: string }
+  | { kind: "canvas" };
+
+export interface FloatingInspectorState {
+  enabled: boolean;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /** Draft de crash recovery (vindo do lib/crashRecovery). Espelhado aqui
  *  pra evitar import circular na store. */
 export interface RecoveryDraftEntry {
@@ -169,6 +182,15 @@ interface AppState {
   sceneMeta: SceneMeta;
   /** Abas abertas. A aba ativa e' aquela cujo `path === activeFilePath`. */
   openTabs: OpenTab[];
+  /** Pilha curta de abas fechadas para Ctrl+Shift+T. */
+  closedTabs: OpenTab[];
+  /** Split pane transiente desta janela. */
+  splitPane: SplitPaneState;
+  /** Scratchpad efemero: nao vira arquivo ate o usuario decidir salvar. */
+  scratchpadOpen: boolean;
+  scratchpadText: string;
+  /** Inspector flutuante, independente do painel direito fixo. */
+  floatingInspector: FloatingInspectorState;
   /** Drafts de crash recovery pendentes — settados no boot quando
    *  `scanRecoveryDrafts` encontra divergencias. Dispara o
    *  `RecoveryDialog` no AppLayout enquanto for nao-vazio. */
@@ -325,9 +347,18 @@ interface AppState {
   closeTab: (path: string) => string | null;
   /** Atualiza path/name de uma aba apos rename ou move. */
   renameTab: (oldPath: string, newPath: string, newName: string) => void;
+  reorderTab: (sourcePath: string, targetPath: string) => void;
+  reopenClosedTab: () => OpenTab | null;
   /** Renomeia em massa quando uma pasta foi movida/renomeada — todos os
    *  paths que comecam com `oldPrefix` sao reescritos. */
   rebaseTabs: (oldPrefix: string, newPrefix: string) => void;
+  setSplitPane: (pane: SplitPaneState) => void;
+  closeSplitPane: () => void;
+  openScratchpad: () => void;
+  closeScratchpad: () => void;
+  setScratchpadText: (text: string) => void;
+  setFloatingInspector: (enabled: boolean) => void;
+  setFloatingInspectorRect: (rect: Partial<FloatingInspectorState>) => void;
   /** Settar drafts pendentes — usado pelo `restoreLastFolder` apos
    *  varredura de recovery. UI consome via RecoveryDialog. */
   setPendingRecoveryDrafts: (drafts: RecoveryDraftEntry[]) => void;
@@ -428,6 +459,9 @@ const THEME_KEY = "solon:theme";
 const OPEN_TABS_KEY = "solon:openTabs";
 const RECENT_FILES_KEY = "solon:recentFiles";
 const RECENT_FILES_MAX = 8;
+const IS_DETACHED_WINDOW =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("solonWindow") === "1";
 
 function loadRecentFiles(): RecentFile[] {
   try {
@@ -458,6 +492,7 @@ function saveRecentFiles(files: RecentFile[]): void {
 }
 
 function loadOpenTabs(): OpenTab[] {
+  if (IS_DETACHED_WINDOW) return [];
   try {
     const raw = localStorage.getItem(OPEN_TABS_KEY);
     if (!raw) return [];
@@ -477,6 +512,7 @@ function loadOpenTabs(): OpenTab[] {
 }
 
 function saveOpenTabs(tabs: OpenTab[]): void {
+  if (IS_DETACHED_WINDOW) return;
   try {
     localStorage.setItem(OPEN_TABS_KEY, JSON.stringify(tabs));
   } catch {
@@ -738,6 +774,17 @@ export const useAppStore = create<AppState>((set) => ({
   fileBody: "",
   sceneMeta: {},
   openTabs: loadOpenTabs(),
+  closedTabs: [],
+  splitPane: { kind: "none" },
+  scratchpadOpen: false,
+  scratchpadText: "",
+  floatingInspector: {
+    enabled: false,
+    x: 820,
+    y: 96,
+    width: 320,
+    height: 560,
+  },
   pendingRecoveryDrafts: [],
   recentFiles: loadRecentFiles(),
   rootFolder: null,
@@ -825,10 +872,12 @@ export const useAppStore = create<AppState>((set) => ({
     // restore no proximo boot. Mesmo padrao do `solon:rootFolder` mais
     // acima — chave separada porque arquivo pode mudar com mais
     // frequencia que pasta.
-    try {
+    if (!IS_DETACHED_WINDOW) {
+      try {
       localStorage.setItem("solon:lastFile", path);
-    } catch {
+      } catch {
       /* storage cheio ou bloqueado — ignora */
+      }
     }
     set({
       activeFilePath: path,
@@ -851,6 +900,7 @@ export const useAppStore = create<AppState>((set) => ({
     set((s) => {
       const idx = s.openTabs.findIndex((t) => t.path === path);
       if (idx === -1) return s;
+      const closed = s.openTabs[idx];
       const next = s.openTabs.filter((_, i) => i !== idx);
       saveOpenTabs(next);
       // Se a aba fechada era a ativa, descobre quem assume o foco —
@@ -862,7 +912,12 @@ export const useAppStore = create<AppState>((set) => ({
       } else {
         nextActive = s.activeFilePath;
       }
-      return { openTabs: next };
+      return {
+        openTabs: next,
+        closedTabs: closed
+          ? [closed, ...s.closedTabs.filter((t) => t.path !== closed.path)].slice(0, 12)
+          : s.closedTabs,
+      };
     });
     return nextActive;
   },
@@ -876,6 +931,34 @@ export const useAppStore = create<AppState>((set) => ({
       saveOpenTabs(next);
       return { openTabs: next };
     }),
+
+  reorderTab: (sourcePath, targetPath) =>
+    set((s) => {
+      if (sourcePath === targetPath) return s;
+      const from = s.openTabs.findIndex((t) => t.path === sourcePath);
+      const to = s.openTabs.findIndex((t) => t.path === targetPath);
+      if (from === -1 || to === -1) return s;
+      const next = s.openTabs.slice();
+      const [tab] = next.splice(from, 1);
+      next.splice(to, 0, tab);
+      saveOpenTabs(next);
+      return { openTabs: next };
+    }),
+
+  reopenClosedTab: () => {
+    let reopened: OpenTab | null = null;
+    set((s) => {
+      const [tab, ...rest] = s.closedTabs;
+      if (!tab) return s;
+      reopened = tab;
+      const nextTabs = s.openTabs.some((t) => t.path === tab.path)
+        ? s.openTabs
+        : [...s.openTabs, tab];
+      saveOpenTabs(nextTabs);
+      return { openTabs: nextTabs, closedTabs: rest };
+    });
+    return reopened;
+  },
 
   rebaseTabs: (oldPrefix, newPrefix) =>
     set((s) => {
@@ -897,6 +980,24 @@ export const useAppStore = create<AppState>((set) => ({
       saveOpenTabs(next);
       return { openTabs: next };
     }),
+
+  setSplitPane: (pane) => set({ splitPane: pane }),
+  closeSplitPane: () => set({ splitPane: { kind: "none" } }),
+  openScratchpad: () => set({ scratchpadOpen: true }),
+  closeScratchpad: () => set({ scratchpadOpen: false }),
+  setScratchpadText: (text) => set({ scratchpadText: text }),
+  setFloatingInspector: (enabled) =>
+    set((s) => ({
+      floatingInspector: { ...s.floatingInspector, enabled },
+      isInspectorOpen: enabled ? true : s.isInspectorOpen,
+    })),
+  setFloatingInspectorRect: (rect) =>
+    set((s) => ({
+      floatingInspector: {
+        ...s.floatingInspector,
+        ...rect,
+      },
+    })),
 
   setPendingRecoveryDrafts: (drafts) => set({ pendingRecoveryDrafts: drafts }),
   clearPendingRecoveryDrafts: () => set({ pendingRecoveryDrafts: [] }),

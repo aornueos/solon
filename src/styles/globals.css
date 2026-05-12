@@ -409,6 +409,24 @@
 .ProseMirror strong { font-weight: 700; color: var(--text-primary); }
 .ProseMirror em { font-style: italic; }
 
+.ProseMirror img.solon-editor-image,
+.solon-reference-pane img {
+  display: block;
+  max-width: min(100%, 720px);
+  max-height: 520px;
+  width: auto;
+  height: auto;
+  margin: 1.25rem auto;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
+.ProseMirror img.solon-editor-image.ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 /* ── Listas — Tailwind preflight remove list-style, restauramos ── */
 .ProseMirror ul {
   list-style: disc outside;

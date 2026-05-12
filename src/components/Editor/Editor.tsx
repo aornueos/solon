@@ -11,6 +11,7 @@ import Blockquote from "@tiptap/extension-blockquote";
 import BulletList from "@tiptap/extension-bullet-list";
 import OrderedList from "@tiptap/extension-ordered-list";
 import ListItem from "@tiptap/extension-list-item";
+import Code from "@tiptap/extension-code";
 import CodeBlock from "@tiptap/extension-code-block";
 import HorizontalRule from "@tiptap/extension-horizontal-rule";
 import History from "@tiptap/extension-history";
@@ -44,6 +45,9 @@ import { FindBar } from "./FindBar";
 import { SpellcheckExtension } from "./SpellcheckExtension";
 import { FindHighlightExtension } from "./FindHighlightExtension";
 import { WikilinkAutocomplete } from "./WikilinkAutocomplete";
+import { EditorImageExtension } from "./EditorImageExtension";
+import { resolveEditorImageHtml, saveImageForEditor } from "../../lib/editorImages";
+import { loadSnippets } from "../../lib/snippets";
 
 export function Editor() {
   // Seletores granulares: evita re-render do editor ao mudar sidebarWidth,
@@ -51,6 +55,7 @@ export function Editor() {
   // das deps do useEffect de load — lemos via getState quando trocamos de
   // arquivo pra não rodar setContent em loop durante a digitação.
   const activeFilePath = useAppStore((s) => s.activeFilePath);
+  const rootFolder = useAppStore((s) => s.rootFolder);
   const focusMode = useAppStore((s) => s.focusMode);
   const setHeadings = useAppStore((s) => s.setHeadings);
   const setWordCount = useAppStore((s) => s.setWordCount);
@@ -93,6 +98,33 @@ export function Editor() {
   // (com {passive: false} pra poder preventDefault o scroll quando
   // Ctrl ta pressionado e a gente quer transformar em zoom).
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const snippetsRef = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadSnippets(rootFolder).then((snippets) => {
+      if (!cancelled) snippetsRef.current = snippets;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [rootFolder]);
+
+  const expandSnippetAtCursor = (view: any, event: KeyboardEvent): boolean => {
+    if (![" ", "Enter", "Tab"].includes(event.key)) return false;
+    const { state, dispatch } = view;
+    const { from, empty } = state.selection;
+    if (!empty) return false;
+    const start = Math.max(0, from - 64);
+    const before = state.doc.textBetween(start, from, "\n", "\n");
+    const match = before.match(/(;[\p{L}\d_-]+)$/u);
+    if (!match) return false;
+    const trigger = match[1];
+    const replacement = snippetsRef.current[trigger];
+    if (!replacement) return false;
+    dispatch(state.tr.insertText(replacement, from - trigger.length, from));
+    return event.key === "Tab";
+  };
 
   const editor = useEditor({
     extensions: [
@@ -107,6 +139,7 @@ export function Editor() {
       BulletList,
       OrderedList,
       ListItem,
+      Code,
       CodeBlock,
       HorizontalRule,
       History,
@@ -146,6 +179,7 @@ export function Editor() {
       // sua historia..." aparecendo. Mantemos a Extension instalada
       // (e' lightweight) caso queiramos placeholders dinamicos por nota
       // no futuro (ex: do frontmatter), mas por agora fica em branco.
+      EditorImageExtension,
       Placeholder.configure({
         placeholder: "",
       }),
@@ -156,6 +190,7 @@ export function Editor() {
         spellcheck: "false",
         lang: "pt-BR",
       },
+      handleKeyDown: (view, event) => expandSnippetAtCursor(view, event),
     },
     onUpdate: ({ editor }) => {
       if (isLoadingRef.current) return;
@@ -242,23 +277,33 @@ export function Editor() {
     lastLoadedPathRef.current = activeFilePath;
 
     isLoadingRef.current = true;
+    let cancelled = false;
+    let raf: number | null = null;
     const body = useAppStore.getState().fileBody;
     const html = markdownToHtml(body);
-    editor.commands.setContent(html, false);
-    extractHeadings(editor, setHeadings);
 
-    const text = editor.getText();
-    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-    setWordCount(words, text.length);
+    void resolveEditorImageHtml(html, rootFolder).then((resolvedHtml) => {
+      if (cancelled || lastLoadedPathRef.current !== activeFilePath) return;
+      editor.commands.setContent(resolvedHtml, false);
+      extractHeadings(editor, setHeadings);
+
+      const text = editor.getText();
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      setWordCount(words, text.length);
+
+      raf = requestAnimationFrame(() => {
+        isLoadingRef.current = false;
+      });
+    });
 
     // Aguarda o próximo microtask — onUpdate do TipTap ainda dispara após
     // setContent, então precisamos segurar `isLoadingRef` até passar esse
     // tick. Antes usávamos 50ms arbitrário que racava em máquinas lentas.
-    const raf = requestAnimationFrame(() => {
-      isLoadingRef.current = false;
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [activeFilePath, editor, setHeadings, setWordCount]);
+    return () => {
+      cancelled = true;
+      if (raf != null) cancelAnimationFrame(raf);
+    };
+  }, [activeFilePath, editor, rootFolder, setHeadings, setWordCount]);
 
   // Mantemos o spellcheck nativo do WebView desligado. Ele costuma seguir
   // o idioma do sistema/Edge e marcar portugues correto como erro; o Solon
@@ -273,6 +318,53 @@ export function Editor() {
   useEffect(() => {
     setFindOpen(false);
   }, [activeFilePath]);
+
+  useEffect(() => {
+    if (!editor || !rootFolder) return;
+
+    const insertImageFile = async (file: File) => {
+      if (!file.type.startsWith("image/")) return false;
+      const saved = await saveImageForEditor(rootFolder, file);
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "image",
+          attrs: {
+            src: saved.displaySrc,
+            dataSolonSrc: saved.markdownSrc,
+            alt: file.name.replace(/\.(png|jpe?g|gif|webp|svg)$/i, ""),
+          },
+        })
+        .run();
+      return true;
+    };
+
+    const onPaste = (event: ClipboardEvent) => {
+      const items = Array.from(event.clipboardData?.items ?? []);
+      const item = items.find((it) => it.type.startsWith("image/"));
+      const file = item?.getAsFile();
+      if (!file) return;
+      event.preventDefault();
+      void insertImageFile(file);
+    };
+
+    const onDrop = (event: DragEvent) => {
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      const image = files.find((file) => file.type.startsWith("image/"));
+      if (!image) return;
+      event.preventDefault();
+      void insertImageFile(image);
+    };
+
+    const dom = editor.view.dom;
+    dom.addEventListener("paste", onPaste);
+    dom.addEventListener("drop", onDrop);
+    return () => {
+      dom.removeEventListener("paste", onPaste);
+      dom.removeEventListener("drop", onDrop);
+    };
+  }, [editor, rootFolder]);
 
   useEffect(() => {
     if (!editor || !activeFilePath) return;
