@@ -152,7 +152,15 @@ export default function App() {
       }
       if (e.key === "F11") {
         e.preventDefault();
-        toggleFocusMode();
+        // Se reading mode esta ligado, F11 PRIORIZA sair de reading
+        // (panic-key behavior). Sem isso, o user em reading sem chrome
+        // visivel apertaria F11 esperando algum efeito e nao acharia
+        // o atalho real (Ctrl+Shift+R).
+        if (useAppStore.getState().readingMode) {
+          toggleReadingMode();
+        } else {
+          toggleFocusMode();
+        }
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "l" || e.key === "L")) {
         e.preventDefault();
@@ -194,9 +202,33 @@ export default function App() {
         e.preventDefault();
         toggleReadingMode();
       }
+      // PANIC KEY — Ctrl+Shift+Esc reseta TODOS os modos especiais e
+      // restaura o chrome ao default. Pensado pra cenarios onde o user
+      // fica "preso" num modo (reading sem chrome visivel) sem saber
+      // como sair. Nao toca em settings persistidas (typewriter,
+      // theme, paper) — so' nos modos transientes.
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "Escape") {
+        e.preventDefault();
+        useAppStore.setState({
+          readingMode: false,
+          focusMode: false,
+          isSidebarOpen: true,
+          isOutlineOpen: true,
+          isInspectorOpen: true,
+        });
+        return;
+      }
+      // F11 alterna focus mode normalmente, MAS se reading mode estiver
+      // ligado, F11 vira "sair do reading mode" — comportamento panic
+      // pra muscle memory de fullscreen toggle. Sem isso, o user que
+      // esquecer Ctrl+Shift+R nao acha o atalho.
+      // (F11 ja' eh tratado acima nesse mesmo handler — adicionamos a
+      // logica extra dentro do bloco F11 abaixo.)
+
       // Esc em reading mode sai do modo (mesmo padrao de presentation
       // mode em browsers/Keynote). Nao bloqueia outros usos do Esc
       // (dialogs, etc) — esses tem listeners proprios com stopPropagation.
+      // Capture phase pra sair ANTES de outros listeners consumirem o Esc.
       if (e.key === "Escape" && useAppStore.getState().readingMode) {
         // So' sai se nao tem texto selecionado ou dialog aberto. Dialogs
         // ja se fecham primeiro via seus proprios handlers — se chegou

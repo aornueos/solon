@@ -609,12 +609,14 @@ export function Editor() {
           style={{
             ...editorVars,
             maxWidth: editorMaxWidth,
-            // Typewriter mode adiciona padding-top/bottom de 40vh pra
-            // poder centralizar mesmo em docs curtos (caret pode rolar
-            // ate 40% da viewport pra cima do conteudo real e ate 40%
-            // pra baixo). Sem typewriter, mantemos py-12 do padrao.
-            paddingTop: typewriterMode ? "40vh" : "3rem",
-            paddingBottom: typewriterMode ? "40vh" : "3rem",
+            // Typewriter mode adiciona padding pra que o caret possa
+            // centralizar mesmo em docs curtos. Antes era 40vh — muito
+            // agressivo: em docs com poucas linhas, o conteudo aparecia
+            // empurrado pro centro/fundo e podia parecer "tela vazia".
+            // 30vh dá folga sem virar pagina em branco. min(30vh, 220px)
+            // limita em monitores muito altos (4K vertical).
+            paddingTop: typewriterMode ? "min(30vh, 220px)" : "3rem",
+            paddingBottom: typewriterMode ? "min(30vh, 220px)" : "3rem",
             minHeight: "100%",
           } as React.CSSProperties}
         >

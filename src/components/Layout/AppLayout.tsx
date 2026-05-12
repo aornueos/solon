@@ -185,18 +185,23 @@ export function AppLayout() {
           type="button"
           onClick={toggleReadingMode}
           aria-label="Sair do modo leitura"
-          title="Sair do modo leitura (Esc)"
-          className="fixed top-3 right-3 z-[90] p-1.5 rounded-full transition-opacity"
+          title="Sair do modo leitura (Esc, F11 ou Ctrl+Shift+R)"
+          className="fixed top-3 right-3 z-[90] flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-opacity text-[0.72rem]"
           style={{
+            // Opacidade alta (0.85) — antes era 0.3, quase invisivel
+            // no dark theme. Em fundo escuro, 0.3 dava preto-em-preto
+            // e o user nao via o botao. Confiavel > sutil.
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
-            color: "var(--text-muted)",
-            opacity: 0.3,
+            border: "1px solid var(--accent)",
+            color: "var(--text-primary)",
+            opacity: 0.85,
+            boxShadow: "var(--shadow-md)",
           }}
           onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.opacity = "1")}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.opacity = "0.3")}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.opacity = "0.85")}
         >
           <X size={12} />
+          <span>Sair</span>
         </button>
       )}
       <ContextMenuLayer />
