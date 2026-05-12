@@ -180,6 +180,25 @@ turndown.addRule("highlight", {
   },
 });
 
+// Wikilinks `[[name]]` — quando a mark "wikilink" do TipTap esta
+// presente, o HTML tem `<a class="wikilink">name</a>` (ou
+// `data-wikilink="true"`). Capturamos antes do default link rule pra
+// emitir a sintaxe `[[...]]` em vez de `[name](href)`. Ordem importa:
+// essa rule tem que vir antes da default; turndown testa em ordem
+// inversa de adicao, entao adicionamos POR ULTIMO entre as link rules
+// (qualquer rule de link aqui em cima dispara antes do default).
+turndown.addRule("wikilink", {
+  filter: (node) => {
+    if (node.nodeName !== "A") return false;
+    const el = node as HTMLElement;
+    return (
+      el.classList.contains("wikilink") ||
+      el.getAttribute("data-wikilink") === "true"
+    );
+  },
+  replacement: (content) => `[[${content}]]`,
+});
+
 // Headings com text-align: emite HTML literal (perde sintaxe `#` mas
 // preserva alinhamento). Turndown default nao suporta atributos em
 // headings markdown.
@@ -211,6 +230,10 @@ const ALLOWED_TAGS = [
   // <mark> e' usado pelo Highlight extension. Sem isso o grifo
   // colorido seria stripado no save/load roundtrip.
   "mark",
+  // <a> pra wikilinks (mark `[[name]]`). Roundtrip emite back pra
+  // `[[name]]`; durante a edicao o WikilinkExtension reconhece o
+  // <a.wikilink>.
+  "a",
 ];
 
 /**
@@ -232,6 +255,14 @@ const ALLOWED_ATTR = [
   "align",
   "data-indent",
   "style",
+  // Wikilink: o `class="wikilink"` + `data-wikilink="true"` viaja
+  // junto do <a>. `role` mantemos pra acessibilidade. `href` fica
+  // FORBID porque o click eh interceptado pelo Editor (javascript:
+  // void(0) eh tratado como vazio pra que DOMPurify nao bloqueie
+  // a wikilink toda — `class` e' o seletor real).
+  "class",
+  "data-wikilink",
+  "role",
 ];
 
 function sanitizeEditorHtml(html: string): string {
@@ -250,9 +281,36 @@ function sanitizeEditorHtml(html: string): string {
   });
 }
 
+/**
+ * Substitui ocorrencias de `[[name]]` por `<a class="wikilink" ...>...</a>`
+ * ANTES do marked parsear. Sem isso, o marked pode entender o conteudo
+ * como link reference style ou ignorar — qualquer um quebra o
+ * roundtrip. Fazendo a substituicao primeiro, garantimos que o output
+ * eh um `<a>` que a WikilinkExtension reconhece.
+ *
+ * Regra: `[[X]]` onde X nao tem `]` ou newline. Caso de uso comum:
+ * nome de arquivo curto. Edge cases (markdown que quer LITERAL `[[`)
+ * podem usar escape `\[\[` que esta fora do escopo agora.
+ */
+function injectWikilinks(md: string): string {
+  return md.replace(/\[\[([^\]\n]+)\]\]/g, (_, target) => {
+    const safe = String(target)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+    return `<a class="wikilink" data-wikilink="true" role="link">${safe}</a>`;
+  });
+}
+
 export function markdownToHtml(md: string): string {
   if (!md) return "";
-  const rawHtml = marked.parse(md, { async: false }) as string;
+  // 1) wikilinks PRIMEIRO — substitui [[...]] por <a class="wikilink">
+  //    antes do marked, pra que o parser markdown trate como HTML
+  //    inline (passa direto sem interpretar).
+  // 2) marked converte o resto pra HTML.
+  const withWikilinks = injectWikilinks(md);
+  const rawHtml = marked.parse(withWikilinks, { async: false }) as string;
   // Reverse do marker EM SPACE: paragrafos cujo conteudo comeca com EM
   // SPACE sao identados. A regex pega `<p>` ou `<p ... >` (caso
   // marked adicione atributos no futuro). Removemos o marker pra que

@@ -261,6 +261,10 @@ interface AppState {
    *  Sidebar pra montar a view filtrada sem re-indexar. null =
    *  ainda nao indexado nesta sessao. */
   tagIndex: Map<string, string[]> | null;
+  /** Cache do index de wikilinks (target normalizado -> arquivos
+   *  fonte). Populado por buildBacklinkIndex sob demanda (quando o
+   *  Inspector vai exibir backlinks). Reset em troca de pasta. */
+  backlinkIndex: Map<string, { path: string; name: string }[]> | null;
   /** Context menu ativo (custom, substitui o nativo do WebView). */
   activeContextMenu: ActiveContextMenu | null;
   /** Liga/desliga spellcheck visual (red underlines) no editor. */
@@ -401,6 +405,9 @@ interface AppState {
   closeShortcuts: () => void;
   setActiveTagFilter: (tag: string | null) => void;
   setTagIndex: (index: Map<string, string[]> | null) => void;
+  setBacklinkIndex: (
+    index: Map<string, { path: string; name: string }[]> | null,
+  ) => void;
   openExport: () => void;
   closeExport: () => void;
   /** Reset de todas as preferencias pro default (zoom 100%, theme light,
@@ -768,6 +775,7 @@ export const useAppStore = create<AppState>((set) => ({
   showExport: false,
   activeTagFilter: null,
   tagIndex: null,
+  backlinkIndex: null,
   activeContextMenu: null,
   spellcheckEnabled: loadBoolPref(SPELLCHECK_KEY, DEFAULT_SPELLCHECK),
   editorMaxWidth: loadEditorMaxWidth(),
@@ -1088,6 +1096,7 @@ export const useAppStore = create<AppState>((set) => ({
   closeShortcuts: () => set({ showShortcuts: false }),
   setActiveTagFilter: (tag) => set({ activeTagFilter: tag }),
   setTagIndex: (idx) => set({ tagIndex: idx }),
+  setBacklinkIndex: (idx) => set({ backlinkIndex: idx }),
   openExport: () => set({ showExport: true }),
   closeExport: () => set({ showExport: false }),
   resetSettings: () => {

@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { SCENE_STATUSES, SceneStatus } from "../../types/scene";
-import { X, History } from "lucide-react";
+import { useFileSystem } from "../../hooks/useFileSystem";
+import { buildBacklinkIndex, backlinksFor } from "../../lib/backlinks";
+import { X, History, FileText } from "lucide-react";
 import clsx from "clsx";
 
 /**
@@ -20,6 +22,33 @@ export function Inspector() {
   const toggleInspector = useAppStore((s) => s.toggleInspector);
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
   const localHistoryEnabled = useAppStore((s) => s.localHistoryEnabled);
+  const fileTree = useAppStore((s) => s.fileTree);
+  const backlinkIndex = useAppStore((s) => s.backlinkIndex);
+  const setBacklinkIndex = useAppStore((s) => s.setBacklinkIndex);
+  const { openFile } = useFileSystem();
+
+  // Indexa backlinks quando: (a) ainda nao indexou, OU (b) fileTree
+  // mudou (nova pasta, arquivos criados/deletados/renomeados). Cache
+  // sobrevive enquanto a arvore for a mesma — re-indexar a cada
+  // re-render do Inspector queimaria I/O.
+  const indexFingerprint = fileTree;
+  useEffect(() => {
+    if (!activeFilePath) return;
+    let cancelled = false;
+    void (async () => {
+      const idx = await buildBacklinkIndex(indexFingerprint);
+      if (cancelled) return;
+      setBacklinkIndex(idx);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [indexFingerprint, activeFilePath, setBacklinkIndex]);
+
+  const backlinks = useMemo(() => {
+    if (!backlinkIndex || !activeFilePath) return [];
+    return backlinksFor(backlinkIndex, activeFilePath);
+  }, [backlinkIndex, activeFilePath]);
 
   const shellStyle: React.CSSProperties = {
     background: "var(--bg-panel-2)",
@@ -200,6 +229,45 @@ export function Inspector() {
             }
           />
         </Field>
+
+        {/* Backlinks — arquivos que linkam pra esta nota via [[...]].
+            So' aparece se ha resultados (evita ruido em projetos sem
+            wikilinks ainda). Click abre o arquivo origem. */}
+        {backlinks.length > 0 && (
+          <Field label={`Linkado por (${backlinks.length})`}>
+            <ul className="space-y-0.5">
+              {backlinks.map((b) => {
+                const display = b.name.replace(/\.(md|txt)$/i, "");
+                return (
+                  <li key={b.path}>
+                    <button
+                      type="button"
+                      onClick={() => openFile(b.path, b.name)}
+                      className="w-full flex items-center gap-1.5 px-2 py-1 rounded text-left text-[0.75rem] transition-colors"
+                      style={{
+                        background: "transparent",
+                        color: "var(--text-secondary)",
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = "var(--bg-hover)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "transparent")
+                      }
+                      title={b.path}
+                    >
+                      <FileText
+                        size={11}
+                        style={{ color: "var(--text-muted)", flexShrink: 0 }}
+                      />
+                      <span className="truncate">{display}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </Field>
+        )}
 
         {/* Histórico local — botão pra abrir o dialog. Antes so' via
             Ctrl+Alt+H (escondido); agora visivel pra que o user saiba

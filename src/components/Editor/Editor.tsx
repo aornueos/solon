@@ -27,6 +27,7 @@ import { IndentExtension } from "./IndentExtension";
 import { ListExitExtension } from "./ListExitExtension";
 import { SmartDashesExtension } from "./SmartDashesExtension";
 import { HeadingNavExtension } from "./HeadingNavExtension";
+import { WikilinkExtension } from "./WikilinkExtension";
 import {
   EDITOR_INDENT_SIZES,
   EDITOR_FONT_FAMILIES,
@@ -37,10 +38,12 @@ import {
 import { EditorToolbar } from "./EditorToolbar";
 import { markdownToHtml, htmlToMarkdown } from "./markdownBridge";
 import { setCurrentEditor, setEditorFlush } from "../../lib/editorRef";
+import { useFileSystem } from "../../hooks/useFileSystem";
 import { ensureSpellchecker } from "../../lib/spellcheck";
 import { FindBar } from "./FindBar";
 import { SpellcheckExtension } from "./SpellcheckExtension";
 import { FindHighlightExtension } from "./FindHighlightExtension";
+import { WikilinkAutocomplete } from "./WikilinkAutocomplete";
 
 export function Editor() {
   // Seletores granulares: evita re-render do editor ao mudar sidebarWidth,
@@ -63,6 +66,7 @@ export function Editor() {
   const readingMode = useAppStore((s) => s.readingMode);
   const typewriterMode = useAppStore((s) => s.typewriterMode);
   const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
+  const { openFile } = useFileSystem();
 
   const isLoadingRef = useRef(false);
   const lastLoadedPathRef = useRef<string | null>(null);
@@ -110,6 +114,7 @@ export function Editor() {
       CharacterCount,
       SpellcheckExtension,
       FindHighlightExtension,
+      WikilinkExtension,
       // Ordem: HeadingNav ANTES de IndentExtension. Ambos respondem a
       // Tab/Shift+Tab; TipTap testa em ordem e o primeiro que retornar
       // `true` consome o evento. HeadingNav so' age se cursor esta em
@@ -341,6 +346,37 @@ export function Editor() {
     };
   }, [editor, typewriterMode]);
 
+  // Click em wikilinks (Ctrl/Cmd+click) abre o arquivo correspondente.
+  // Exigimos Ctrl/Cmd pra evitar que click normal — usado pra posicionar
+  // o caret dentro do texto da wikilink (editar o nome do destino) —
+  // dispare navegacao acidental. Mesma convencao de VSCode pra Go to
+  // Definition.
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view.dom;
+    const onClick = (e: MouseEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const target = e.target as HTMLElement | null;
+      const link = target?.closest("a.wikilink, a[data-wikilink='true']");
+      if (!link) return;
+      const name = (link.textContent ?? "").trim();
+      if (!name) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // Busca recursiva por basename (sem ext) bate case-insensitive.
+      // Match exato preferido; se nao acha, toast.
+      const { fileTree, pushToast } = useAppStore.getState();
+      const found = findFileByName(fileTree, name);
+      if (found) {
+        void openFile(found.path, found.name);
+      } else {
+        pushToast("info", `Nenhuma nota chamada "${name}" no projeto.`);
+      }
+    };
+    dom.addEventListener("click", onClick);
+    return () => dom.removeEventListener("click", onClick);
+  }, [editor, openFile]);
+
   // Pre-warming do spellcheck: spawna o worker 2s apos o editor montar.
   // Worker compila o dicionario em background sem travar a UI (~8-10s
   // numa maquina lenta). Quando o user fizer o primeiro right-click em
@@ -547,6 +583,7 @@ export function Editor() {
           onClose={() => setFindOpen(false)}
         />
       )}
+      {editor && <WikilinkAutocomplete editor={editor} />}
       {editor && !focusMode && !readingMode && <EditorToolbar editor={editor} />}
       <div
         ref={scrollRef}
@@ -586,6 +623,38 @@ export function Editor() {
       </div>
     </div>
   );
+}
+
+/**
+ * Acha o primeiro arquivo no tree cujo basename (sem extensao) bate
+ * case-insensitive com `name`. Comparacao normalizada (acentos
+ * stripados) pra que `[[capitulo um]]` ache "Capitulo Um.md" e
+ * "capítulo um.md" indistintamente. Pasta nao matcha.
+ */
+function findFileByName(
+  nodes: { type: "file" | "folder"; name: string; path: string; children?: any[] }[],
+  name: string,
+): { path: string; name: string } | null {
+  const target = normalize(name);
+  for (const n of nodes) {
+    if (n.type === "file") {
+      const base = n.name.replace(/\.(md|txt)$/i, "");
+      if (normalize(base) === target) return { path: n.path, name: n.name };
+    }
+    if (n.children) {
+      const found = findFileByName(n.children as any, name);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function normalize(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
 function extractHeadings(
