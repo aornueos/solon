@@ -34,6 +34,9 @@ export interface Toast {
 
 export type EditorFontFamily = "serif" | "sans" | "mono";
 
+/** Variantes de "papel" do editor — vide doc no AppState.editorPaper. */
+export type EditorPaper = "default" | "creme" | "sepia" | "gray" | "midnight";
+
 /**
  * Dialog modal ativo — usado em vez de `window.prompt/confirm` (que
  * renderizam fora do tema do app e quebram o feeling editorial).
@@ -192,6 +195,12 @@ interface AppState {
   isOutlineOpen: boolean;
   isInspectorOpen: boolean;
   focusMode: boolean;
+  /** Reading mode — modo "livro": esconde TODO chrome (titlebar,
+   *  sidebar, outline, inspector, statusbar, tabbar, editor toolbar).
+   *  Sobra so' a coluna do texto. Mais agressivo que focusMode (que
+   *  preserva toolbar/statusbar). Pra leitura, revisao, ou imersao
+   *  maxima. Esc sai. */
+  readingMode: boolean;
   wordCount: number;
   charCount: number;
   /** Visão principal — home (landing), editor de texto, ou canvas storyboard.
@@ -270,6 +279,17 @@ interface AppState {
   editorIndentSize: "small" | "normal" | "large";
   /** Familia tipografica padrao do editor. */
   editorFontFamily: EditorFontFamily;
+  /** "Papel" do editor — substitui SO' o fundo da coluna do texto +
+   *  cor do texto, sem mexer no chrome (sidebar/panels). Cria a
+   *  sensacao de "livro num plano de fundo de mesa" e deixa o escritor
+   *  escolher o tom que combina com a sessao do dia. "default" = usa
+   *  o `--bg-app`/`--text-primary` do theme atual. */
+  editorPaper: EditorPaper;
+  /** Typewriter scrolling — quando ligado, o caret fica no meio
+   *  vertical do scroller; o texto eh que escorre por baixo. Padrao
+   *  de Ulysses/iA Writer pra concentracao. Padding virtual no topo
+   *  e fundo permite centralizar mesmo em docs curtos. */
+  typewriterMode: boolean;
   /** Mostra contadores e formato na StatusBar. */
   showStatusStats: boolean;
   /** Mostra caminho completo do arquivo na StatusBar. */
@@ -329,6 +349,7 @@ interface AppState {
   toggleOutline: () => void;
   toggleInspector: () => void;
   toggleFocusMode: () => void;
+  toggleReadingMode: () => void;
   setActiveView: (v: "home" | "editor" | "canvas") => void;
   toggleActiveView: () => void;
   setWordCount: (w: number, c: number) => void;
@@ -357,6 +378,8 @@ interface AppState {
   setEditorParagraphSpacing: (v: "tight" | "normal" | "airy") => void;
   setEditorIndentSize: (v: "small" | "normal" | "large") => void;
   setEditorFontFamily: (v: EditorFontFamily) => void;
+  setEditorPaper: (v: EditorPaper) => void;
+  setTypewriterMode: (v: boolean) => void;
   setShowStatusStats: (v: boolean) => void;
   setShowStatusPath: (v: boolean) => void;
   setCanvasGridEnabled: (v: boolean) => void;
@@ -472,6 +495,8 @@ const DEFAULT_EDITOR_LINE_HEIGHT: "compact" | "normal" | "relaxed" = "normal";
 const DEFAULT_EDITOR_PARAGRAPH_SPACING: "tight" | "normal" | "airy" = "normal";
 const DEFAULT_EDITOR_INDENT_SIZE: "small" | "normal" | "large" = "normal";
 const DEFAULT_EDITOR_FONT_FAMILY: EditorFontFamily = "serif";
+const DEFAULT_EDITOR_PAPER: EditorPaper = "default";
+const DEFAULT_TYPEWRITER_MODE = false;
 const DEFAULT_SHOW_STATUS_STATS = true;
 const DEFAULT_SHOW_STATUS_PATH = true;
 const DEFAULT_CANVAS_GRID_ENABLED = true;
@@ -494,6 +519,8 @@ const EDITOR_LINE_HEIGHT_KEY = "solon:editorLineHeight";
 const EDITOR_PARAGRAPH_SPACING_KEY = "solon:editorParagraphSpacing";
 const EDITOR_INDENT_SIZE_KEY = "solon:editorIndentSize";
 const EDITOR_FONT_FAMILY_KEY = "solon:editorFontFamily";
+const EDITOR_PAPER_KEY = "solon:editorPaper";
+const TYPEWRITER_MODE_KEY = "solon:typewriterMode";
 const SHOW_STATUS_STATS_KEY = "solon:showStatusStats";
 const SHOW_STATUS_PATH_KEY = "solon:showStatusPath";
 const CANVAS_GRID_ENABLED_KEY = "solon:canvasGridEnabled";
@@ -553,6 +580,17 @@ export const EDITOR_FONT_FAMILIES = [
   },
 ] as const;
 
+/** Lista canonica de variantes de papel + meta visual.
+ *  Hex coordenado com legibilidade: contraste minimo AA pra texto
+ *  normal mantido em todos os pares bg/text. */
+export const EDITOR_PAPERS = [
+  { value: "default" as const, label: "Padrão", hint: "Segue o tema" },
+  { value: "creme" as const, label: "Creme", hint: "Papel quente claro" },
+  { value: "sepia" as const, label: "Sépia", hint: "Pergaminho" },
+  { value: "gray" as const, label: "Cinza", hint: "Neutro frio" },
+  { value: "midnight" as const, label: "Noite", hint: "Azul-tinta escuro" },
+];
+
 export const CANVAS_GRID_SIZES = [16, 24, 32, 48] as const;
 export const CANVAS_TEXT_SIZES = [18, 24, 32, 48] as const;
 export const CANVAS_DRAW_WIDTHS = [1.5, 2, 3, 6] as const;
@@ -594,6 +632,17 @@ function loadEditorFontFamily(): EditorFontFamily {
     if (v === "serif" || v === "sans" || v === "mono") return v;
   } catch {}
   return DEFAULT_EDITOR_FONT_FAMILY;
+}
+
+function loadEditorPaper(): EditorPaper {
+  try {
+    const v = localStorage.getItem(EDITOR_PAPER_KEY);
+    if (
+      v === "default" || v === "creme" || v === "sepia" ||
+      v === "gray" || v === "midnight"
+    ) return v;
+  } catch {}
+  return DEFAULT_EDITOR_PAPER;
 }
 
 function loadNumberOption<T extends readonly number[]>(
@@ -694,6 +743,7 @@ export const useAppStore = create<AppState>((set) => ({
   isOutlineOpen: true,
   isInspectorOpen: true,
   focusMode: false,
+  readingMode: false,
   wordCount: 0,
   charCount: 0,
   // ActiveView inicial respeita a pref `startView` (default "home").
@@ -725,6 +775,8 @@ export const useAppStore = create<AppState>((set) => ({
   editorParagraphSpacing: loadEditorParagraphSpacing(),
   editorIndentSize: loadEditorIndentSize(),
   editorFontFamily: loadEditorFontFamily(),
+  editorPaper: loadEditorPaper(),
+  typewriterMode: loadBoolPref(TYPEWRITER_MODE_KEY, DEFAULT_TYPEWRITER_MODE),
   showStatusStats: loadBoolPref(SHOW_STATUS_STATS_KEY, DEFAULT_SHOW_STATUS_STATS),
   showStatusPath: loadBoolPref(SHOW_STATUS_PATH_KEY, DEFAULT_SHOW_STATUS_PATH),
   canvasGridEnabled: loadBoolPref(CANVAS_GRID_ENABLED_KEY, DEFAULT_CANVAS_GRID_ENABLED),
@@ -891,6 +943,7 @@ export const useAppStore = create<AppState>((set) => ({
   toggleOutline: () => set((s) => ({ isOutlineOpen: !s.isOutlineOpen })),
   toggleInspector: () => set((s) => ({ isInspectorOpen: !s.isInspectorOpen })),
   toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
+  toggleReadingMode: () => set((s) => ({ readingMode: !s.readingMode })),
   setActiveView: (v) => set({ activeView: v }),
   toggleActiveView: () =>
     set((s) => ({ activeView: s.activeView === "editor" ? "canvas" : "editor" })),
@@ -1051,6 +1104,8 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.removeItem(EDITOR_PARAGRAPH_SPACING_KEY);
       localStorage.removeItem(EDITOR_INDENT_SIZE_KEY);
       localStorage.removeItem(EDITOR_FONT_FAMILY_KEY);
+      localStorage.removeItem(EDITOR_PAPER_KEY);
+      localStorage.removeItem(TYPEWRITER_MODE_KEY);
       localStorage.removeItem(SHOW_STATUS_STATS_KEY);
       localStorage.removeItem(SHOW_STATUS_PATH_KEY);
       localStorage.removeItem(CANVAS_GRID_ENABLED_KEY);
@@ -1077,6 +1132,8 @@ export const useAppStore = create<AppState>((set) => ({
       editorParagraphSpacing: DEFAULT_EDITOR_PARAGRAPH_SPACING,
       editorIndentSize: DEFAULT_EDITOR_INDENT_SIZE,
       editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
+      editorPaper: DEFAULT_EDITOR_PAPER,
+      typewriterMode: DEFAULT_TYPEWRITER_MODE,
       showStatusStats: DEFAULT_SHOW_STATUS_STATS,
       showStatusPath: DEFAULT_SHOW_STATUS_PATH,
       canvasGridEnabled: DEFAULT_CANVAS_GRID_ENABLED,
@@ -1173,6 +1230,25 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ editorFontFamily: v });
+  },
+
+  setEditorPaper: (v) => {
+    if (!EDITOR_PAPERS.some((option) => option.value === v)) return;
+    try {
+      localStorage.setItem(EDITOR_PAPER_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ editorPaper: v });
+  },
+
+  setTypewriterMode: (v) => {
+    try {
+      localStorage.setItem(TYPEWRITER_MODE_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ typewriterMode: v });
   },
 
   setShowStatusStats: (v) => {

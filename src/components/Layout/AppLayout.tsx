@@ -19,6 +19,7 @@ import { LocalHistoryDialog } from "./LocalHistoryDialog";
 import { ContextMenuLayer } from "./ContextMenuLayer";
 import { ContextMenuProvider } from "./ContextMenuProvider";
 import { startDrag } from "../../lib/drag";
+import { X } from "lucide-react";
 
 const Editor = lazy(() =>
   import("../Editor/Editor").then((m) => ({ default: m.Editor })),
@@ -41,18 +42,28 @@ export function AppLayout() {
   const sidebarWidth = useAppStore((s) => s.sidebarWidth);
   const outlineWidth = useAppStore((s) => s.outlineWidth);
   const focusMode = useAppStore((s) => s.focusMode);
+  const readingMode = useAppStore((s) => s.readingMode);
+  const toggleReadingMode = useAppStore((s) => s.toggleReadingMode);
   const activeView = useAppStore((s) => s.activeView);
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
   const setOutlineWidth = useAppStore((s) => s.setOutlineWidth);
 
   const inCanvas = activeView === "canvas";
   const inHome = activeView === "home";
-  const showSidebar = isSidebarOpen && !focusMode && !inHome;
+  // Reading mode esconde TODO chrome — supera focusMode + chrome-toggles.
+  // Outros toggles (sidebar/outline/inspector) sao ignorados enquanto
+  // reading mode estiver ativo; quando sai, volta ao que estava.
+  const showSidebar = isSidebarOpen && !focusMode && !readingMode && !inHome;
   // No canvas/home: painel direito não faz sentido (Inspector/Outline são do editor).
   // Home tambem fica sem chrome — landing limpa, so o conteudo central.
-  const showInspector = isInspectorOpen && !focusMode && !inCanvas && !inHome;
-  const showOutline = isOutlineOpen && !focusMode && !inCanvas && !inHome;
+  const showInspector =
+    isInspectorOpen && !focusMode && !readingMode && !inCanvas && !inHome;
+  const showOutline =
+    isOutlineOpen && !focusMode && !readingMode && !inCanvas && !inHome;
   const showRightPanel = showInspector || showOutline;
+  const showTitlebar = !readingMode;
+  const showStatusBar = !readingMode;
+  const showTabBar = !inHome && !readingMode;
 
   const onSidebarMouseDown = useCallback(() => {
     document.body.style.cursor = "col-resize";
@@ -90,7 +101,7 @@ export function AppLayout() {
       className="flex flex-col h-screen"
       style={{ background: "var(--bg-panel)" }}
     >
-      <Titlebar />
+      {showTitlebar && <Titlebar />}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
@@ -116,7 +127,7 @@ export function AppLayout() {
               user pediu pra ela ficar aberta porque navegar entre abas
               e parte do fluxo de escrita; eh menos chrome do que tirar
               a navegacao. */}
-          {!inHome && <TabBar />}
+          {showTabBar && <TabBar />}
           <div className="flex-1 min-h-0 overflow-hidden">
             <Suspense fallback={<ViewLoading />}>
               {inHome ? <HomePage /> : inCanvas ? <CanvasView /> : <Editor />}
@@ -158,7 +169,7 @@ export function AppLayout() {
         )}
       </div>
 
-      <StatusBar />
+      {showStatusBar && <StatusBar />}
       <ToastLayer />
       <DialogLayer />
       <CommandPalette />
@@ -169,6 +180,25 @@ export function AppLayout() {
       <RecoveryDialog />
       <ShortcutsDialog open={showShortcuts} onClose={closeShortcuts} />
       <ExportDialog />
+      {readingMode && (
+        <button
+          type="button"
+          onClick={toggleReadingMode}
+          aria-label="Sair do modo leitura"
+          title="Sair do modo leitura (Esc)"
+          className="fixed top-3 right-3 z-[90] p-1.5 rounded-full transition-opacity"
+          style={{
+            background: "var(--bg-panel)",
+            border: "1px solid var(--border)",
+            color: "var(--text-muted)",
+            opacity: 0.3,
+          }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.opacity = "1")}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.opacity = "0.3")}
+        >
+          <X size={12} />
+        </button>
+      )}
       <ContextMenuLayer />
       <ContextMenuProvider />
     </div>

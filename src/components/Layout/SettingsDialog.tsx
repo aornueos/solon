@@ -20,6 +20,7 @@ import {
   EDITOR_INDENT_SIZES,
   EDITOR_LINE_HEIGHTS,
   EDITOR_MAX_WIDTHS,
+  EDITOR_PAPERS,
   EDITOR_PARAGRAPH_SPACING,
   useAppStore,
 } from "../../store/useAppStore";
@@ -68,6 +69,10 @@ export function SettingsDialog() {
   const setEditorIndentSize = useAppStore((s) => s.setEditorIndentSize);
   const editorFontFamily = useAppStore((s) => s.editorFontFamily);
   const setEditorFontFamily = useAppStore((s) => s.setEditorFontFamily);
+  const editorPaper = useAppStore((s) => s.editorPaper);
+  const setEditorPaper = useAppStore((s) => s.setEditorPaper);
+  const typewriterMode = useAppStore((s) => s.typewriterMode);
+  const setTypewriterMode = useAppStore((s) => s.setTypewriterMode);
   const startView = useAppStore((s) => s.startView);
   const setStartView = useAppStore((s) => s.setStartView);
   const autoSaveEnabled = useAppStore((s) => s.autoSaveEnabled);
@@ -390,10 +395,35 @@ export function SettingsDialog() {
                 onChange={(v) => setEditorFontFamily(v)}
               />
             </Row>
+
+            <Row
+              label="Papel do editor"
+              hint="Tom de fundo da coluna do texto (não afeta sidebar/painéis)."
+            >
+              <SegmentedControl
+                value={editorPaper}
+                options={EDITOR_PAPERS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                onChange={(v) => setEditorPaper(v)}
+              />
+            </Row>
           </Section>
 
           {/* Editor */}
           <Section title="Editor">
+            <Row
+              label="Modo máquina de escrever"
+              hint="Mantém o cursor no meio da tela; o texto rola por baixo."
+            >
+              <Toggle
+                checked={typewriterMode}
+                onChange={setTypewriterMode}
+                label={typewriterMode ? "Ligado" : "Desligado"}
+              />
+            </Row>
+
             <Row
               label="Auto-save"
               hint="Ctrl+S sempre salva."

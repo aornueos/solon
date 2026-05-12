@@ -32,6 +32,7 @@ export default function App() {
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
   const openShortcuts = useAppStore((s) => s.openShortcuts);
   const openExport = useAppStore((s) => s.openExport);
+  const toggleReadingMode = useAppStore((s) => s.toggleReadingMode);
   const { restoreLastFolder, refresh, openFile, createUntitled } = useFileSystem();
 
   // Aplica tema no <html data-theme="...">
@@ -181,6 +182,30 @@ export default function App() {
         e.preventDefault();
         openExport();
       }
+      // Ctrl+Shift+R alterna reading mode (modo livro — esconde todo
+      // chrome). R aqui *nao* eh "reload" do browser; em Tauri release
+      // o reload nao tem efeito util e em dev fica como Ctrl+R puro.
+      // Combinacao com Shift evita colidir com Ctrl+R do TipTap.
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "r"
+      ) {
+        e.preventDefault();
+        toggleReadingMode();
+      }
+      // Esc em reading mode sai do modo (mesmo padrao de presentation
+      // mode em browsers/Keynote). Nao bloqueia outros usos do Esc
+      // (dialogs, etc) — esses tem listeners proprios com stopPropagation.
+      if (e.key === "Escape" && useAppStore.getState().readingMode) {
+        // So' sai se nao tem texto selecionado ou dialog aberto. Dialogs
+        // ja se fecham primeiro via seus proprios handlers — se chegou
+        // aqui, nada esta priorizando o Esc.
+        if (!useAppStore.getState().showCommandPalette) {
+          e.preventDefault();
+          toggleReadingMode();
+        }
+      }
       // Ctrl+T cria nova nota "Sem titulo" na raiz do projeto e abre
       // como aba ativa. Convencao classica de browsers/editores. Sem
       // pasta aberta, mostra toast (createUntitled cuida).
@@ -247,6 +272,7 @@ export default function App() {
     openLocalHistory,
     openShortcuts,
     openExport,
+    toggleReadingMode,
     openFile,
     createUntitled,
   ]);

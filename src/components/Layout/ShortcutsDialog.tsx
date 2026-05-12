@@ -64,6 +64,7 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "Ctrl + J", label: "Alternar índice (Outline)" },
       { keys: "Ctrl + Alt + I", label: "Alternar inspector (Cena)" },
       { keys: "F11", label: "Modo foco" },
+      { keys: "Ctrl + Shift + R", label: "Modo leitura (esconde todo o chrome)" },
       { keys: "Ctrl + Shift + L", label: "Alternar tema claro/escuro" },
       { keys: "Ctrl + ,", label: "Preferências" },
       { keys: "Ctrl + /", label: "Esta janela de atalhos" },

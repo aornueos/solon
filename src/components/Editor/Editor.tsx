@@ -59,6 +59,9 @@ export function Editor() {
   const editorParagraphSpacing = useAppStore((s) => s.editorParagraphSpacing);
   const editorIndentSize = useAppStore((s) => s.editorIndentSize);
   const editorFontFamily = useAppStore((s) => s.editorFontFamily);
+  const editorPaper = useAppStore((s) => s.editorPaper);
+  const readingMode = useAppStore((s) => s.readingMode);
+  const typewriterMode = useAppStore((s) => s.typewriterMode);
   const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
 
   const isLoadingRef = useRef(false);
@@ -297,6 +300,47 @@ export function Editor() {
     return () => setCurrentEditor(null);
   }, [editor]);
 
+  // Typewriter scrolling: mantem o caret no meio vertical do scroller.
+  // Re-centra em cada selectionUpdate ou update. Como o scrollRef tem
+  // padding-top/bottom de 40vh adicional em typewriter mode (settado
+  // no inline style do scroller abaixo), conseguimos centralizar mesmo
+  // em docs curtos.
+  //
+  // Usamos `coordsAtPos` (viewport coords) + bounding rect do scroller
+  // pra calcular o delta exato. scrollBy "instant" (sem smooth) — em
+  // digitacao continua, smooth-scroll dava jitter visivel.
+  useEffect(() => {
+    if (!editor || !typewriterMode) return;
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const recenter = () => {
+      // rAF garante que a layout passou pelo ciclo apos a edicao (caret
+      // pode ter ido pra linha nova).
+      requestAnimationFrame(() => {
+        try {
+          const { from } = editor.state.selection;
+          const coords = editor.view.coordsAtPos(from);
+          const rect = scroller.getBoundingClientRect();
+          const desiredY = rect.top + rect.height / 2;
+          const delta = coords.top - desiredY;
+          if (Math.abs(delta) > 1) {
+            scroller.scrollBy({ top: delta, behavior: "instant" as ScrollBehavior });
+          }
+        } catch {
+          /* posicoes podem invalidar durante hot-reload — ignora */
+        }
+      });
+    };
+    editor.on("selectionUpdate", recenter);
+    editor.on("update", recenter);
+    // Re-centra ao ligar — o cursor pode estar em qualquer lugar.
+    recenter();
+    return () => {
+      editor.off("selectionUpdate", recenter);
+      editor.off("update", recenter);
+    };
+  }, [editor, typewriterMode]);
+
   // Pre-warming do spellcheck: spawna o worker 2s apos o editor montar.
   // Worker compila o dicionario em background sem travar a UI (~8-10s
   // numa maquina lenta). Quando o user fizer o primeiro right-click em
@@ -395,14 +439,29 @@ export function Editor() {
             }}
           />
         )}
-        <div className="flex-1 overflow-y-auto" style={{ background: "var(--bg-app)" }}>
+        <div
+          data-paper={editorPaper === "default" ? undefined : editorPaper}
+          className="flex-1 overflow-y-auto"
+          style={{
+            background:
+              editorPaper === "default"
+                ? "var(--bg-app)"
+                : "var(--editor-paper-bg)",
+          }}
+        >
           <div
             className="mx-auto px-8 py-12"
             style={{ maxWidth: editorMaxWidth }}
           >
             <p
               className="font-serif italic text-[1.05rem]"
-              style={{ color: "var(--text-placeholder)", lineHeight: 1.6 }}
+              style={{
+                color:
+                  editorPaper === "default"
+                    ? "var(--text-placeholder)"
+                    : "var(--editor-paper-text-placeholder)",
+                lineHeight: 1.6,
+              }}
             >
               Nenhum arquivo aberto. Escolha um no explorador à esquerda
               ou volte para a página inicial pra começar.
@@ -488,15 +547,39 @@ export function Editor() {
           onClose={() => setFindOpen(false)}
         />
       )}
-      {editor && !focusMode && <EditorToolbar editor={editor} />}
+      {editor && !focusMode && !readingMode && <EditorToolbar editor={editor} />}
       <div
         ref={scrollRef}
+        data-paper={editorPaper === "default" ? undefined : editorPaper}
         className="flex-1 overflow-y-auto"
         onClick={focusEnd}
+        style={{
+          // Quando ha papel custom, aplica bg/text via vars CSS settadas
+          // em globals.css ([data-paper=...]). "default" deixa vazio →
+          // fallback pro --bg-app/--text-primary do tema.
+          background:
+            editorPaper === "default"
+              ? "var(--bg-app)"
+              : "var(--editor-paper-bg)",
+          color:
+            editorPaper === "default"
+              ? "var(--text-primary)"
+              : "var(--editor-paper-text)",
+        }}
       >
         <div
-          className="mx-auto px-8 py-12 min-h-full cursor-text"
-          style={{ ...editorVars, maxWidth: editorMaxWidth } as React.CSSProperties}
+          className="mx-auto px-8 cursor-text"
+          style={{
+            ...editorVars,
+            maxWidth: editorMaxWidth,
+            // Typewriter mode adiciona padding-top/bottom de 40vh pra
+            // poder centralizar mesmo em docs curtos (caret pode rolar
+            // ate 40% da viewport pra cima do conteudo real e ate 40%
+            // pra baixo). Sem typewriter, mantemos py-12 do padrao.
+            paddingTop: typewriterMode ? "40vh" : "3rem",
+            paddingBottom: typewriterMode ? "40vh" : "3rem",
+            minHeight: "100%",
+          } as React.CSSProperties}
         >
           <EditorContent editor={editor} />
         </div>

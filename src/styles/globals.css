@@ -143,6 +143,41 @@
 }
 
 /* ─────────────────────────────────────────
+   Editor — "papel" customizado (paper variants)
+───────────────────────────────────────── */
+/* Cada variante sobrepoe `--editor-paper-bg`/`--editor-paper-text` no
+   wrapper do EditorContent. O Editor consome essas vars no inline style
+   pra que o efeito so' aplique a' coluna do texto (chrome continua
+   seguindo o theme atual). "default" nao define = fallback pro
+   `--bg-app`/`--text-primary` do tema.
+
+   Contraste minimo AA verificado em todos os pares (text/bg). */
+[data-paper="creme"] {
+  --editor-paper-bg: #faf3e0;
+  --editor-paper-text: #3a2f24;
+  --editor-paper-text-muted: #7a6d5f;
+  --editor-paper-text-placeholder: #b8ac9a;
+}
+[data-paper="sepia"] {
+  --editor-paper-bg: #ede0c0;
+  --editor-paper-text: #3e3220;
+  --editor-paper-text-muted: #7a6a4d;
+  --editor-paper-text-placeholder: #bcaa84;
+}
+[data-paper="gray"] {
+  --editor-paper-bg: #e3e1dc;
+  --editor-paper-text: #1f1e1c;
+  --editor-paper-text-muted: #6a6764;
+  --editor-paper-text-placeholder: #a5a29e;
+}
+[data-paper="midnight"] {
+  --editor-paper-bg: #1a1e26;
+  --editor-paper-text: #dde2ea;
+  --editor-paper-text-muted: #8b94a4;
+  --editor-paper-text-placeholder: #5f6878;
+}
+
+/* ─────────────────────────────────────────
    TabBar — abas dos arquivos abertos
 ───────────────────────────────────────── */
 /* Hover via CSS (em vez de inline onMouseEnter/Leave) para evitar

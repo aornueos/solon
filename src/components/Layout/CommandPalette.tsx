@@ -51,6 +51,7 @@ export function CommandPalette() {
   const setActiveView = useAppStore((s) => s.setActiveView);
   const toggleTheme = useAppStore((s) => s.toggleTheme);
   const toggleFocusMode = useAppStore((s) => s.toggleFocusMode);
+  const toggleReadingMode = useAppStore((s) => s.toggleReadingMode);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
@@ -133,6 +134,23 @@ export function CommandPalette() {
         hint: "F11",
         icon: <Focus size={15} />,
         run: toggleFocusMode,
+      },
+      {
+        id: "reading",
+        label: "Alternar modo leitura",
+        hint: "Ctrl+Shift+R",
+        icon: <Focus size={15} />,
+        run: toggleReadingMode,
+      },
+      {
+        id: "typewriter",
+        label: "Alternar máquina de escrever",
+        hint: "Cursor centralizado",
+        icon: <Type size={15} />,
+        run: () => {
+          const s = useAppStore.getState();
+          s.setTypewriterMode(!s.typewriterMode);
+        },
       },
       {
         id: "sidebar",
@@ -224,6 +242,7 @@ export function CommandPalette() {
       setTool,
       theme,
       toggleFocusMode,
+      toggleReadingMode,
       toggleInspector,
       toggleOutline,
       toggleSidebar,
