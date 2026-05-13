@@ -1,6 +1,6 @@
 [package]
 name = "solon"
-version = "0.8.4"
+version = "0.8.5"
 description = "Solon — Editor de Escrita Criativa"
 authors = ["Solon"]
 edition = "2021"

@@ -145,6 +145,42 @@ const turndown = new TurndownService({
   },
 });
 
+// CRITICAL: override do `escape()` do turndown pra NAO escapar `*`.
+//
+// O default escapa `*` literal em texto pra `\*` (proteger contra
+// markdown unintended). Mas isso causa um ciclo destrutivo quando o
+// editor perde o bold mark por qualquer motivo (race entre setContent
+// e onUpdate, doc carregado de markdown ja' corrompido, etc):
+//
+//   1. Editor tem `<p>**Onirica**</p>` (texto literal, sem <strong>)
+//   2. turndown vê asteriscos em texto -> escapa -> `\*\*Onirica\*\*`
+//   3. Salva no disco
+//   4. Reload: marked.parse(`\*\*Onirica\*\*`) -> `<p>**Onirica**</p>`
+//      (sem strong — backslashes dizem ao marked pra tratar como literal)
+//   5. Editor exibe `**Onirica**` literal. Volta ao passo 1.
+//
+// Sem escape de `*`, o passo 2 emite `**Onirica**` (sem backslashes).
+// No reload, marked vê `**Onirica**` e parseia como strong de novo —
+// **o bold se auto-recupera**.
+//
+// Trade-off: usuario que digita `*` ou `**` LITERAL como texto pode
+// ter parse acidental como bold/italic. Em ficcao isso e' raro
+// (raramente se escreve "* asterisco" em prosa). O ganho — bold
+// estavel no roundtrip — supera o risco.
+//
+// Tambem mantemos escape de `_` (italic markdown alternativo) por
+// motivo similar; underscores em palavras como `meta_data` no texto
+// nao devem virar italic. Hash, backtick, brackets, etc continuam
+// escapados — eles tem sintaxe markdown clara que nao bate com prosa.
+const TurndownEscape = (
+  TurndownService.prototype as unknown as { escape: (s: string) => string }
+).escape;
+turndown.escape = function (string: string): string {
+  // Aplica o escape default e DESFAZ o escape de `*`.
+  const escaped = TurndownEscape.call(this, string);
+  return escaped.replace(/\\\*/g, "*");
+};
+
 // Plugins GFM: tabelas + strike + checkboxes
 turndown.use([gfm, tables, strikethrough]);
 
