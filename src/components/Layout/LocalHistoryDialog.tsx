@@ -8,6 +8,7 @@ import {
   restoreSnapshot,
 } from "../../lib/localHistory";
 import { parseDocument } from "../../lib/frontmatter";
+import { isProjectNotePath } from "../../lib/pathSecurity";
 
 export function LocalHistoryDialog() {
   const open = useAppStore((s) => s.showLocalHistory);
@@ -62,6 +63,7 @@ export function LocalHistoryDialog() {
 
   const restore = async () => {
     if (!activeFilePath || !selected) return;
+    if (!isProjectNotePath(rootFolder, activeFilePath)) return;
     const raw = await restoreSnapshot(activeFilePath, selected.path);
     const { meta, body } = parseDocument(raw);
     setActiveFile(

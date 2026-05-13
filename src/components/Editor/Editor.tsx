@@ -60,6 +60,7 @@ export function Editor() {
   const setHeadings = useAppStore((s) => s.setHeadings);
   const setWordCount = useAppStore((s) => s.setWordCount);
   const setFileBody = useAppStore((s) => s.setFileBody);
+  const pushToast = useAppStore((s) => s.pushToast);
   const editorZoom = useAppStore((s) => s.editorZoom);
   const setEditorZoom = useAppStore((s) => s.setEditorZoom);
   const editorMaxWidth = useAppStore((s) => s.editorMaxWidth);
@@ -324,20 +325,28 @@ export function Editor() {
 
     const insertImageFile = async (file: File) => {
       if (!file.type.startsWith("image/")) return false;
-      const saved = await saveImageForEditor(rootFolder, file);
-      editor
-        .chain()
-        .focus()
-        .insertContent({
-          type: "image",
-          attrs: {
-            src: saved.displaySrc,
-            dataSolonSrc: saved.markdownSrc,
-            alt: file.name.replace(/\.(png|jpe?g|gif|webp|svg)$/i, ""),
-          },
-        })
-        .run();
-      return true;
+      try {
+        const saved = await saveImageForEditor(rootFolder, file);
+        editor
+          .chain()
+          .focus()
+          .insertContent({
+            type: "image",
+            attrs: {
+              src: saved.displaySrc,
+              dataSolonSrc: saved.markdownSrc,
+              alt: file.name.replace(/\.(png|jpe?g|gif|webp)$/i, ""),
+            },
+          })
+          .run();
+        return true;
+      } catch (err) {
+        pushToast(
+          "error",
+          err instanceof Error ? err.message : "Não foi possível inserir a imagem.",
+        );
+        return false;
+      }
     };
 
     const onPaste = (event: ClipboardEvent) => {
@@ -364,7 +373,7 @@ export function Editor() {
       dom.removeEventListener("paste", onPaste);
       dom.removeEventListener("drop", onDrop);
     };
-  }, [editor, rootFolder]);
+  }, [editor, rootFolder, pushToast]);
 
   useEffect(() => {
     if (!editor || !activeFilePath) return;

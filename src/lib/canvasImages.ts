@@ -13,6 +13,13 @@ const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 const ASSETS_DIR = ".solon/assets";
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const SUPPORTED_IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+]);
 
 function join(a: string, b: string): string {
   const sep = a.includes("\\") && !a.includes("/") ? "\\" : "/";
@@ -28,8 +35,25 @@ function extFromMime(mime: string): string {
   if (mime === "image/jpeg") return "jpg";
   if (mime === "image/gif") return "gif";
   if (mime === "image/webp") return "webp";
-  if (mime === "image/svg+xml") return "svg";
   return "png";
+}
+
+export function isSafeAssetSrc(src: string): boolean {
+  const normalized = src.replace(/\\/g, "/");
+  if (!normalized.startsWith("assets/")) return false;
+  if (normalized.includes("..") || normalized.includes("//")) return false;
+  return /\.(png|jpe?g|gif|webp)$/i.test(normalized);
+}
+
+function assertSupportedImage(file: File): string {
+  const mime = file.type || "image/png";
+  if (!SUPPORTED_IMAGE_TYPES.has(mime)) {
+    throw new Error("Imagem não suportada. Use PNG, JPG, GIF ou WebP.");
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error("Imagem muito grande. Limite: 20 MB.");
+  }
+  return mime;
 }
 
 /** Lê um File inteiro para Uint8Array. */
@@ -56,12 +80,13 @@ export async function saveImageForCanvas(
   rootFolder: string,
   file: File,
 ): Promise<{ src: string; width: number; height: number }> {
+  const mime = assertSupportedImage(file);
   const dims = await readImageDimensions(file);
   const bytes = await fileToBytes(file);
 
   if (!isTauri) {
     return {
-      src: bytesToDataUrl(bytes, file.type || "image/png"),
+      src: bytesToDataUrl(bytes, mime),
       ...dims,
     };
   }
@@ -71,7 +96,7 @@ export async function saveImageForCanvas(
   if (!(await exists(dir))) {
     await mkdir(dir, { recursive: true });
   }
-  const ext = extFromMime(file.type || "image/png");
+  const ext = extFromMime(mime);
   const rel = `assets/${nanoid()}.${ext}`;
   const full = join(rootFolder, `.solon/${rel}`);
   await writeFile(full, bytes);
@@ -126,6 +151,7 @@ export async function resolveImageUrl(
 ): Promise<string | null> {
   if (src.startsWith("data:")) return src;
   if (!isTauri || !rootFolder) return null;
+  if (!isSafeAssetSrc(src)) return null;
 
   const key = cacheKey(rootFolder, src);
   const cached = urlCache.get(key);

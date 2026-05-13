@@ -5,6 +5,7 @@ import { useFileSystem } from "../../hooks/useFileSystem";
 import { parseDocument } from "../../lib/frontmatter";
 import { markdownToHtml } from "../Editor/markdownBridge";
 import { resolveEditorImageHtml } from "../../lib/editorImages";
+import { assertProjectNotePath } from "../../lib/pathSecurity";
 
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -31,6 +32,7 @@ export function ReferencePane({
           setHtml(`<p>${name}</p>`);
           return;
         }
+        assertProjectNotePath(rootFolder, path);
         const { readTextFile } = await import("@tauri-apps/plugin-fs");
         const raw = await readTextFile(path);
         const { body } = parseDocument(raw);

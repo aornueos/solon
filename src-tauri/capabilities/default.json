@@ -21,7 +21,6 @@
     "process:default",
     "process:allow-restart",
     "process:allow-exit",
-    "fs:default",
     "fs:deny-default",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
@@ -40,6 +39,8 @@
       ],
       "deny": [
         { "path": "$HOME/.ssh/**" },
+        { "path": "$HOME/.claude/**" },
+        { "path": "$HOME/.codex/**" },
         { "path": "$HOME/.aws/**" },
         { "path": "$HOME/.azure/**" },
         { "path": "$HOME/.gnupg/**" },
@@ -52,6 +53,10 @@
         { "path": "$HOME/.cargo/credentials" },
         { "path": "$HOME/.cargo/credentials.toml" },
         { "path": "$HOME/.netrc" },
+        { "path": "**/.git/**" },
+        { "path": "**/.env" },
+        { "path": "**/.env.*" },
+        { "path": "**/.claude/**" },
         { "path": "$HOME/AppData/Roaming/GitHub CLI/**" },
         { "path": "$HOME/AppData/Roaming/Code/User/globalStorage/github.*/*" }
       ]

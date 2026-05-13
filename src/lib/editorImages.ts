@@ -1,13 +1,14 @@
-import { resolveImageUrl, saveImageForCanvas } from "./canvasImages";
+import { isSafeAssetSrc, resolveImageUrl, saveImageForCanvas } from "./canvasImages";
 
 const EDITOR_ASSET_PREFIX = ".solon/";
 
 function storageRelFromMarkdown(src: string): string | null {
   const normalized = src.replace(/\\/g, "/");
   if (normalized.startsWith(".solon/assets/")) {
-    return normalized.slice(EDITOR_ASSET_PREFIX.length);
+    const rel = normalized.slice(EDITOR_ASSET_PREFIX.length);
+    return isSafeAssetSrc(rel) ? rel : null;
   }
-  if (normalized.startsWith("assets/")) return normalized;
+  if (normalized.startsWith("assets/")) return isSafeAssetSrc(normalized) ? normalized : null;
   return null;
 }
 

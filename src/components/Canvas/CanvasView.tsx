@@ -70,6 +70,7 @@ export function CanvasView() {
   const canvasDefaultTextSize = useAppStore((s) => s.canvasDefaultTextSize);
   const canvasDefaultDrawWidth = useAppStore((s) => s.canvasDefaultDrawWidth);
   const canvasDefaultColor = useAppStore((s) => s.canvasDefaultColor);
+  const pushToast = useAppStore((s) => s.pushToast);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const spaceDown = useRef(false);
@@ -363,13 +364,17 @@ export function CanvasView() {
           });
         } catch (err) {
           console.error("Erro ao colar imagem:", err);
+          pushToast(
+            "error",
+            err instanceof Error ? err.message : "Não foi possível colar a imagem.",
+          );
         }
         return; // só a primeira imagem
       }
     };
     document.addEventListener("paste", onPaste);
     return () => document.removeEventListener("paste", onPaste);
-  }, [activeView, rootFolder, viewport.x, viewport.y, viewport.zoom, addImage]);
+  }, [activeView, rootFolder, viewport.x, viewport.y, viewport.zoom, addImage, pushToast]);
 
   const onDragOver = (e: React.DragEvent) => {
     if (e.dataTransfer.types.includes(SCENE_DND_MIME)) {

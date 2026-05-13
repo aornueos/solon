@@ -9,6 +9,13 @@ import { scanRecoveryDrafts } from "../lib/crashRecovery";
 import { atomicWriteTextFile } from "../lib/atomicWrite";
 import { clearImageUrlCache } from "../lib/canvasImages";
 import {
+  NOTE_FILE_RE,
+  assertInsideProject,
+  assertProjectNotePath,
+  isProjectNotePath,
+  isSafeEntryName,
+} from "../lib/pathSecurity";
+import {
   applyOrder,
   loadOrder,
   relPath,
@@ -20,8 +27,9 @@ import {
   saveOrder,
 } from "../lib/sidebarOrder";
 
-// No ambiente web (dev sem Tauri), usa mock
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const IGNORED_TREE_DIRS = new Set(["node_modules", "target", "dist", "out"]);
+const MAX_TREE_DEPTH = 24;
 
 /** Mensagem humana a partir de um erro arbitrário do Tauri. */
 function describeError(err: unknown): string {
@@ -67,6 +75,19 @@ function joinRelative(root: string, relative: string): string {
   if (!relative) return root;
   const sep = root.includes("\\") && !root.includes("/") ? "\\" : "/";
   return joinPath(root, relative.replace(/[\\/]/g, sep));
+}
+
+function rejectUnsafeName(name: string, kind: "file" | "folder"): boolean {
+  if (isSafeEntryName(name, kind)) return false;
+  useAppStore
+    .getState()
+    .pushToast(
+      "error",
+      kind === "file"
+        ? "Use um nome de arquivo .md/.txt sem caracteres especiais."
+        : "Use um nome de pasta sem caracteres especiais.",
+    );
+  return true;
 }
 
 function findNodeType(nodes: FileNode[], path: string): FileNode["type"] | null {
@@ -148,7 +169,7 @@ export function useFileSystem() {
       setRootFolder("/mock/romance");
       setFileTree(mockTree);
     }
-  }, [setRootFolder, setFileTree]);
+  }, [setRootFolder, setFileTree, setSidebarOrder]);
 
   const openFile = useCallback(
     async (path: string, name: string) => {
@@ -160,6 +181,7 @@ export function useFileSystem() {
       flushEditor();
       if (isTauri) {
         try {
+          assertProjectNotePath(useAppStore.getState().rootFolder, path);
           const { readTextFile } = await import("@tauri-apps/plugin-fs");
           const content = await readTextFile(path);
           const { meta, body } = parseDocument(content);
@@ -204,6 +226,7 @@ export function useFileSystem() {
       if (!isTauri) return;
       try {
         const { rootFolder, localHistoryEnabled } = useAppStore.getState();
+        assertProjectNotePath(rootFolder, path);
         if (localHistoryEnabled) {
           await createSnapshotBeforeWrite({
             rootFolder,
@@ -287,7 +310,7 @@ export function useFileSystem() {
         : null;
       if (lastFile) {
         try {
-          if (await exists(lastFile)) {
+          if (isProjectNotePath(last, lastFile) && await exists(lastFile)) {
             const content = await readTextFile(lastFile);
             const { meta, body } = parseDocument(content);
             const name = lastFile.split(/[\\/]/).pop() ?? lastFile;
@@ -306,7 +329,10 @@ export function useFileSystem() {
       const tabs = useAppStore.getState().openTabs;
       if (tabs.length > 0) {
         const checks = await Promise.all(
-          tabs.map(async (t) => ({ tab: t, exists: await exists(t.path) })),
+          tabs.map(async (t) => ({
+            tab: t,
+            exists: isProjectNotePath(last, t.path) && await exists(t.path),
+          })),
         );
         for (const { tab, exists: ok } of checks) {
           if (!ok) useAppStore.getState().closeTab(tab.path);
@@ -338,6 +364,8 @@ export function useFileSystem() {
       const finalName = name.endsWith(".md") || name.endsWith(".txt") ? name : `${name}.md`;
       const full = joinPath(parentDir, finalName);
       try {
+        assertInsideProject(rootFolder, parentDir, "Pasta");
+        if (rejectUnsafeName(finalName, "file")) return;
         const { exists } = await import("@tauri-apps/plugin-fs");
         if (await exists(full)) {
           useAppStore
@@ -374,7 +402,7 @@ export function useFileSystem() {
           );
       }
     },
-    [refresh, openFile]
+    [refresh, openFile, rootFolder]
   );
 
   /**
@@ -390,6 +418,7 @@ export function useFileSystem() {
     async (sourcePath: string) => {
       if (!isTauri) return;
       try {
+        assertProjectNotePath(rootFolder, sourcePath, "Arquivo de origem");
         const { readTextFile, exists } = await import(
           "@tauri-apps/plugin-fs"
         );
@@ -427,7 +456,7 @@ export function useFileSystem() {
           .pushToast("error", `Erro ao duplicar: ${describeError(err)}`);
       }
     },
-    [refresh, openFile],
+    [refresh, openFile, rootFolder],
   );
 
   const createFolder = useCallback(
@@ -435,6 +464,8 @@ export function useFileSystem() {
       if (!isTauri) return;
       const full = joinPath(parentDir, name);
       try {
+        assertInsideProject(rootFolder, parentDir, "Pasta");
+        if (rejectUnsafeName(name, "folder")) return;
         const { mkdir, exists } = await import("@tauri-apps/plugin-fs");
         if (await exists(full)) {
           useAppStore
@@ -451,7 +482,7 @@ export function useFileSystem() {
           .pushToast("error", `Erro ao criar pasta: ${describeError(err)}`);
       }
     },
-    [refresh]
+    [refresh, rootFolder]
   );
 
   const renameNode = useCallback(
@@ -462,11 +493,15 @@ export function useFileSystem() {
       if (newPath === oldPath) return;
       const nodeType = findNodeType(useAppStore.getState().fileTree, oldPath);
       const isFolder = nodeType === "folder";
+      if (rejectUnsafeName(newName, isFolder ? "folder" : "file")) return;
       const activeRelBefore = activeFilePath
         ? relativeInside(activeFilePath, oldPath)
         : null;
       try {
         const { rename, exists } = await import("@tauri-apps/plugin-fs");
+        assertInsideProject(rootFolder, oldPath, "Origem");
+        assertInsideProject(rootFolder, newPath, "Destino");
+        if (!isFolder) assertProjectNotePath(rootFolder, newPath, "Arquivo");
         if (await exists(newPath)) {
           useAppStore
             .getState()
@@ -544,13 +579,17 @@ export function useFileSystem() {
           .pushToast("error", `Erro ao renomear: ${describeError(err)}`);
       }
     },
-    [refresh, activeFilePath, setActiveFile, saveFile]
+    [refresh, activeFilePath, setActiveFile, saveFile, rootFolder, setSidebarOrder]
   );
 
   const deleteNode = useCallback(
     async (path: string, isFolder: boolean) => {
       if (!isTauri) return;
       try {
+        assertInsideProject(rootFolder, path, "Item");
+        if (normalizedPath(path) === normalizedPath(rootFolder ?? "")) {
+          throw new Error("A pasta raiz do projeto não pode ser excluída pelo Solon.");
+        }
         const { remove } = await import("@tauri-apps/plugin-fs");
         await remove(path, isFolder ? { recursive: true } : undefined);
         if (!isFolder) await deleteCanvasSidecar(path);
@@ -612,7 +651,7 @@ export function useFileSystem() {
           .pushToast("error", `Erro ao excluir: ${describeError(err)}`);
       }
     },
-    [refresh, activeFilePath, openFile]
+    [refresh, activeFilePath, openFile, rootFolder, setSidebarOrder]
   );
 
   /**
@@ -680,13 +719,13 @@ export function useFileSystem() {
       if (!isTauri || !rootFolder) {
         return;
       }
-
       // Guards de sanidade
       if (normalizedPath(sourcePath) === normalizedPath(targetFolderPath)) {
         return;
       }
       const parentOfSource = parentOf(sourcePath);
       const sourceType = findNodeType(useAppStore.getState().fileTree, sourcePath);
+      if (!sourceType) return;
       const sourceIsFolder = sourceType === "folder";
       if (normalizedPath(parentOfSource) === normalizedPath(targetFolderPath)) {
         return;
@@ -700,12 +739,16 @@ export function useFileSystem() {
       }
 
       const name = baseName(sourcePath);
+      if (rejectUnsafeName(name, sourceIsFolder ? "folder" : "file")) return;
       const newPath = joinPath(targetFolderPath, name);
       const activeRelBefore = activeFilePath
         ? relativeInside(activeFilePath, sourcePath)
         : null;
 
       try {
+        assertInsideProject(rootFolder, sourcePath, "Origem");
+        assertInsideProject(rootFolder, targetFolderPath, "Destino");
+        if (!sourceIsFolder) assertProjectNotePath(rootFolder, sourcePath, "Arquivo");
         const { rename, exists } = await import(
           "@tauri-apps/plugin-fs"
         );
@@ -816,6 +859,7 @@ export function useFileSystem() {
         if (n > 999) break; // sanity guard — quase impossivel mas evita loop
       }
       const full = joinPath(rootFolder, name);
+      assertProjectNotePath(rootFolder, full);
       await atomicWriteTextFile(full, "");
       await refresh();
       await openFile(full, name);
@@ -882,20 +926,22 @@ function forceExpandPath(nodes: FileNode[], targetPath: string): FileNode[] {
 async function buildFileTree(
   dirPath: string,
   preserveExpanded?: Set<string>,
+  depth = 0,
 ): Promise<FileNode[]> {
-  if (!isTauri) return [];
+  if (!isTauri || depth > MAX_TREE_DEPTH) return [];
   try {
     const { readDir } = await import("@tauri-apps/plugin-fs");
     const entries = await readDir(dirPath);
     const nodes: FileNode[] = [];
 
     for (const entry of entries) {
-      if (entry.name?.startsWith(".")) continue;
-      const fullPath = joinPath(dirPath, entry.name || "");
+      const entryName = entry.name || "";
+      if (entryName.startsWith(".") || IGNORED_TREE_DIRS.has(entryName)) continue;
+      const fullPath = joinPath(dirPath, entryName);
       if ("isDirectory" in entry ? entry.isDirectory : (entry as any).children !== undefined) {
-        const children = await buildFileTree(fullPath, preserveExpanded);
+        const children = await buildFileTree(fullPath, preserveExpanded, depth + 1);
         nodes.push({
-          name: entry.name || "",
+          name: entryName,
           path: fullPath,
           type: "folder",
           // Preserva estado de expansao do tree anterior. Default false
@@ -903,8 +949,8 @@ async function buildFileTree(
           expanded: preserveExpanded?.has(fullPath) ?? false,
           children,
         });
-      } else if (entry.name?.endsWith(".md") || entry.name?.endsWith(".txt")) {
-        nodes.push({ name: entry.name || "", path: fullPath, type: "file" });
+      } else if (NOTE_FILE_RE.test(entryName)) {
+        nodes.push({ name: entryName, path: fullPath, type: "file" });
       }
     }
     return nodes.sort((a, b) => {

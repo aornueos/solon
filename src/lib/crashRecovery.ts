@@ -25,6 +25,8 @@
  *    nao pode bloquear o fluxo normal.
  */
 
+import { isProjectNotePath } from "./pathSecurity";
+
 const RECOVERY_DIR = ".solon/.recovery";
 
 const isTauri =
@@ -82,7 +84,7 @@ export async function saveRecoveryDraft(
   filePath: string,
   content: string,
 ): Promise<void> {
-  if (!isTauri || !rootFolder || !filePath) return;
+  if (!isTauri || !rootFolder || !isProjectNotePath(rootFolder, filePath)) return;
   try {
     const { writeTextFile } = await import("@tauri-apps/plugin-fs");
     await ensureRecoveryDir(rootFolder);
@@ -104,7 +106,7 @@ export async function clearRecoveryDraft(
   rootFolder: string | null,
   filePath: string,
 ): Promise<void> {
-  if (!isTauri || !rootFolder || !filePath) return;
+  if (!isTauri || !rootFolder || !isProjectNotePath(rootFolder, filePath)) return;
   try {
     const { remove, exists } = await import("@tauri-apps/plugin-fs");
     const draftPath = recoveryPathFor(rootFolder, filePath);
@@ -163,6 +165,10 @@ export async function scanRecoveryDrafts(
           const raw = await readTextFile(draftPath);
           const draft = JSON.parse(raw) as RecoveryDraft;
           if (!draft.path || typeof draft.content !== "string") {
+            return null;
+          }
+          if (!isProjectNotePath(rootFolder, draft.path)) {
+            await remove(draftPath).catch(() => {});
             return null;
           }
           if (!(await exists(draft.path))) {

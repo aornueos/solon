@@ -12,9 +12,15 @@ import {
   isSameOrDescendantPath,
 } from "../src/lib/sidebarDrop.ts";
 import {
+  isInsideProject,
+  isProjectNotePath,
+  isSafeEntryName,
+} from "../src/lib/pathSecurity.ts";
+import {
   htmlToMarkdown,
   markdownToHtml,
 } from "../src/components/Editor/markdownBridge.ts";
+import { isSafeAssetSrc } from "../src/lib/canvasImages.ts";
 
 describe("frontmatter", () => {
   it("keeps body separators out of the yaml parser", () => {
@@ -135,6 +141,31 @@ describe("sidebar folder drops", () => {
   });
 });
 
+describe("project path safety", () => {
+  it("accepts notes only inside the active project", () => {
+    const root = "C:\\Projeto\\Livro";
+    assert.equal(isInsideProject(root, "C:\\Projeto\\Livro\\Cena.md"), true);
+    assert.equal(isProjectNotePath(root, "C:\\Projeto\\Livro\\Cena.md"), true);
+    assert.equal(isProjectNotePath(root, "C:\\Projeto\\Livro\\asset.png"), false);
+    assert.equal(isProjectNotePath(root, "C:\\Projeto\\Outro\\Cena.md"), false);
+  });
+
+  it("rejects unsafe entry names", () => {
+    assert.equal(isSafeEntryName("Cena 1.md", "file"), true);
+    assert.equal(isSafeEntryName("Cena 1", "file"), false);
+    assert.equal(isSafeEntryName("../Cena.md", "file"), false);
+    assert.equal(isSafeEntryName("CON.md", "file"), false);
+    assert.equal(isSafeEntryName("Notas", "folder"), true);
+  });
+
+  it("keeps canvas/editor asset paths inside .solon assets", () => {
+    assert.equal(isSafeAssetSrc("assets/image.png"), true);
+    assert.equal(isSafeAssetSrc("assets/../secret.png"), false);
+    assert.equal(isSafeAssetSrc("../assets/image.png"), false);
+    assert.equal(isSafeAssetSrc("assets/vector.svg"), false);
+  });
+});
+
 describe("editor markdown bridge", () => {
   it("preserves leading visual spaces in paragraphs", () => {
     const md = htmlToMarkdown("<p>  OLHOS</p>");
@@ -186,5 +217,32 @@ describe("editor markdown bridge", () => {
     const html = markdownToHtml("Use `atalho` aqui.");
     assert.match(html, /<code>atalho<\/code>/);
     assert.match(htmlToMarkdown(html), /`atalho`/);
+  });
+
+  it("round-trips bold and italic without multiplying markers", () => {
+    assert.equal(htmlToMarkdown(markdownToHtml("**negrito**")).trim(), "**negrito**");
+    assert.equal(htmlToMarkdown(markdownToHtml("*italico*")).trim(), "*italico*");
+    assert.equal(htmlToMarkdown(markdownToHtml("***ambos***")).trim(), "***ambos***");
+  });
+
+  it("normalizes accidentally nested markdown marks on load", () => {
+    const repaired = htmlToMarkdown(markdownToHtml("****negrito****")).trim();
+    assert.equal(repaired, "**negrito**");
+  });
+
+  it("repairs escaped inline marks from older save/load cycles", () => {
+    const brokenBold = String.raw`\\\\\*\\\\\*Onírica\\\\\*\\\\\*`;
+    const html = markdownToHtml(brokenBold);
+    assert.match(html, /<strong>Onírica<\/strong>/);
+    assert.equal(htmlToMarkdown(`<p>${brokenBold}</p>`).trim(), "**Onírica**");
+  });
+
+  it("repairs literal markdown marks inside raw html blocks", () => {
+    assert.match(markdownToHtml("<p>**Onírica**</p>"), /<strong>Onírica<\/strong>/);
+    assert.match(
+      markdownToHtml("<p>&#42;&#42;Real&#42;&#42;</p>"),
+      /<strong>Real<\/strong>/,
+    );
+    assert.match(markdownToHtml("<p>*Sonho*</p>"), /<em>Sonho<\/em>/);
   });
 });

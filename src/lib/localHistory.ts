@@ -1,4 +1,5 @@
 import { parseDocument } from "./frontmatter";
+import { isProjectNotePath } from "./pathSecurity";
 
 export interface LocalSnapshot {
   path: string;
@@ -71,7 +72,7 @@ export async function listSnapshots(
   rootFolder: string | null,
   filePath: string | null,
 ): Promise<LocalSnapshot[]> {
-  if (!isTauri() || !rootFolder || !filePath) return [];
+  if (!isTauri() || !rootFolder || !filePath || !isProjectNotePath(rootFolder, filePath)) return [];
   const { readDir, stat } = await import("@tauri-apps/plugin-fs");
   const dir = historyDir(rootFolder, filePath);
   try {
@@ -111,7 +112,7 @@ export async function createSnapshotBeforeWrite({
   filePath: string;
   nextContent: string;
 }): Promise<void> {
-  if (!isTauri() || !rootFolder) return;
+  if (!isTauri() || !rootFolder || !isProjectNotePath(rootFolder, filePath)) return;
   const { exists, mkdir, readTextFile, remove } = await import(
     "@tauri-apps/plugin-fs"
   );

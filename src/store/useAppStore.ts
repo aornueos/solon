@@ -144,6 +144,8 @@ export interface OpenTab {
   name: string;
 }
 
+export type TabInsertPlacement = "before" | "after";
+
 export type SplitPaneState =
   | { kind: "none" }
   | { kind: "reference"; path: string; name: string }
@@ -349,7 +351,11 @@ interface AppState {
   closeTab: (path: string) => string | null;
   /** Atualiza path/name de uma aba apos rename ou move. */
   renameTab: (oldPath: string, newPath: string, newName: string) => void;
-  reorderTab: (sourcePath: string, targetPath: string) => void;
+  reorderTab: (
+    sourcePath: string,
+    targetPath: string,
+    placement?: TabInsertPlacement,
+  ) => void;
   reopenClosedTab: () => OpenTab | null;
   /** Renomeia em massa quando uma pasta foi movida/renomeada — todos os
    *  paths que comecam com `oldPrefix` sao reescritos. */
@@ -946,7 +952,7 @@ export const useAppStore = create<AppState>((set) => ({
       return { openTabs: next };
     }),
 
-  reorderTab: (sourcePath, targetPath) =>
+  reorderTab: (sourcePath, targetPath, placement = "before") =>
     set((s) => {
       if (sourcePath === targetPath) return s;
       const from = s.openTabs.findIndex((t) => t.path === sourcePath);
@@ -954,7 +960,9 @@ export const useAppStore = create<AppState>((set) => ({
       if (from === -1 || to === -1) return s;
       const next = s.openTabs.slice();
       const [tab] = next.splice(from, 1);
-      next.splice(to, 0, tab);
+      const targetIndex = next.findIndex((t) => t.path === targetPath);
+      if (targetIndex === -1) return s;
+      next.splice(placement === "after" ? targetIndex + 1 : targetIndex, 0, tab);
       saveOpenTabs(next);
       return { openTabs: next };
     }),
@@ -1036,7 +1044,8 @@ export const useAppStore = create<AppState>((set) => ({
       return { recentFiles: next };
     }),
 
-  setFileBody: (body) => set({ fileBody: body }),
+  setFileBody: (body) =>
+    set((s) => (s.fileBody === body ? s : { fileBody: body })),
 
   setSceneMeta: (meta) => set({ sceneMeta: meta }),
 
@@ -1070,7 +1079,8 @@ export const useAppStore = create<AppState>((set) => ({
   setActiveView: (v) => set({ activeView: v }),
   toggleActiveView: () =>
     set((s) => ({ activeView: s.activeView === "editor" ? "canvas" : "editor" })),
-  setWordCount: (w, c) => set({ wordCount: w, charCount: c }),
+  setWordCount: (w, c) =>
+    set((s) => (s.wordCount === w && s.charCount === c ? s : { wordCount: w, charCount: c })),
 
   setTheme: (t) => {
     try {
@@ -1166,12 +1176,14 @@ export const useAppStore = create<AppState>((set) => ({
   closeLocalHistory: () => set({ showLocalHistory: false }),
 
   setSaveStatus: (s) =>
-    set((curr) => ({
-      saveStatus: s,
-      // `lastSavedAt` so atualiza no transition pra "saved" — assim a
-      // StatusBar pode mostrar "Salvo ha 12s" usando esse timestamp.
-      lastSavedAt: s === "saved" ? Date.now() : curr.lastSavedAt,
-    })),
+    set((curr) =>
+      curr.saveStatus === s && s !== "saved"
+        ? curr
+        : {
+            saveStatus: s,
+            lastSavedAt: s === "saved" ? Date.now() : curr.lastSavedAt,
+          },
+    ),
 
   setProjectStats: (s) => set({ projectStats: s }),
 

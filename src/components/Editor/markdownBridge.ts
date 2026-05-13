@@ -176,9 +176,11 @@ const TurndownEscape = (
   TurndownService.prototype as unknown as { escape: (s: string) => string }
 ).escape;
 turndown.escape = function (string: string): string {
-  // Aplica o escape default e DESFAZ o escape de `*`.
+  // Aplica o escape default e desfaz escapes dos marcadores inline que o
+  // proprio editor gera. Runs antigos de barras antes de `*` eram a causa
+  // do bug visual `\\\\\*` ao trocar de arquivo.
   const escaped = TurndownEscape.call(this, string);
-  return escaped.replace(/\\\*/g, "*");
+  return repairEscapedInlineMarks(escaped);
 };
 
 // Plugins GFM: tabelas + strike + checkboxes
@@ -347,6 +349,51 @@ function normalizeNestedMarks(html: string): string {
   return next;
 }
 
+function repairLiteralMarksInText(text: string): string {
+  return text
+    .replace(/(?:&#42;|&#x2a;|&ast;)/gi, "*")
+    .replace(/(?:&#126;|&#x7e;)/gi, "~")
+    .replace(/\*\*\*([^*\n][\s\S]*?[^*\n]|\S)\*\*\*/g, "<strong><em>$1</em></strong>")
+    .replace(/\*\*([^*\n][\s\S]*?[^*\n]|\S)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^\w*])\*([^*\n][^*\n]*?[^*\n]|\S)\*(?!\w)/g, "$1<em>$2</em>")
+    .replace(/~~([^~\n][\s\S]*?[^~\n]|\S)~~/g, "<s>$1</s>");
+}
+
+function repairLiteralMarkdownMarksInHtml(html: string): string {
+  const tokens = html.split(/(<[^>]+>)/g);
+  let blockedDepth = 0;
+  return tokens
+    .map((token) => {
+      if (!token) return token;
+      if (token.startsWith("<")) {
+        const name = tagNameOf(token);
+        if (name && (name === "code" || name === "pre")) {
+          if (isClosingTag(token)) {
+            blockedDepth = Math.max(0, blockedDepth - 1);
+          } else if (!isSelfClosingTag(token)) {
+            blockedDepth += 1;
+          }
+        }
+        return token;
+      }
+      if (blockedDepth > 0) return token;
+      return repairLiteralMarksInText(token);
+    })
+    .join("");
+}
+
+function repairEscapedInlineMarks(markdown: string): string {
+  let next = markdown;
+  let prev = "";
+  while (next !== prev) {
+    prev = next;
+    next = next
+      .replace(/\\+(\*{1,3})/g, "$1")
+      .replace(/\\+(~{2})/g, "$1");
+  }
+  return next;
+}
+
 /**
  * Substitui ocorrencias de `[[name]]` por `<a class="wikilink" ...>...</a>`
  * ANTES do marked parsear. Sem isso, o marked pode entender o conteudo
@@ -375,13 +422,14 @@ export function markdownToHtml(md: string): string {
   //    antes do marked, pra que o parser markdown trate como HTML
   //    inline (passa direto sem interpretar).
   // 2) marked converte o resto pra HTML.
-  const withWikilinks = injectWikilinks(md);
+  const withWikilinks = injectWikilinks(repairEscapedInlineMarks(md));
   const rawHtml = marked.parse(withWikilinks, { async: false }) as string;
+  const withRepairedMarks = repairLiteralMarkdownMarksInHtml(rawHtml);
   // Reverse do marker EM SPACE: paragrafos cujo conteudo comeca com EM
   // SPACE sao identados. A regex pega `<p>` ou `<p ... >` (caso
   // marked adicione atributos no futuro). Removemos o marker pra que
   // ele nao apareca como texto literal no editor.
-  const withIndent = rawHtml.replace(
+  const withIndent = withRepairedMarks.replace(
     new RegExp(`<p([^>]*)>${EM_SPACE}`, "g"),
     '<p data-indent="true"$1>',
   );
@@ -393,8 +441,9 @@ export function htmlToMarkdown(html: string): string {
   // Trim CONSERVADOR: so' newlines e space ASCII. Nao usamos `.trim()`
   // padrao porque ele considera EM SPACE como whitespace e come o
   // marker de indent do primeiro paragrafo.
-  return turndown
+  const markdown = turndown
     .turndown(protectEditorSpaces(html))
     .replace(/^[\n ]+/, "")
     .replace(/[\n ]+$/, "\n");
+  return repairEscapedInlineMarks(markdown);
 }

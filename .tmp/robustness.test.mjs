@@ -4941,21 +4941,21 @@ var require_NodeIterator = __commonJS({
 var require_URL = __commonJS({
   "node_modules/@mixmark-io/domino/lib/URL.js"(exports, module) {
     "use strict";
-    module.exports = URL;
-    function URL(url) {
-      if (!url) return Object.create(URL.prototype);
+    module.exports = URL2;
+    function URL2(url) {
+      if (!url) return Object.create(URL2.prototype);
       this.url = url.replace(/^[ \t\n\r\f]+|[ \t\n\r\f]+$/g, "");
-      var match = URL.pattern.exec(this.url);
+      var match = URL2.pattern.exec(this.url);
       if (match) {
         if (match[2]) this.scheme = match[2];
         if (match[4]) {
-          var userinfo = match[4].match(URL.userinfoPattern);
+          var userinfo = match[4].match(URL2.userinfoPattern);
           if (userinfo) {
             this.username = userinfo[1];
             this.password = userinfo[3];
             match[4] = match[4].substring(userinfo[0].length);
           }
-          if (match[4].match(URL.portPattern)) {
+          if (match[4].match(URL2.portPattern)) {
             var pos = match[4].lastIndexOf(":");
             this.host = match[4].substring(0, pos);
             this.port = match[4].substring(pos + 1);
@@ -4968,27 +4968,27 @@ var require_URL = __commonJS({
         if (match[8]) this.fragment = match[9];
       }
     }
-    URL.pattern = /^(([^:\/?#]+):)?(\/\/([^\/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$/;
-    URL.userinfoPattern = /^([^@:]*)(:([^@]*))?@/;
-    URL.portPattern = /:\d+$/;
-    URL.authorityPattern = /^[^:\/?#]+:\/\//;
-    URL.hierarchyPattern = /^[^:\/?#]+:\//;
-    URL.percentEncode = function percentEncode(s) {
+    URL2.pattern = /^(([^:\/?#]+):)?(\/\/([^\/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$/;
+    URL2.userinfoPattern = /^([^@:]*)(:([^@]*))?@/;
+    URL2.portPattern = /:\d+$/;
+    URL2.authorityPattern = /^[^:\/?#]+:\/\//;
+    URL2.hierarchyPattern = /^[^:\/?#]+:\//;
+    URL2.percentEncode = function percentEncode(s) {
       var c = s.charCodeAt(0);
       if (c < 256) return "%" + c.toString(16);
       else throw Error("can't percent-encode codepoints > 255 yet");
     };
-    URL.prototype = {
-      constructor: URL,
+    URL2.prototype = {
+      constructor: URL2,
       // XXX: not sure if this is the precise definition of absolute
       isAbsolute: function() {
         return !!this.scheme;
       },
       isAuthorityBased: function() {
-        return URL.authorityPattern.test(this.url);
+        return URL2.authorityPattern.test(this.url);
       },
       isHierarchical: function() {
-        return URL.hierarchyPattern.test(this.url);
+        return URL2.hierarchyPattern.test(this.url);
       },
       toString: function() {
         var s = "";
@@ -5016,8 +5016,8 @@ var require_URL = __commonJS({
       // and https://url.spec.whatwg.org/#constructors
       resolve: function(relative) {
         var base = this;
-        var r = new URL(relative);
-        var t = new URL();
+        var r = new URL2(relative);
+        var t = new URL2();
         if (r.scheme !== void 0) {
           t.scheme = r.scheme;
           t.username = r.username;
@@ -5389,13 +5389,13 @@ var require_CSSStyleDeclaration = __commonJS({
 var require_URLUtils = __commonJS({
   "node_modules/@mixmark-io/domino/lib/URLUtils.js"(exports, module) {
     "use strict";
-    var URL = require_URL();
+    var URL2 = require_URL();
     module.exports = URLUtils;
     function URLUtils() {
     }
     URLUtils.prototype = Object.create(Object.prototype, {
       _url: { get: function() {
-        return new URL(this.href);
+        return new URL2(this.href);
       } },
       protocol: {
         get: function() {
@@ -5405,10 +5405,10 @@ var require_URLUtils = __commonJS({
         },
         set: function(v) {
           var output = this.href;
-          var url = new URL(output);
+          var url = new URL2(output);
           if (url.isAbsolute()) {
             v = v.replace(/:+$/, "");
-            v = v.replace(/[^-+\.a-zA-Z0-9]/g, URL.percentEncode);
+            v = v.replace(/[^-+\.a-zA-Z0-9]/g, URL2.percentEncode);
             if (v.length > 0) {
               url.scheme = v;
               output = url.toString();
@@ -5427,9 +5427,9 @@ var require_URLUtils = __commonJS({
         },
         set: function(v) {
           var output = this.href;
-          var url = new URL(output);
+          var url = new URL2(output);
           if (url.isAbsolute() && url.isAuthorityBased()) {
-            v = v.replace(/[^-+\._~!$&'()*,;:=a-zA-Z0-9]/g, URL.percentEncode);
+            v = v.replace(/[^-+\._~!$&'()*,;:=a-zA-Z0-9]/g, URL2.percentEncode);
             if (v.length > 0) {
               url.host = v;
               delete url.port;
@@ -5449,10 +5449,10 @@ var require_URLUtils = __commonJS({
         },
         set: function(v) {
           var output = this.href;
-          var url = new URL(output);
+          var url = new URL2(output);
           if (url.isAbsolute() && url.isAuthorityBased()) {
             v = v.replace(/^\/+/, "");
-            v = v.replace(/[^-+\._~!$&'()*,;:=a-zA-Z0-9]/g, URL.percentEncode);
+            v = v.replace(/[^-+\._~!$&'()*,;:=a-zA-Z0-9]/g, URL2.percentEncode);
             if (v.length > 0) {
               url.host = v;
               output = url.toString();
@@ -5471,7 +5471,7 @@ var require_URLUtils = __commonJS({
         },
         set: function(v) {
           var output = this.href;
-          var url = new URL(output);
+          var url = new URL2(output);
           if (url.isAbsolute() && url.isAuthorityBased()) {
             v = "" + v;
             v = v.replace(/[^0-9].*$/, "");
@@ -5495,11 +5495,11 @@ var require_URLUtils = __commonJS({
         },
         set: function(v) {
           var output = this.href;
-          var url = new URL(output);
+          var url = new URL2(output);
           if (url.isAbsolute() && url.isHierarchical()) {
             if (v.charAt(0) !== "/")
               v = "/" + v;
-            v = v.replace(/[^-+\._~!$&'()*,;:=@\/a-zA-Z0-9]/g, URL.percentEncode);
+            v = v.replace(/[^-+\._~!$&'()*,;:=@\/a-zA-Z0-9]/g, URL2.percentEncode);
             url.path = v;
             output = url.toString();
           }
@@ -5516,10 +5516,10 @@ var require_URLUtils = __commonJS({
         },
         set: function(v) {
           var output = this.href;
-          var url = new URL(output);
+          var url = new URL2(output);
           if (url.isAbsolute() && url.isHierarchical()) {
             if (v.charAt(0) === "?") v = v.substring(1);
-            v = v.replace(/[^-+\._~!$&'()*,;:=@\/?a-zA-Z0-9]/g, URL.percentEncode);
+            v = v.replace(/[^-+\._~!$&'()*,;:=@\/?a-zA-Z0-9]/g, URL2.percentEncode);
             url.query = v;
             output = url.toString();
           }
@@ -5537,9 +5537,9 @@ var require_URLUtils = __commonJS({
         },
         set: function(v) {
           var output = this.href;
-          var url = new URL(output);
+          var url = new URL2(output);
           if (v.charAt(0) === "#") v = v.substring(1);
-          v = v.replace(/[^-+\._~!$&'()*,;:=@\/?a-zA-Z0-9]/g, URL.percentEncode);
+          v = v.replace(/[^-+\._~!$&'()*,;:=@\/?a-zA-Z0-9]/g, URL2.percentEncode);
           url.fragment = v;
           output = url.toString();
           this.href = output;
@@ -5552,9 +5552,9 @@ var require_URLUtils = __commonJS({
         },
         set: function(v) {
           var output = this.href;
-          var url = new URL(output);
+          var url = new URL2(output);
           if (url.isAbsolute()) {
-            v = v.replace(/[\x00-\x1F\x7F-\uFFFF "#<>?`\/@\\:]/g, URL.percentEncode);
+            v = v.replace(/[\x00-\x1F\x7F-\uFFFF "#<>?`\/@\\:]/g, URL2.percentEncode);
             url.username = v;
             output = url.toString();
           }
@@ -5568,12 +5568,12 @@ var require_URLUtils = __commonJS({
         },
         set: function(v) {
           var output = this.href;
-          var url = new URL(output);
+          var url = new URL2(output);
           if (url.isAbsolute()) {
             if (v === "") {
               url.password = null;
             } else {
-              v = v.replace(/[\x00-\x1F\x7F-\uFFFF "#<>?`\/@\\]/g, URL.percentEncode);
+              v = v.replace(/[\x00-\x1F\x7F-\uFFFF "#<>?`\/@\\]/g, URL2.percentEncode);
               url.password = v;
             }
             output = url.toString();
@@ -5715,7 +5715,7 @@ var require_htmlelts = __commonJS({
     function define(spec) {
       return defineElement(spec, HTMLElement, htmlElements, htmlNameToImpl);
     }
-    function URL(attr) {
+    function URL2(attr) {
       return {
         get: function() {
           var v = this._getattr(attr);
@@ -5958,7 +5958,7 @@ var require_htmlelts = __commonJS({
         } }
       },
       attributes: {
-        href: URL,
+        href: URL2,
         ping: String,
         download: String,
         target: String,
@@ -5988,7 +5988,7 @@ var require_htmlelts = __commonJS({
         download: String,
         rel: String,
         media: String,
-        href: URL,
+        href: URL2,
         hreflang: String,
         type: String,
         shape: String,
@@ -6080,7 +6080,7 @@ var require_htmlelts = __commonJS({
         autofocus: Boolean,
         type: { type: ["submit", "reset", "button", "menu"], missing: "submit" },
         formTarget: String,
-        formAction: URL,
+        formAction: URL2,
         formNoValidate: Boolean,
         formMethod: { type: ["get", "post", "dialog"], invalid: "get", missing: "" },
         formEnctype: { type: ["application/x-www-form-urlencoded", "multipart/form-data", "text/plain"], invalid: "application/x-www-form-urlencoded", missing: "" }
@@ -6142,7 +6142,7 @@ var require_htmlelts = __commonJS({
         HTMLElement.call(this, doc, localName, prefix);
       },
       attributes: {
-        src: URL,
+        src: URL2,
         type: String,
         width: String,
         height: String,
@@ -6222,7 +6222,7 @@ var require_htmlelts = __commonJS({
         HTMLElement.call(this, doc, localName, prefix);
       },
       attributes: {
-        xmlns: URL,
+        xmlns: URL2,
         // Obsolete
         version: String
       }
@@ -6234,7 +6234,7 @@ var require_htmlelts = __commonJS({
         HTMLElement.call(this, doc, localName, prefix);
       },
       attributes: {
-        src: URL,
+        src: URL2,
         srcdoc: String,
         name: String,
         width: String,
@@ -6251,7 +6251,7 @@ var require_htmlelts = __commonJS({
         align: String,
         scrolling: String,
         frameBorder: String,
-        longDesc: URL,
+        longDesc: URL2,
         marginHeight: { type: String, treatNullAsEmptyString: true },
         marginWidth: { type: String, treatNullAsEmptyString: true }
       }
@@ -6264,7 +6264,7 @@ var require_htmlelts = __commonJS({
       },
       attributes: {
         alt: String,
-        src: URL,
+        src: URL2,
         srcset: String,
         crossOrigin: CORS,
         useMap: String,
@@ -6276,11 +6276,11 @@ var require_htmlelts = __commonJS({
         loading: { type: ["eager", "lazy"], missing: "" },
         // Obsolete:
         name: String,
-        lowsrc: URL,
+        lowsrc: URL2,
         align: String,
         hspace: { type: "unsigned long", default: 0 },
         vspace: { type: "unsigned long", default: 0 },
-        longDesc: URL,
+        longDesc: URL2,
         border: { type: String, treatNullAsEmptyString: true }
       }
     });
@@ -6322,7 +6322,7 @@ var require_htmlelts = __commonJS({
         readOnly: Boolean,
         checked: Boolean,
         value: String,
-        src: URL,
+        src: URL2,
         defaultChecked: { name: "checked", type: Boolean },
         size: { type: "unsigned long", default: 20, min: 1, setmin: 1 },
         width: { type: "unsigned long", min: 0, setmin: 0, default: 0 },
@@ -6426,7 +6426,7 @@ var require_htmlelts = __commonJS({
       },
       attributes: {
         // XXX Reflect DOMSettableTokenList sizes also DOMTokenList relList
-        href: URL,
+        href: URL2,
         rel: String,
         media: String,
         hreflang: String,
@@ -6497,7 +6497,7 @@ var require_htmlelts = __commonJS({
         HTMLElement.call(this, doc, localName, prefix);
       },
       attributes: {
-        cite: URL,
+        cite: URL2,
         dateTime: String
       }
     });
@@ -6543,7 +6543,7 @@ var require_htmlelts = __commonJS({
       },
       props: formAssociatedProps,
       attributes: {
-        data: URL,
+        data: URL2,
         type: String,
         name: String,
         useMap: String,
@@ -6558,7 +6558,7 @@ var require_htmlelts = __commonJS({
         hspace: { type: "unsigned long", default: 0 },
         standby: String,
         vspace: { type: "unsigned long", default: 0 },
-        codeBase: URL,
+        codeBase: URL2,
         codeType: String,
         border: { type: String, treatNullAsEmptyString: true }
       }
@@ -6683,7 +6683,7 @@ var require_htmlelts = __commonJS({
         HTMLElement.call(this, doc, localName, prefix);
       },
       attributes: {
-        cite: URL
+        cite: URL2
       }
     });
     define({
@@ -6712,7 +6712,7 @@ var require_htmlelts = __commonJS({
         }
       },
       attributes: {
-        src: URL,
+        src: URL2,
         type: String,
         charset: String,
         referrerPolicy: REFERRER,
@@ -6985,7 +6985,7 @@ var require_htmlelts = __commonJS({
         HTMLElement.call(this, doc, localName, prefix);
       },
       attributes: {
-        src: URL,
+        src: URL2,
         crossOrigin: CORS,
         preload: { type: ["metadata", "none", "auto", { value: "", alias: "auto" }], missing: "auto" },
         loop: Boolean,
@@ -7011,7 +7011,7 @@ var require_htmlelts = __commonJS({
         htmlElements.HTMLMediaElement.call(this, doc, localName, prefix);
       },
       attributes: {
-        poster: URL,
+        poster: URL2,
         width: { type: "unsigned long", min: 0, default: 0 },
         height: { type: "unsigned long", min: 0, default: 0 }
       }
@@ -7115,7 +7115,7 @@ var require_htmlelts = __commonJS({
       },
       attributes: {
         type: { type: ["command", "checkbox", "radio"], missing: "command" },
-        icon: URL,
+        icon: URL2,
         disabled: Boolean,
         checked: Boolean,
         radiogroup: String,
@@ -7132,7 +7132,7 @@ var require_htmlelts = __commonJS({
         srcset: String,
         sizes: String,
         media: String,
-        src: URL,
+        src: URL2,
         type: String,
         width: String,
         height: String
@@ -7145,7 +7145,7 @@ var require_htmlelts = __commonJS({
         HTMLElement.call(this, doc, localName, prefix);
       },
       attributes: {
-        src: URL,
+        src: URL2,
         srclang: String,
         label: String,
         default: Boolean,
@@ -7419,7 +7419,7 @@ var require_Document = __commonJS({
     var TreeWalker = require_TreeWalker();
     var NodeIterator = require_NodeIterator();
     var NodeFilter = require_NodeFilter();
-    var URL = require_URL();
+    var URL2 = require_URL();
     var select = require_select();
     var events = require_events();
     var xml2 = require_xmlnames();
@@ -7714,7 +7714,7 @@ var require_Document = __commonJS({
       contentType: { get: function contentType() {
         return this._contentType;
       } },
-      URL: { get: function URL2() {
+      URL: { get: function URL3() {
         return this._address;
       } },
       domain: { get: utils.nyi, set: utils.nyi },
@@ -7962,14 +7962,14 @@ var require_Document = __commonJS({
         }
       } },
       _resolve: { value: function(href) {
-        return new URL(this._documentBaseURL).resolve(href);
+        return new URL2(this._documentBaseURL).resolve(href);
       } },
       _documentBaseURL: { get: function() {
         var url = this._address;
         if (url === "about:blank") url = "/";
         var base = this.querySelector("base[href]");
         if (base) {
-          return new URL(url).resolve(base.getAttribute("href"));
+          return new URL2(url).resolve(base.getAttribute("href"));
         }
         return url;
       } },
@@ -16429,7 +16429,7 @@ var require_DOMImplementation = __commonJS({
 var require_Location = __commonJS({
   "node_modules/@mixmark-io/domino/lib/Location.js"(exports, module) {
     "use strict";
-    var URL = require_URL();
+    var URL2 = require_URL();
     var URLUtils = require_URLUtils();
     module.exports = Location;
     function Location(window2, href) {
@@ -16448,7 +16448,7 @@ var require_Location = __commonJS({
         }
       },
       assign: { value: function(url) {
-        var current = new URL(this._href);
+        var current = new URL2(this._href);
         var newurl = current.resolve(url);
         this._href = newurl;
       } },
@@ -20160,6 +20160,31 @@ function cleanMeta(meta) {
   return out;
 }
 
+// src/lib/pathSecurity.ts
+var NOTE_FILE_RE = /\.(md|txt)$/i;
+var INVALID_ENTRY_CHARS = /[<>:"/\\|?*\u0000-\u001f]/;
+var RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
+function normalizeProjectPath(path) {
+  return path.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+function isInsideProject(rootFolder, path) {
+  if (!rootFolder || !path) return false;
+  const root = normalizeProjectPath(rootFolder).toLowerCase();
+  const target = normalizeProjectPath(path).toLowerCase();
+  return target === root || target.startsWith(`${root}/`);
+}
+function isProjectNotePath(rootFolder, path) {
+  return isInsideProject(rootFolder, path) && NOTE_FILE_RE.test(path);
+}
+function isSafeEntryName(name, kind) {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed === "." || trimmed === "..") return false;
+  if (trimmed !== name || INVALID_ENTRY_CHARS.test(trimmed)) return false;
+  if (trimmed.endsWith(".")) return false;
+  if (RESERVED_WINDOWS_NAMES.test(trimmed)) return false;
+  return kind === "folder" || NOTE_FILE_RE.test(trimmed);
+}
+
 // src/lib/localHistory.ts
 function normalize(path) {
   return path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
@@ -23519,6 +23544,11 @@ ${EMPTY_PARAGRAPH_HTML}
     return el.isBlock ? "\n\n" : "";
   }
 });
+var TurndownEscape = import_turndown.default.prototype.escape;
+turndown.escape = function(string) {
+  const escaped = TurndownEscape.call(this, string);
+  return repairEscapedInlineMarks(escaped);
+};
 turndown.use([import_turndown_plugin_gfm.gfm, import_turndown_plugin_gfm.tables, import_turndown_plugin_gfm.strikethrough]);
 turndown.addRule("paragraphStrip", {
   filter: "p",
@@ -23667,6 +23697,47 @@ function sanitizeEditorHtml(html3) {
     FORBID_ATTR: ["srcdoc", "href", "onerror", "onload"]
   });
 }
+function normalizeNestedMarks(html3) {
+  let next = html3;
+  let prev = "";
+  while (next !== prev) {
+    prev = next;
+    next = next.replace(/<(strong|em|s|code)(\s[^>]*)?>\s*<\1(?:\s[^>]*)?>/gi, "<$1$2>").replace(/<\/(strong|em|s|code)>\s*<\/\1>/gi, "</$1>");
+  }
+  return next;
+}
+function repairLiteralMarksInText(text2) {
+  return text2.replace(/(?:&#42;|&#x2a;|&ast;)/gi, "*").replace(/(?:&#126;|&#x7e;)/gi, "~").replace(/\*\*\*([^*\n][\s\S]*?[^*\n]|\S)\*\*\*/g, "<strong><em>$1</em></strong>").replace(/\*\*([^*\n][\s\S]*?[^*\n]|\S)\*\*/g, "<strong>$1</strong>").replace(/(^|[^\w*])\*([^*\n][^*\n]*?[^*\n]|\S)\*(?!\w)/g, "$1<em>$2</em>").replace(/~~([^~\n][\s\S]*?[^~\n]|\S)~~/g, "<s>$1</s>");
+}
+function repairLiteralMarkdownMarksInHtml(html3) {
+  const tokens = html3.split(/(<[^>]+>)/g);
+  let blockedDepth = 0;
+  return tokens.map((token) => {
+    if (!token) return token;
+    if (token.startsWith("<")) {
+      const name = tagNameOf(token);
+      if (name && (name === "code" || name === "pre")) {
+        if (isClosingTag(token)) {
+          blockedDepth = Math.max(0, blockedDepth - 1);
+        } else if (!isSelfClosingTag(token)) {
+          blockedDepth += 1;
+        }
+      }
+      return token;
+    }
+    if (blockedDepth > 0) return token;
+    return repairLiteralMarksInText(token);
+  }).join("");
+}
+function repairEscapedInlineMarks(markdown) {
+  let next = markdown;
+  let prev = "";
+  while (next !== prev) {
+    prev = next;
+    next = next.replace(/\\+(\*{1,3})/g, "$1").replace(/\\+(~{2})/g, "$1");
+  }
+  return next;
+}
 function injectWikilinks(md) {
   return md.replace(/\[\[([^\]\n]+)\]\]/g, (_, target) => {
     const safe = String(target).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -23675,17 +23746,29 @@ function injectWikilinks(md) {
 }
 function markdownToHtml(md) {
   if (!md) return "";
-  const withWikilinks = injectWikilinks(md);
+  const withWikilinks = injectWikilinks(repairEscapedInlineMarks(md));
   const rawHtml = marked.parse(withWikilinks, { async: false });
-  const withIndent = rawHtml.replace(
+  const withRepairedMarks = repairLiteralMarkdownMarksInHtml(rawHtml);
+  const withIndent = withRepairedMarks.replace(
     new RegExp(`<p([^>]*)>${EM_SPACE}`, "g"),
     '<p data-indent="true"$1>'
   );
-  return sanitizeEditorHtml(withIndent);
+  return normalizeNestedMarks(sanitizeEditorHtml(withIndent));
 }
 function htmlToMarkdown(html3) {
   if (!html3) return "";
-  return turndown.turndown(protectEditorSpaces(html3)).replace(/^[\n ]+/, "").replace(/[\n ]+$/, "\n");
+  const markdown = turndown.turndown(protectEditorSpaces(html3)).replace(/^[\n ]+/, "").replace(/[\n ]+$/, "\n");
+  return repairEscapedInlineMarks(markdown);
+}
+
+// src/lib/canvasImages.ts
+var isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+function isSafeAssetSrc(src) {
+  const normalized = src.replace(/\\/g, "/");
+  if (!normalized.startsWith("assets/")) return false;
+  if (normalized.includes("..") || normalized.includes("//")) return false;
+  return /\.(png|jpe?g|gif|webp)$/i.test(normalized);
 }
 
 // tests/robustness.test.mjs
@@ -23799,6 +23882,28 @@ describe("sidebar folder drops", () => {
     );
   });
 });
+describe("project path safety", () => {
+  it("accepts notes only inside the active project", () => {
+    const root = "C:\\Projeto\\Livro";
+    assert.equal(isInsideProject(root, "C:\\Projeto\\Livro\\Cena.md"), true);
+    assert.equal(isProjectNotePath(root, "C:\\Projeto\\Livro\\Cena.md"), true);
+    assert.equal(isProjectNotePath(root, "C:\\Projeto\\Livro\\asset.png"), false);
+    assert.equal(isProjectNotePath(root, "C:\\Projeto\\Outro\\Cena.md"), false);
+  });
+  it("rejects unsafe entry names", () => {
+    assert.equal(isSafeEntryName("Cena 1.md", "file"), true);
+    assert.equal(isSafeEntryName("Cena 1", "file"), false);
+    assert.equal(isSafeEntryName("../Cena.md", "file"), false);
+    assert.equal(isSafeEntryName("CON.md", "file"), false);
+    assert.equal(isSafeEntryName("Notas", "folder"), true);
+  });
+  it("keeps canvas/editor asset paths inside .solon assets", () => {
+    assert.equal(isSafeAssetSrc("assets/image.png"), true);
+    assert.equal(isSafeAssetSrc("assets/../secret.png"), false);
+    assert.equal(isSafeAssetSrc("../assets/image.png"), false);
+    assert.equal(isSafeAssetSrc("assets/vector.svg"), false);
+  });
+});
 describe("editor markdown bridge", () => {
   it("preserves leading visual spaces in paragraphs", () => {
     const md = htmlToMarkdown("<p>  OLHOS</p>");
@@ -23843,6 +23948,29 @@ describe("editor markdown bridge", () => {
     const html3 = markdownToHtml("Use `atalho` aqui.");
     assert.match(html3, /<code>atalho<\/code>/);
     assert.match(htmlToMarkdown(html3), /`atalho`/);
+  });
+  it("round-trips bold and italic without multiplying markers", () => {
+    assert.equal(htmlToMarkdown(markdownToHtml("**negrito**")).trim(), "**negrito**");
+    assert.equal(htmlToMarkdown(markdownToHtml("*italico*")).trim(), "*italico*");
+    assert.equal(htmlToMarkdown(markdownToHtml("***ambos***")).trim(), "***ambos***");
+  });
+  it("normalizes accidentally nested markdown marks on load", () => {
+    const repaired = htmlToMarkdown(markdownToHtml("****negrito****")).trim();
+    assert.equal(repaired, "**negrito**");
+  });
+  it("repairs escaped inline marks from older save/load cycles", () => {
+    const brokenBold = String.raw`\\\\\*\\\\\*Onírica\\\\\*\\\\\*`;
+    const html3 = markdownToHtml(brokenBold);
+    assert.match(html3, /<strong>Onírica<\/strong>/);
+    assert.equal(htmlToMarkdown(`<p>${brokenBold}</p>`).trim(), "**On\xEDrica**");
+  });
+  it("repairs literal markdown marks inside raw html blocks", () => {
+    assert.match(markdownToHtml("<p>**On\xEDrica**</p>"), /<strong>Onírica<\/strong>/);
+    assert.match(
+      markdownToHtml("<p>&#42;&#42;Real&#42;&#42;</p>"),
+      /<strong>Real<\/strong>/
+    );
+    assert.match(markdownToHtml("<p>*Sonho*</p>"), /<em>Sonho<\/em>/);
   });
 });
 /*! Bundled license information:

@@ -1,6 +1,12 @@
-import { forwardRef, useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { Columns2, ExternalLink, GripVertical, PanelRight, X } from "lucide-react";
-import { useAppStore } from "../../store/useAppStore";
+import { useAppStore, type TabInsertPlacement } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { flushEditor } from "../../lib/editorRef";
 import { readDraggedTab, TAB_DND_MIME } from "../../lib/tabs";
@@ -69,6 +75,75 @@ export function TabBar() {
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
+
+  const beginPointerReorder = (
+    event: ReactPointerEvent<HTMLElement>,
+    sourcePath: string,
+  ) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const pointerId = event.pointerId;
+    const originalCursor = document.body.style.cursor;
+    const originalUserSelect = document.body.style.userSelect;
+
+    document.body.style.cursor = "grabbing";
+    document.body.style.userSelect = "none";
+    setDraggingPath(sourcePath);
+    setDropTargetPath(null);
+
+    const cleanup = () => {
+      document.body.style.cursor = originalCursor;
+      document.body.style.userSelect = originalUserSelect;
+      setDraggingPath(null);
+      setDropTargetPath(null);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+
+    const reorderAt = (clientX: number, clientY: number) => {
+      const container = containerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        if (clientX < rect.left + 28) container.scrollLeft -= 14;
+        if (clientX > rect.right - 28) container.scrollLeft += 14;
+      }
+
+      const target = document
+        .elementsFromPoint(clientX, clientY)
+        .map((el) => (el as HTMLElement).closest?.("[data-tab-path]"))
+        .find((el): el is HTMLElement => !!el);
+      const targetPath = target?.dataset.tabPath;
+      if (!targetPath || targetPath === sourcePath) {
+        setDropTargetPath(null);
+        return;
+      }
+
+      const rect = target.getBoundingClientRect();
+      const placement: TabInsertPlacement =
+        clientX > rect.left + rect.width / 2 ? "after" : "before";
+      setDropTargetPath(targetPath);
+      reorderTab(sourcePath, targetPath, placement);
+    };
+
+    function onPointerMove(moveEvent: PointerEvent) {
+      if (moveEvent.pointerId !== pointerId) return;
+      moveEvent.preventDefault();
+      reorderAt(moveEvent.clientX, moveEvent.clientY);
+    }
+
+    function onPointerUp(upEvent: PointerEvent) {
+      if (upEvent.pointerId !== pointerId) return;
+      upEvent.preventDefault();
+      cleanup();
+    }
+
+    window.addEventListener("pointermove", onPointerMove, { passive: false });
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+  };
 
   if (tabs.length === 0) return null;
 
@@ -175,11 +250,14 @@ export function TabBar() {
             path={tab.path}
             onActivate={() => onActivate(tab.path, tab.name)}
             onClose={() => onClose(tab.path)}
-            onReorder={(sourcePath) => reorderTab(sourcePath, tab.path)}
+            onReorder={(sourcePath, placement) =>
+              reorderTab(sourcePath, tab.path, placement)
+            }
             onDetach={() => void detachToNewWindow(tab.path, tab.name)}
             onContextMenu={(e) => onTabContextMenu(e, tab.path, tab.name)}
             dragging={draggingPath === tab.path}
             dropTarget={dropTargetPath === tab.path && draggingPath !== tab.path}
+            onPointerReorderStart={(e) => beginPointerReorder(e, tab.path)}
             onDragStartPath={() => setDraggingPath(tab.path)}
             onDragTarget={() => setDropTargetPath(tab.path)}
             onDragDone={() => {
@@ -201,11 +279,12 @@ interface TabProps {
   isDirty: boolean;
   onActivate: () => void;
   onClose: () => void;
-  onReorder: (targetPath: string) => void;
+  onReorder: (targetPath: string, placement?: TabInsertPlacement) => void;
   onDetach: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
   dragging: boolean;
   dropTarget: boolean;
+  onPointerReorderStart: (e: ReactPointerEvent<HTMLElement>) => void;
   onDragStartPath: () => void;
   onDragTarget: () => void;
   onDragDone: () => void;
@@ -225,6 +304,7 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
   onContextMenu,
   dragging,
   dropTarget,
+  onPointerReorderStart,
   onDragStartPath,
   onDragTarget,
   onDragDone,
@@ -234,6 +314,7 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
   return (
     <div
       ref={ref}
+      data-tab-path={path}
       role="tab"
       aria-selected={isActive}
       draggable
@@ -274,7 +355,10 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
         }
         e.preventDefault();
         e.stopPropagation();
-        onReorder(tab.path);
+        const rect = e.currentTarget.getBoundingClientRect();
+        const placement: TabInsertPlacement =
+          e.clientX > rect.left + rect.width / 2 ? "after" : "before";
+        onReorder(tab.path, placement);
         onDragDone();
       }}
       onDragEnd={(e) => {
@@ -342,12 +426,26 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
       }}
       title={fullName}
     >
-      <GripVertical
-        size={12}
-        className="flex-shrink-0 opacity-45"
-        aria-hidden
-        style={{ cursor: "grab" }}
-      />
+      <button
+        type="button"
+        draggable={false}
+        onPointerDown={onPointerReorderStart}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        className="flex-shrink-0 rounded-sm opacity-50 transition-opacity group-hover:opacity-85"
+        style={{
+          width: 14,
+          height: 18,
+          display: "grid",
+          placeItems: "center",
+          color: "var(--text-muted)",
+          cursor: "grab",
+        }}
+        aria-label={`Mover aba ${fullName}`}
+        title="Arrastar para reorganizar"
+      >
+        <GripVertical size={12} aria-hidden style={{ pointerEvents: "none" }} />
+      </button>
       <span
         className="truncate flex-1"
         style={{
