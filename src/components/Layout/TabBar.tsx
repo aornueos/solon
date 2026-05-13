@@ -1,5 +1,5 @@
-import { forwardRef, useEffect, useRef } from "react";
-import { Columns2, ExternalLink, PanelRight, X } from "lucide-react";
+import { forwardRef, useEffect, useRef, useState } from "react";
+import { Columns2, ExternalLink, GripVertical, PanelRight, X } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { flushEditor } from "../../lib/editorRef";
@@ -41,6 +41,8 @@ export function TabBar() {
   // Ctrl+Tab que cicla pra abas fora da viewport horizontal.
   const containerRef = useRef<HTMLDivElement | null>(null);
   const activeTabRef = useRef<HTMLDivElement | null>(null);
+  const [draggingPath, setDraggingPath] = useState<string | null>(null);
+  const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
   useEffect(() => {
     const el = activeTabRef.current;
     if (!el) return;
@@ -131,6 +133,8 @@ export function TabBar() {
         // morre (fixa = 32px = padding 6px × 2 + content ~20px).
         minHeight: 32,
         scrollbarWidth: "thin",
+        padding: "3px 6px 0",
+        gap: 4,
       }}
       role="tablist"
       aria-label="Arquivos abertos"
@@ -153,6 +157,14 @@ export function TabBar() {
             onReorder={(sourcePath) => reorderTab(sourcePath, tab.path)}
             onDetach={() => void detachToNewWindow(tab.path, tab.name)}
             onContextMenu={(e) => onTabContextMenu(e, tab.path, tab.name)}
+            dragging={draggingPath === tab.path}
+            dropTarget={dropTargetPath === tab.path && draggingPath !== tab.path}
+            onDragStartPath={() => setDraggingPath(tab.path)}
+            onDragTarget={() => setDropTargetPath(tab.path)}
+            onDragDone={() => {
+              setDraggingPath(null);
+              setDropTargetPath(null);
+            }}
           />
         );
       })}
@@ -171,6 +183,11 @@ interface TabProps {
   onReorder: (targetPath: string) => void;
   onDetach: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
+  dragging: boolean;
+  dropTarget: boolean;
+  onDragStartPath: () => void;
+  onDragTarget: () => void;
+  onDragDone: () => void;
 }
 
 const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
@@ -185,6 +202,11 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
   onReorder,
   onDetach,
   onContextMenu,
+  dragging,
+  dropTarget,
+  onDragStartPath,
+  onDragTarget,
+  onDragDone,
 },
   ref,
 ) {
@@ -195,32 +217,60 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
       aria-selected={isActive}
       draggable
       onDragStart={(e) => {
+        onDragStartPath();
         e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData(
-          TAB_DND_MIME,
-          JSON.stringify({ path, name: fullName }),
-        );
+        const payload = JSON.stringify({ path, name: fullName });
+        e.dataTransfer.setData(TAB_DND_MIME, payload);
+        // Fallback `text/plain` — alguns webviews (incluindo o Tauri
+        // em certas builds) tem restricoes no MIME type custom durante
+        // dragover; ter o text/plain garante que `types.includes` pelo
+        // menos detecta um. O readDraggedTab tenta primeiro o MIME
+        // custom e depois fallback pro plain.
+        try {
+          e.dataTransfer.setData("text/plain", payload);
+        } catch {
+          /* alguns ambientes nao permitem setData duplicado */
+        }
       }}
       onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes(TAB_DND_MIME)) return;
+        // Aceita drag se tem o nosso MIME OU se ha text/plain (fallback
+        // do Tauri webview). preventDefault EH OBRIGATORIO pra que onDrop
+        // dispare — esquecer disso bloqueia silenciosamente o drag.
+        const types = e.dataTransfer.types;
+        if (!types.includes(TAB_DND_MIME) && !types.includes("text/plain")) {
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect = "move";
+        onDragTarget();
       }}
       onDrop={(e) => {
         const tab = readDraggedTab(e.dataTransfer);
-        if (!tab || tab.path === path) return;
+        if (!tab || tab.path === path) {
+          onDragDone();
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         onReorder(tab.path);
+        onDragDone();
       }}
       onDragEnd={(e) => {
-        const outside =
-          e.clientX < 0 ||
-          e.clientY < 0 ||
-          e.clientX > window.innerWidth ||
-          e.clientY > window.innerHeight;
-        if (outside) onDetach();
+        // Detach só se o drag terminou GENUINAMENTE fora da janela —
+        // dropEffect = "none" quando o drop foi cancelado ou em lugar
+        // invalido; "move" quando o reorder aconteceu (entao nao
+        // detach). Coordenadas (0,0) ou negativas as vezes aparecem em
+        // cancelamentos no Tauri webview e disparariam detach falso.
+        const droppedSomewhere = e.dataTransfer.dropEffect === "move";
+        const outsideWindow =
+          e.clientX > 0 &&
+          e.clientY > 0 &&
+          (e.clientX > window.innerWidth || e.clientY > window.innerHeight);
+        if (!droppedSomewhere && outsideWindow) {
+          onDetach();
+        }
+        onDragDone();
       }}
       onContextMenu={onContextMenu}
       onMouseDown={(e) => {
@@ -242,36 +292,41 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
       }}
       className={clsx(
         "solon-tab group relative flex items-center gap-1.5 cursor-pointer flex-shrink-0",
-        "select-none transition-colors",
+        "select-none transition-all",
         isActive && "solon-tab--active",
+        dragging && "opacity-55",
       )}
       style={{
         // Padding lateral assimetrico — mais a' direita pra dar respiro
         // pro botao ✕. minWidth garante que aba "x" curta nao some.
-        padding: "6px 8px 6px 12px",
+        padding: "5px 7px",
         minWidth: 96,
         maxWidth: 220,
         fontSize: "0.78rem",
         // Aba ativa "destaca" do bg-panel-2 da TabBar com a cor do conteudo
         // (bg-app), criando a sensacao classica de "esta aba e' o documento
         // visivel atras". Inativas ficam no fundo.
-        background: isActive ? "var(--bg-app)" : "transparent",
+        background: isActive ? "var(--bg-app)" : "color-mix(in srgb, var(--bg-panel) 45%, transparent)",
         color: isActive ? "var(--text-primary)" : "var(--text-muted)",
         // Borda direita serve de separador entre abas (fica entre cada par).
         // A ativa tem borda-top accent pra reforcar o estado.
-        borderRight: "1px solid var(--border-subtle)",
-        borderTop: isActive
-          ? "2px solid var(--accent)"
-          : "2px solid transparent",
-        // Borda inferior some na ativa pra emendar com o editor; outras
-        // herdam o border da TabBar via marginBottom -1.
+        border: `1px solid ${dropTarget ? "var(--accent)" : "var(--border-subtle)"}`,
+        borderTop: isActive ? "2px solid var(--accent)" : "1px solid var(--border-subtle)",
         borderBottom: isActive
           ? "1px solid var(--bg-app)"
-          : "1px solid transparent",
+          : `1px solid ${dropTarget ? "var(--accent)" : "var(--border-subtle)"}`,
+        borderRadius: "7px 7px 0 0",
         marginBottom: "-1px",
+        boxShadow: isActive ? "var(--shadow-sm)" : undefined,
       }}
       title={fullName}
     >
+      <GripVertical
+        size={12}
+        className="flex-shrink-0 opacity-45"
+        aria-hidden
+        style={{ cursor: "grab" }}
+      />
       <span
         className="truncate flex-1"
         style={{

@@ -31,6 +31,16 @@ export async function resolveEditorImageHtml(
 ): Promise<string> {
   if (!html || !rootFolder) return html;
 
+  // SHORT-CIRCUIT: docs sem `<img>` (caso majoritario — texto puro) NAO
+  // passam pelo DOMParser/innerHTML round-trip. Esse round-trip pelo
+  // parser nativo do WebView reescreve detalhes do HTML (entities,
+  // whitespace canonico, atributos auto-fechados) que em alguns casos
+  // raros confundem o TipTap. Detectado quando user reportou bold
+  // virando texto literal `**Onírica**` apos trocar de aba e voltar.
+  // Pular o round-trip elimina o caminho problematico pra ~99% dos
+  // docs e mantem o flow rapido.
+  if (!/<img\b/i.test(html)) return html;
+
   const doc = new DOMParser().parseFromString(html, "text/html");
   const images = Array.from(doc.querySelectorAll("img"));
   await Promise.all(
