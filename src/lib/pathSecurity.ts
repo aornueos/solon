@@ -7,8 +7,13 @@ export function normalizeProjectPath(path: string): string {
   return path.replace(/\\/g, "/").replace(/\/+$/, "");
 }
 
+function hasTraversalSegment(path: string): boolean {
+  return path.replace(/\\/g, "/").split("/").some((segment) => segment === "..");
+}
+
 export function isInsideProject(rootFolder: string | null, path: string): boolean {
   if (!rootFolder || !path) return false;
+  if (hasTraversalSegment(rootFolder) || hasTraversalSegment(path)) return false;
   const root = normalizeProjectPath(rootFolder).toLowerCase();
   const target = normalizeProjectPath(path).toLowerCase();
   return target === root || target.startsWith(`${root}/`);

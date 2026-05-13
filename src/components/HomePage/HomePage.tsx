@@ -156,7 +156,7 @@ export function HomePage() {
                   files={recentFiles}
                   rootFolder={rootFolder}
                   onOpen={(path, name) => {
-                    void openFile(path, name);
+                    void openFile(path, name, { tab: "replace" });
                     setActiveView("editor");
                   }}
                 />

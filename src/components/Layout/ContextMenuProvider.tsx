@@ -9,6 +9,8 @@ import {
   Redo2,
   CaseSensitive,
   BookPlus,
+  Search,
+  Settings,
 } from "lucide-react";
 import { useAppStore, ContextMenuItem } from "../../store/useAppStore";
 import { findWordAtCoords, replaceRange, getCurrentEditor } from "../../lib/editorRef";
@@ -403,6 +405,25 @@ function genericItems({
       shortcut: "Ctrl+C",
       disabled: !hasSelection,
       onClick: () => document.execCommand("copy"),
+    },
+    { kind: "separator" },
+    {
+      label: "Buscar notas e pastas",
+      icon: <Search size={12} />,
+      shortcut: "Ctrl+P",
+      onClick: () => useAppStore.getState().openCommandPalette(),
+    },
+    {
+      label: "Buscar no projeto",
+      icon: <Search size={12} />,
+      shortcut: "Ctrl+Shift+F",
+      onClick: () => useAppStore.getState().openGlobalSearch(),
+    },
+    {
+      label: "Preferencias",
+      icon: <Settings size={12} />,
+      shortcut: "Ctrl+,",
+      onClick: () => useAppStore.getState().openSettings(),
     },
   ];
 }

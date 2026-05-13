@@ -4,12 +4,10 @@ import {
   FolderOpen,
   Home,
   LayoutGrid,
-  Moon,
   MousePointer2,
   Pencil,
   Search,
   Settings,
-  Sun,
   Type,
   MoveUpRight,
   Eraser,
@@ -47,9 +45,7 @@ export function CommandPalette() {
   const close = useAppStore((s) => s.closeCommandPalette);
   const fileTree = useAppStore((s) => s.fileTree);
   const activeView = useAppStore((s) => s.activeView);
-  const theme = useAppStore((s) => s.theme);
   const setActiveView = useAppStore((s) => s.setActiveView);
-  const toggleTheme = useAppStore((s) => s.toggleTheme);
   const toggleFocusMode = useAppStore((s) => s.toggleFocusMode);
   const toggleReadingMode = useAppStore((s) => s.toggleReadingMode);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
@@ -60,6 +56,7 @@ export function CommandPalette() {
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
   const openExport = useAppStore((s) => s.openExport);
   const openShortcuts = useAppStore((s) => s.openShortcuts);
+  const setFileTree = useAppStore((s) => s.setFileTree);
   const setTool = useCanvasStore((s) => s.setTool);
   const addCard = useCanvasStore((s) => s.addCard);
   const { openFile, openFolder } = useFileSystem();
@@ -76,19 +73,32 @@ export function CommandPalette() {
   }, [open]);
 
   const fileCommands = useMemo(
-    () =>
-      flattenFiles(fileTree).map<CommandItem>((file) => ({
+    () => {
+      const files = flattenFiles(fileTree).map<CommandItem>((file) => ({
         id: `file:${file.path}`,
         label: file.name.replace(/\.(md|txt)$/i, ""),
         hint: compactPath(file.path),
         keywords: `${file.name} ${file.path}`,
         icon: <FileText size={15} />,
         run: async () => {
-          await openFile(file.path, file.name);
+          await openFile(file.path, file.name, { tab: "replace" });
           setActiveView("editor");
         },
-      })),
-    [fileTree, openFile, setActiveView],
+      }));
+      const folders = flattenFolders(fileTree).map<CommandItem>((folder) => ({
+        id: `folder:${folder.path}`,
+        label: folder.name,
+        hint: `Pasta · ${compactPath(folder.path)}`,
+        keywords: `${folder.name} ${folder.path} pasta folder`,
+        icon: <FolderOpen size={15} />,
+        run: () => {
+          setFileTree(expandFolderPath(useAppStore.getState().fileTree, folder.path));
+          useAppStore.setState({ isSidebarOpen: true });
+        },
+      }));
+      return [...files, ...folders];
+    },
+    [fileTree, openFile, setActiveView, setFileTree],
   );
 
   const baseCommands = useMemo<CommandItem[]>(
@@ -122,16 +132,9 @@ export function CommandPalette() {
         run: () => setActiveView("canvas"),
       },
       {
-        id: "theme",
-        label: theme === "dark" ? "Tema claro" : "Tema escuro",
-        hint: "Ctrl+Shift+L",
-        icon: theme === "dark" ? <Sun size={15} /> : <Moon size={15} />,
-        run: toggleTheme,
-      },
-      {
         id: "focus",
         label: "Alternar modo foco",
-        hint: "F11",
+        hint: "esconde painéis laterais",
         icon: <Focus size={15} />,
         run: toggleFocusMode,
       },
@@ -240,13 +243,11 @@ export function CommandPalette() {
       openSettings,
       setActiveView,
       setTool,
-      theme,
       toggleFocusMode,
       toggleReadingMode,
       toggleInspector,
       toggleOutline,
       toggleSidebar,
-      toggleTheme,
     ],
   );
 
@@ -321,7 +322,7 @@ export function CommandPalette() {
                 void run(filtered[activeIndex]);
               }
             }}
-            placeholder="Buscar comando ou arquivo..."
+            placeholder="Buscar comando, nota ou pasta..."
             className="flex-1 bg-transparent outline-none text-[0.92rem]"
             style={{ color: "var(--text-primary)" }}
           />
@@ -391,6 +392,33 @@ function flattenFiles(nodes: FileNode[]): FileNode[] {
     if (node.children) out.push(...flattenFiles(node.children));
   }
   return out;
+}
+
+function flattenFolders(nodes: FileNode[]): FileNode[] {
+  const out: FileNode[] = [];
+  for (const node of nodes) {
+    if (node.type === "folder") out.push(node);
+    if (node.children) out.push(...flattenFolders(node.children));
+  }
+  return out;
+}
+
+function expandFolderPath(nodes: FileNode[], path: string): FileNode[] {
+  let changed = false;
+  const next = nodes.map((node) => {
+    if (node.path === path && node.type === "folder") {
+      changed = true;
+      return { ...node, expanded: true };
+    }
+    if (!node.children) return node;
+    const children = expandFolderPath(node.children, path);
+    if (children !== node.children) {
+      changed = true;
+      return { ...node, expanded: true, children };
+    }
+    return node;
+  });
+  return changed ? next : nodes;
 }
 
 function normalize(value: string): string {

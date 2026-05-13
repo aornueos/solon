@@ -132,7 +132,7 @@ export async function checkForUpdate(
       return {
         kind: "unconfigured",
         message:
-          "Canal de atualizacoes ainda nao publicado (latest.json ausente).",
+          "Canal de atualizacoes ausente: publique o latest.json assinado nos assets do release.",
       };
     }
     if (isSignatureOrManifestIssue(message)) {
@@ -158,7 +158,9 @@ function isMissingUpdateFeed(message: string): boolean {
   return (
     text.includes("404") ||
     text.includes("not found") ||
-    (text.includes("latest.json") && text.includes("failed"))
+    text.includes("could not fetch json") ||
+    text.includes("failed to fetch json") ||
+    (text.includes("latest.json") && (text.includes("failed") || text.includes("fetch")))
   );
 }
 

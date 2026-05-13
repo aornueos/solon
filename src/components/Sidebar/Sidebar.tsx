@@ -9,6 +9,8 @@ import {
   Pencil,
   Trash2,
   Copy,
+  ExternalLink,
+  Clipboard,
   Tag as TagIcon,
   X as XIcon,
 } from "lucide-react";
@@ -62,7 +64,7 @@ export function Sidebar() {
   const tagIndex = useAppStore((s) => s.tagIndex);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const tagBtnRef = useRef<HTMLButtonElement | null>(null);
-  const { openFolder, refresh, createFile, createFolder, renameNode, deleteNode, reorderItem, moveItem, duplicateFile } =
+  const { openFolder, openFile, refresh, createFile, createFolder, renameNode, deleteNode, reorderItem, moveItem, duplicateFile } =
     useFileSystem();
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   /**
@@ -200,7 +202,7 @@ export function Sidebar() {
           className="text-[0.7rem] font-semibold uppercase tracking-widest truncate"
           style={{ color: "var(--text-muted)" }}
         >
-          {rootFolder ? rootFolder.split(/[\\/]/).pop() : "Explorador"}
+          Arquivos
         </span>
         <div className="flex items-center gap-0.5">
           {rootFolder && (
@@ -372,6 +374,18 @@ export function Sidebar() {
           onClose={() => setMenu(null)}
           onNewFile={handleNewFile}
           onNewFolder={handleNewFolder}
+          onOpen={(node) => {
+            if (node.type === "folder") {
+              toggleFolder(node.path);
+            } else {
+              void openFile(node.path, node.name, { tab: "replace" });
+            }
+          }}
+          onOpenInNewTab={(node) => {
+            if (node.type === "file") {
+              void openFile(node.path, node.name, { tab: "new" });
+            }
+          }}
           onRename={handleRename}
           onDelete={handleDelete}
           onDuplicate={(node) => {
@@ -500,6 +514,11 @@ function FileTreeRow({
     const originY = e.clientY;
     let dragging = false;
     let currentTargetPath: string | null = null;
+    const originalCursor = document.body.style.cursor;
+
+    const finishDrag = () => {
+      document.body.style.cursor = originalCursor;
+    };
 
     startDrag({
       onMove: (ev) => {
@@ -510,6 +529,7 @@ function FileTreeRow({
           dragging = true;
           suppressClickRef.current = true;
           onDragStart(node.path);
+          document.body.style.cursor = "default";
         }
 
         ev.preventDefault();
@@ -525,6 +545,7 @@ function FileTreeRow({
           currentTargetPath ?? findFolderDropTarget(ev.clientX, ev.clientY);
         if (targetPath) onMoveToFolder(node.path, targetPath);
         else onDragEnd();
+        finishDrag();
         window.setTimeout(() => {
           suppressClickRef.current = false;
         }, 0);
@@ -533,6 +554,7 @@ function FileTreeRow({
         onDragOver(null);
         onDragOverFolder(null);
         onDragEnd();
+        finishDrag();
         window.setTimeout(() => {
           suppressClickRef.current = false;
         }, 0);
@@ -682,6 +704,12 @@ function FileTreeRow({
           suppressClickRef.current = false;
           return;
         }
+        if (node.type === "file" && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          e.stopPropagation();
+          onOpenInBackground();
+          return;
+        }
         onOpen();
       }}
       onAuxClick={(e) => {
@@ -738,8 +766,8 @@ function FileTreeRow({
             className="flex-shrink-0"
             style={{
               color: node.expanded
-                ? "var(--accent)"
-                : "var(--text-placeholder)",
+                ? "var(--folder-color-open, var(--accent))"
+                : "var(--folder-color, var(--text-placeholder))",
             }}
           />
         </>
@@ -824,7 +852,7 @@ function FileTree({
             isActive={node.type === "file" && activeFilePath === node.path}
             onOpen={() => {
               if (node.type === "folder") onToggle(node.path);
-              else openFile(node.path, node.name);
+              else openFile(node.path, node.name, { tab: "replace" });
             }}
             onOpenInBackground={() => {
               // Middle-click em arquivo abre nova aba SEM tirar o foco
@@ -885,6 +913,8 @@ function ContextMenu({
   onClose,
   onNewFile,
   onNewFolder,
+  onOpen,
+  onOpenInNewTab,
   onRename,
   onDelete,
   onDuplicate,
@@ -894,6 +924,8 @@ function ContextMenu({
   onClose: () => void;
   onNewFile: (parentDir: string) => void;
   onNewFolder: (parentDir: string) => void;
+  onOpen: (node: FileNode) => void;
+  onOpenInNewTab: (node: FileNode) => void;
   onRename: (node: FileNode) => void;
   onDelete: (node: FileNode) => void;
   onDuplicate?: (node: FileNode) => void;
@@ -901,6 +933,14 @@ function ContextMenu({
 }) {
   const { node } = menu;
   const items: { label: string; icon: React.ReactNode; action: () => void; danger?: boolean }[] = [];
+  const copyPath = (path: string) => {
+    void navigator.clipboard?.writeText(path);
+  };
+  const revealPath = (path: string) => {
+    void import("@tauri-apps/plugin-opener")
+      .then(({ revealItemInDir }) => revealItemInDir(path))
+      .catch(() => {});
+  };
 
   // Espaço vazio → ações na raiz
   if (!node) {
@@ -918,6 +958,11 @@ function ContextMenu({
     }
   } else if (node.type === "folder") {
     items.push({
+      label: "Abrir",
+      icon: <FolderOpen size={12} />,
+      action: () => onOpen(node),
+    });
+    items.push({
       label: "Novo arquivo",
       icon: <FilePlus size={12} />,
       action: () => onNewFile(node.path),
@@ -926,6 +971,16 @@ function ContextMenu({
       label: "Nova subpasta",
       icon: <FolderPlus size={12} />,
       action: () => onNewFolder(node.path),
+    });
+    items.push({
+      label: "Copiar caminho",
+      icon: <Clipboard size={12} />,
+      action: () => copyPath(node.path),
+    });
+    items.push({
+      label: "Mostrar no Explorer",
+      icon: <ExternalLink size={12} />,
+      action: () => revealPath(node.path),
     });
     items.push({
       label: "Renomear",
@@ -940,9 +995,29 @@ function ContextMenu({
     });
   } else {
     items.push({
+      label: "Abrir aqui",
+      icon: <File size={12} />,
+      action: () => onOpen(node),
+    });
+    items.push({
+      label: "Abrir em nova aba",
+      icon: <FilePlus size={12} />,
+      action: () => onOpenInNewTab(node),
+    });
+    items.push({
       label: "Duplicar",
       icon: <Copy size={12} />,
       action: () => onDuplicate?.(node),
+    });
+    items.push({
+      label: "Copiar caminho",
+      icon: <Clipboard size={12} />,
+      action: () => copyPath(node.path),
+    });
+    items.push({
+      label: "Mostrar no Explorer",
+      icon: <ExternalLink size={12} />,
+      action: () => revealPath(node.path),
     });
     items.push({
       label: "Renomear",
@@ -1071,7 +1146,7 @@ function FilteredFileList({
         return (
           <li key={f.path}>
             <button
-              onClick={() => openFile(f.path, f.name)}
+              onClick={() => openFile(f.path, f.name, { tab: "replace" })}
               className="w-full flex items-center gap-1.5 px-3 py-1 text-left text-[0.8125rem] transition-colors truncate"
               style={{
                 background: isActive ? "var(--bg-hover)" : "transparent",

@@ -1,19 +1,15 @@
 import { useEffect, useState } from "react";
 import {
   X,
-  Sun,
-  Moon,
   RotateCcw,
   Save,
   Sparkles,
   SpellCheck,
   Type,
-  Home,
-  FileText,
-  LayoutGrid,
   Loader2,
   Trash2,
   ExternalLink,
+  Monitor,
 } from "lucide-react";
 import {
   EDITOR_FONT_FAMILIES,
@@ -53,10 +49,10 @@ import {
 export function SettingsDialog() {
   const show = useAppStore((s) => s.showSettings);
   const close = useAppStore((s) => s.closeSettings);
-  const theme = useAppStore((s) => s.theme);
-  const setTheme = useAppStore((s) => s.setTheme);
   const editorZoom = useAppStore((s) => s.editorZoom);
   const setEditorZoom = useAppStore((s) => s.setEditorZoom);
+  const appZoom = useAppStore((s) => s.appZoom);
+  const setAppZoom = useAppStore((s) => s.setAppZoom);
   const editorMaxWidth = useAppStore((s) => s.editorMaxWidth);
   const setEditorMaxWidth = useAppStore((s) => s.setEditorMaxWidth);
   const editorLineHeight = useAppStore((s) => s.editorLineHeight);
@@ -71,6 +67,8 @@ export function SettingsDialog() {
   const setEditorFontFamily = useAppStore((s) => s.setEditorFontFamily);
   const editorPaper = useAppStore((s) => s.editorPaper);
   const setEditorPaper = useAppStore((s) => s.setEditorPaper);
+  const editorToolbarMode = useAppStore((s) => s.editorToolbarMode);
+  const setEditorToolbarMode = useAppStore((s) => s.setEditorToolbarMode);
   const startView = useAppStore((s) => s.startView);
   const setStartView = useAppStore((s) => s.setStartView);
   const autoSaveEnabled = useAppStore((s) => s.autoSaveEnabled);
@@ -266,15 +264,72 @@ export function SettingsDialog() {
         <div className="overflow-y-auto px-5 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Aparencia */}
           <Section title="Aparência">
-            <Row label="Tema">
-              <SegmentedControl
-                value={theme}
-                options={[
-                  { value: "light", label: "Claro", icon: <Sun size={11} /> },
-                  { value: "dark", label: "Escuro", icon: <Moon size={11} /> },
-                ]}
-                onChange={(v) => setTheme(v as "light" | "dark")}
+            <Row
+              label="Tema visual"
+              hint={EDITOR_PAPERS.find((option) => option.value === editorPaper)?.hint}
+            >
+              <SelectControl
+                value={editorPaper}
+                options={EDITOR_PAPERS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+                onChange={(v) => setEditorPaper(v)}
               />
+            </Row>
+
+            <Row
+              label="Zoom do app"
+              hint={`${appZoom}%`}
+              icon={<Monitor size={11} />}
+            >
+              <div className="flex items-center gap-2 w-full">
+                <button
+                  title="Diminuir interface"
+                  onClick={() => setAppZoom(appZoom - 10)}
+                  disabled={appZoom <= 80}
+                  className="px-2 py-0.5 rounded text-[0.72rem] font-mono transition-opacity disabled:opacity-30"
+                  style={{
+                    background: "var(--bg-hover)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  -
+                </button>
+                <input
+                  type="range"
+                  min={80}
+                  max={160}
+                  step={10}
+                  value={appZoom}
+                  onChange={(e) => setAppZoom(parseInt(e.target.value, 10))}
+                  className="flex-1"
+                  style={{ accentColor: "var(--accent)" }}
+                />
+                <button
+                  title="Aumentar interface"
+                  onClick={() => setAppZoom(appZoom + 10)}
+                  disabled={appZoom >= 160}
+                  className="px-2 py-0.5 rounded text-[0.72rem] font-mono transition-opacity disabled:opacity-30"
+                  style={{
+                    background: "var(--bg-hover)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  +
+                </button>
+                <button
+                  title="100%"
+                  onClick={() => setAppZoom(100)}
+                  className="px-1.5 py-0.5 rounded text-[0.65rem]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  100%
+                </button>
+              </div>
             </Row>
 
             <Row
@@ -332,18 +387,18 @@ export function SettingsDialog() {
             </Row>
 
             <Row label="Largura do editor" hint={`${editorMaxWidth}px`}>
-              <SegmentedControl
+              <SelectControl
                 value={String(editorMaxWidth)}
                 options={EDITOR_MAX_WIDTHS.map((w) => ({
                   value: String(w),
-                  label: String(w),
+                  label: `${w}px`,
                 }))}
                 onChange={(v) => setEditorMaxWidth(parseInt(v, 10))}
               />
             </Row>
 
             <Row label="Espaçamento" hint={getLineHeightLabel(editorLineHeight)}>
-              <SegmentedControl
+              <SelectControl
                 value={editorLineHeight}
                 options={EDITOR_LINE_HEIGHTS.map((option) => ({
                   value: option.value,
@@ -352,6 +407,7 @@ export function SettingsDialog() {
                 onChange={(v) => setEditorLineHeight(v)}
               />
             </Row>
+
           </Section>
 
           <Section title="Escrita">
@@ -359,7 +415,7 @@ export function SettingsDialog() {
               label="Entre parágrafos"
               hint={getParagraphSpacingLabel(editorParagraphSpacing)}
             >
-              <SegmentedControl
+              <SelectControl
                 value={editorParagraphSpacing}
                 options={EDITOR_PARAGRAPH_SPACING.map((option) => ({
                   value: option.value,
@@ -373,7 +429,7 @@ export function SettingsDialog() {
               label="Recuo do Tab"
               hint={getIndentSizeLabel(editorIndentSize)}
             >
-              <SegmentedControl
+              <SelectControl
                 value={editorIndentSize}
                 options={EDITOR_INDENT_SIZES.map((option) => ({
                   value: option.value,
@@ -384,7 +440,7 @@ export function SettingsDialog() {
             </Row>
 
             <Row label="Fonte padrão">
-              <SegmentedControl
+              <SelectControl
                 value={editorFontFamily}
                 options={EDITOR_FONT_FAMILIES.map((option) => ({
                   value: option.value,
@@ -394,19 +450,6 @@ export function SettingsDialog() {
               />
             </Row>
 
-            <Row
-              label="Tema visual"
-              hint="Aplica o tom ao editor e ao chrome do app."
-            >
-              <SegmentedControl
-                value={editorPaper}
-                options={EDITOR_PAPERS.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-                onChange={(v) => setEditorPaper(v)}
-              />
-            </Row>
           </Section>
 
           {/* Editor */}
@@ -496,22 +539,38 @@ export function SettingsDialog() {
             )}
           </Section>
 
-          {/* Inicialização */}
-          <Section title="Inicialização">
+          <Section title="Interface">
             <Row label="Ao abrir">
-              <SegmentedControl
+              <SelectControl
                 value={startView}
                 options={[
-                  { value: "home", label: "Início", icon: <Home size={11} /> },
-                  { value: "editor", label: "Editor", icon: <FileText size={11} /> },
-                  { value: "canvas", label: "Canvas", icon: <LayoutGrid size={11} /> },
+                  { value: "home", label: "Início" },
+                  { value: "editor", label: "Editor" },
+                  { value: "canvas", label: "Canvas" },
                 ]}
                 onChange={(v) => setStartView(v as "home" | "editor" | "canvas")}
               />
             </Row>
-          </Section>
 
-          <Section title="Interface">
+            <Row label="Toolbar do editor">
+              <SelectControl
+                value={editorToolbarMode}
+                options={[
+                  { value: "fixed", label: "Fixa" },
+                  { value: "hover", label: "Hover" },
+                ]}
+                onChange={(v) => setEditorToolbarMode(v)}
+              />
+            </Row>
+
+            <Row label="Abrir último arquivo">
+              <Toggle
+                checked={openLastFileOnStartup}
+                onChange={setOpenLastFileOnStartup}
+                label={openLastFileOnStartup ? "Ativado" : "Desativado"}
+              />
+            </Row>
+
             <Row label="Estatísticas na barra inferior">
               <Toggle
                 checked={showStatusStats}
@@ -530,14 +589,6 @@ export function SettingsDialog() {
           </Section>
 
           <Section title="Comportamento">
-            <Row label="Abrir último arquivo">
-              <Toggle
-                checked={openLastFileOnStartup}
-                onChange={setOpenLastFileOnStartup}
-                label={openLastFileOnStartup ? "Ativado" : "Desativado"}
-              />
-            </Row>
-
             <Row label="Expandir pasta após mover">
               <Toggle
                 checked={autoExpandMovedFolders}
@@ -795,41 +846,32 @@ function Row({
   );
 }
 
-function SegmentedControl<T extends string>({
+function SelectControl<T extends string>({
   value,
   options,
   onChange,
 }: {
   value: T;
-  options: { value: T; label: string; icon?: React.ReactNode }[];
+  options: { value: T; label: string }[];
   onChange: (v: T) => void;
 }) {
   return (
-    <div
-      className="inline-flex flex-wrap justify-end gap-0.5 p-0.5 rounded-md"
-      style={{ background: "var(--bg-hover)" }}
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value as T)}
+      className="min-w-[132px] rounded-md px-2.5 py-1 text-[0.74rem] outline-none"
+      style={{
+        background: "var(--bg-panel)",
+        color: "var(--text-primary)",
+        border: "1px solid var(--border)",
+      }}
     >
-      {options.map((opt) => {
-        const active = value === opt.value;
-        return (
-          <button
-            key={opt.value}
-            onClick={() => onChange(opt.value)}
-            aria-label={opt.label}
-            aria-pressed={active}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.72rem] transition-colors"
-            style={{
-              background: active ? "var(--bg-panel)" : "transparent",
-              color: active ? "var(--text-primary)" : "var(--text-muted)",
-              boxShadow: active ? "var(--shadow-sm)" : undefined,
-            }}
-          >
-            {opt.icon}
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
   );
 }
 

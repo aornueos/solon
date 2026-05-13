@@ -34,7 +34,7 @@ export function RecoveryDialog() {
       useAppStore.getState().setPendingRecoveryDrafts(remaining);
       // Abre o arquivo recuperado pra o user ver imediatamente.
       const name = path.split(/[\\/]/).pop() ?? path;
-      await openFile(path, name);
+      await openFile(path, name, { tab: "replace" });
       pushToast("success", `Recuperado: ${name}`);
     } catch (err) {
       console.error("Erro ao recuperar draft:", err);

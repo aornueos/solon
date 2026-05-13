@@ -260,7 +260,7 @@ export function Inspector() {
                   <li key={b.path}>
                     <button
                       type="button"
-                      onClick={() => openFile(b.path, b.name)}
+                      onClick={() => openFile(b.path, b.name, { tab: "replace" })}
                       className="w-full flex items-center gap-1.5 px-2 py-1 rounded text-left text-[0.75rem] transition-colors"
                       style={{
                         background: "transparent",

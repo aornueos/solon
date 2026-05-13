@@ -473,7 +473,7 @@ export function Editor() {
       const { fileTree, pushToast } = useAppStore.getState();
       const found = findFileByName(fileTree, name);
       if (found) {
-        void openFile(found.path, found.name);
+        void openFile(found.path, found.name, { tab: "replace" });
       } else {
         pushToast("info", `Nenhuma nota chamada "${name}" no projeto.`);
       }
@@ -713,7 +713,7 @@ export function Editor() {
           className="mx-auto px-8 cursor-text"
           style={{
             ...editorVars,
-            maxWidth: editorMaxWidth,
+            maxWidth: Math.round(editorMaxWidth * (editorZoom / 100)),
             // Typewriter mode adiciona padding pra que o caret possa
             // centralizar mesmo em docs curtos. Antes era 40vh — muito
             // agressivo: em docs com poucas linhas, o conteudo aparecia

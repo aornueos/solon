@@ -36,7 +36,7 @@ export type EditorFontFamily = "serif" | "sans" | "mono";
 export type EditorToolbarMode = "fixed" | "hover";
 
 /** Variantes de "papel" do editor — vide doc no AppState.editorPaper. */
-export type EditorPaper = "default" | "creme" | "sepia" | "gray" | "midnight";
+export type EditorPaper = "default" | "creme" | "sepia" | "gray" | "midnight" | "tokyo";
 
 /**
  * Dialog modal ativo — usado em vez de `window.prompt/confirm` (que
@@ -232,8 +232,6 @@ interface AppState {
    *  "home" e o estado inicial e o destino do clique no wordmark "Solon"
    *  na titlebar; os outros sao acionados por abrir um arquivo / atalhos. */
   activeView: "home" | "editor" | "canvas";
-  /** Tema da interface (light sépia / dark sépia escuro). */
-  theme: "light" | "dark";
   /** Notificações transientes mostradas na StatusBar. */
   toasts: Toast[];
   /** Dialog modal ativo (prompt/confirm in-app). */
@@ -264,6 +262,7 @@ interface AppState {
   /** Zoom do texto do editor — 75..200, default 100. Multiplicador
    *  aplicado via CSS var `--editor-zoom` no .ProseMirror. */
   editorZoom: number;
+  appZoom: number;
   /** Liga/desliga auto-save (so afeta o debounce; Ctrl+S sempre salva). */
   autoSaveEnabled: boolean;
   /** Liga/desliga check de update no boot. Tambem valido pra ja' marcar
@@ -308,11 +307,7 @@ interface AppState {
   editorIndentSize: "small" | "normal" | "large";
   /** Familia tipografica padrao do editor. */
   editorFontFamily: EditorFontFamily;
-  /** "Papel" do editor — substitui SO' o fundo da coluna do texto +
-   *  cor do texto, sem mexer no chrome (sidebar/panels). Cria a
-   *  sensacao de "livro num plano de fundo de mesa" e deixa o escritor
-   *  escolher o tom que combina com a sessao do dia. "default" = usa
-   *  o `--bg-app`/`--text-primary` do theme atual. */
+  /** Tema visual do app e do editor. */
   editorPaper: EditorPaper;
   /** Typewriter scrolling — quando ligado, o caret fica no meio
    *  vertical do scroller; o texto eh que escorre por baixo. Padrao
@@ -346,6 +341,7 @@ interface AppState {
   /** Adiciona aba se ainda nao existe. Idempotente — chamado por `openFile`
    *  toda vez. Persiste a lista em localStorage. */
   addTab: (path: string, name: string) => void;
+  replaceActiveTab: (path: string, name: string, previousActivePath?: string | null) => void;
   /** Fecha aba pelo path. Se era a ativa, retorna o path da proxima/anterior
    *  pra que o caller chame `openFile` (precisa de I/O — store nao faz). */
   closeTab: (path: string) => string | null;
@@ -396,8 +392,6 @@ interface AppState {
   setActiveView: (v: "home" | "editor" | "canvas") => void;
   toggleActiveView: () => void;
   setWordCount: (w: number, c: number) => void;
-  setTheme: (t: "light" | "dark") => void;
-  toggleTheme: () => void;
   pushToast: (kind: Toast["kind"], message: string, ttlMs?: number) => void;
   dismissToast: (id: number) => void;
   openPrompt: (opts: PromptOptions) => Promise<string | null>;
@@ -414,6 +408,7 @@ interface AppState {
   setSaveStatus: (s: AppState["saveStatus"]) => void;
   setProjectStats: (s: { wordCount: number; fileCount: number } | null) => void;
   setEditorZoom: (zoom: number) => void;
+  setAppZoom: (zoom: number) => void;
   setAutoSaveEnabled: (v: boolean) => void;
   setAutoCheckUpdates: (v: boolean) => void;
   setEditorMaxWidth: (w: number) => void;
@@ -450,8 +445,7 @@ interface AppState {
   ) => void;
   openExport: () => void;
   closeExport: () => void;
-  /** Reset de todas as preferencias pro default (zoom 100%, theme light,
-   *  auto-save on, etc). Usado pelo botao "Restaurar padroes". */
+  /** Reset de todas as preferencias pro default. */
   resetSettings: () => void;
   /** Abre context menu e retorna id unico — uso em fluxos async (ex:
    *  spellcheck) que precisam atualizar items DESTE menu sem risco de
@@ -464,7 +458,6 @@ interface AppState {
   setSpellcheckEnabled: (v: boolean) => void;
 }
 
-const THEME_KEY = "solon:theme";
 const OPEN_TABS_KEY = "solon:openTabs";
 const RECENT_FILES_KEY = "solon:recentFiles";
 const RECENT_FILES_MAX = 8;
@@ -528,17 +521,10 @@ function saveOpenTabs(tabs: OpenTab[]): void {
     /* storage cheio — ignora */
   }
 }
-function loadTheme(): "light" | "dark" {
-  try {
-    const v = localStorage.getItem(THEME_KEY);
-    if (v === "dark" || v === "light") return v;
-  } catch {}
-  return "light";
-}
-
 // Defaults explicitos pra preferencias — usados na inicializacao e em
 // `resetSettings`. Em um lugar so pra evitar dessincronia.
 const DEFAULT_EDITOR_ZOOM = 100;
+const DEFAULT_APP_ZOOM = 100;
 const DEFAULT_AUTO_SAVE = true;
 const DEFAULT_AUTO_CHECK_UPDATES = true;
 const DEFAULT_SPELLCHECK = true;
@@ -564,6 +550,7 @@ const DEFAULT_OPEN_LAST_FILE_ON_STARTUP = true;
 const DEFAULT_AUTO_EXPAND_MOVED_FOLDERS = true;
 const DEFAULT_START_VIEW: "home" | "editor" | "canvas" = "home";
 const EDITOR_ZOOM_KEY = "solon:editorZoom";
+const APP_ZOOM_KEY = "solon:appZoom";
 const AUTO_SAVE_KEY = "solon:autoSave";
 const AUTO_CHECK_UPDATES_KEY = "solon:autoCheckUpdates";
 const SPELLCHECK_KEY = "solon:spellcheck";
@@ -638,11 +625,12 @@ export const EDITOR_FONT_FAMILIES = [
  *  Hex coordenado com legibilidade: contraste minimo AA pra texto
  *  normal mantido em todos os pares bg/text. */
 export const EDITOR_PAPERS = [
-  { value: "default" as const, label: "Padrão", hint: "Segue o tema" },
+  { value: "default" as const, label: "Solon", hint: "Editorial claro" },
   { value: "creme" as const, label: "Creme", hint: "Papel quente claro" },
   { value: "sepia" as const, label: "Sépia", hint: "Pergaminho" },
   { value: "gray" as const, label: "Cinza", hint: "Neutro frio" },
   { value: "midnight" as const, label: "Noite", hint: "Azul-tinta escuro" },
+  { value: "tokyo" as const, label: "Tokyo", hint: "Escuro neon suave" },
 ];
 
 export const CANVAS_GRID_SIZES = [16, 24, 32, 48] as const;
@@ -693,7 +681,7 @@ function loadEditorPaper(): EditorPaper {
     const v = localStorage.getItem(EDITOR_PAPER_KEY);
     if (
       v === "default" || v === "creme" || v === "sepia" ||
-      v === "gray" || v === "midnight"
+      v === "gray" || v === "midnight" || v === "tokyo"
     ) return v;
   } catch {}
   return DEFAULT_EDITOR_PAPER;
@@ -777,6 +765,18 @@ function loadEditorZoom(): number {
   }
 }
 
+function loadAppZoom(): number {
+  try {
+    const v = localStorage.getItem(APP_ZOOM_KEY);
+    if (!v) return DEFAULT_APP_ZOOM;
+    const n = parseInt(v, 10);
+    if (Number.isNaN(n) || n < 80 || n > 160) return DEFAULT_APP_ZOOM;
+    return n;
+  } catch {
+    return DEFAULT_APP_ZOOM;
+  }
+}
+
 function loadBoolPref(key: string, fallback: boolean): boolean {
   try {
     const v = localStorage.getItem(key);
@@ -822,7 +822,6 @@ export const useAppStore = create<AppState>((set) => ({
   // ActiveView inicial respeita a pref `startView` (default "home").
   // Se o user escolheu abrir direto no editor/canvas, comeca por la'.
   activeView: loadStartView(),
-  theme: loadTheme(),
   toasts: [],
   activeDialog: null,
   updateStatus: { kind: "idle" },
@@ -833,6 +832,7 @@ export const useAppStore = create<AppState>((set) => ({
   lastSavedAt: null,
   projectStats: null,
   editorZoom: loadEditorZoom(),
+  appZoom: loadAppZoom(),
   autoSaveEnabled: loadBoolPref(AUTO_SAVE_KEY, DEFAULT_AUTO_SAVE),
   autoCheckUpdates: loadBoolPref(AUTO_CHECK_UPDATES_KEY, DEFAULT_AUTO_CHECK_UPDATES),
   showSettings: false,
@@ -911,6 +911,31 @@ export const useAppStore = create<AppState>((set) => ({
     set((s) => {
       if (s.openTabs.some((t) => t.path === path)) return s;
       const next = [...s.openTabs, { path, name }];
+      saveOpenTabs(next);
+      return { openTabs: next };
+    }),
+
+  replaceActiveTab: (path, name, previousActivePath) =>
+    set((s) => {
+      const activePath = previousActivePath ?? s.activeFilePath;
+      const targetIdx = s.openTabs.findIndex((t) => t.path === path);
+      const activeIdx = activePath
+        ? s.openTabs.findIndex((t) => t.path === activePath)
+        : -1;
+
+      let next = s.openTabs.slice();
+      if (activeIdx >= 0) {
+        if (targetIdx >= 0 && targetIdx !== activeIdx) {
+          next = next.filter((t) => t.path !== activePath);
+        } else {
+          next[activeIdx] = { path, name };
+        }
+      } else if (targetIdx === -1) {
+        next.push({ path, name });
+      } else {
+        next[targetIdx] = { path, name };
+      }
+
       saveOpenTabs(next);
       return { openTabs: next };
     }),
@@ -1082,21 +1107,6 @@ export const useAppStore = create<AppState>((set) => ({
   setWordCount: (w, c) =>
     set((s) => (s.wordCount === w && s.charCount === c ? s : { wordCount: w, charCount: c })),
 
-  setTheme: (t) => {
-    try {
-      localStorage.setItem(THEME_KEY, t);
-    } catch {}
-    set({ theme: t });
-  },
-  toggleTheme: () =>
-    set((s) => {
-      const next = s.theme === "light" ? "dark" : "light";
-      try {
-        localStorage.setItem(THEME_KEY, next);
-      } catch {}
-      return { theme: next };
-    }),
-
   pushToast: (kind, message, ttlMs = 4000) =>
     set((s) => {
       // `Date.now()` pode colidir se dois toasts caírem no mesmo ms (raro),
@@ -1197,6 +1207,16 @@ export const useAppStore = create<AppState>((set) => ({
     set({ editorZoom: clamped });
   },
 
+  setAppZoom: (zoom) => {
+    const clamped = Math.max(80, Math.min(160, Math.round(zoom)));
+    try {
+      localStorage.setItem(APP_ZOOM_KEY, String(clamped));
+    } catch {
+      /* ignora */
+    }
+    set({ appZoom: clamped });
+  },
+
   setAutoSaveEnabled: (v) => {
     try {
       localStorage.setItem(AUTO_SAVE_KEY, v ? "1" : "0");
@@ -1232,6 +1252,7 @@ export const useAppStore = create<AppState>((set) => ({
     // OS (dark mode preference) e o user pode estar em dark deliberadamente.
     try {
       localStorage.removeItem(EDITOR_ZOOM_KEY);
+      localStorage.removeItem(APP_ZOOM_KEY);
       localStorage.removeItem(AUTO_SAVE_KEY);
       localStorage.removeItem(AUTO_CHECK_UPDATES_KEY);
       localStorage.removeItem(SPELLCHECK_KEY);
@@ -1261,6 +1282,7 @@ export const useAppStore = create<AppState>((set) => ({
     }
     set({
       editorZoom: DEFAULT_EDITOR_ZOOM,
+      appZoom: DEFAULT_APP_ZOOM,
       autoSaveEnabled: DEFAULT_AUTO_SAVE,
       autoCheckUpdates: DEFAULT_AUTO_CHECK_UPDATES,
       spellcheckEnabled: DEFAULT_SPELLCHECK,

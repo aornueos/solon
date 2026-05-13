@@ -51,7 +51,7 @@ export function ReferencePane({
   }, [name, path, rootFolder]);
 
   const makeActive = async () => {
-    await openFile(path, name);
+    await openFile(path, name, { tab: "replace" });
     setActiveView("editor");
   };
 

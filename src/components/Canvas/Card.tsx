@@ -70,7 +70,7 @@ export const Card = memo(function Card({ card }: Props) {
     // Deriva o nome real do arquivo a partir do path — funciona para .md, .txt
     // e sobrevive a renames (scenePath é atualizado por rewireScenePath).
     const fileName = card.scenePath.split(/[\\/]/).pop() ?? card.text;
-    openFile(card.scenePath, fileName);
+    openFile(card.scenePath, fileName, { tab: "replace" });
     setActiveView("editor");
   };
 

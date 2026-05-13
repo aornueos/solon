@@ -56,7 +56,7 @@ export function GlobalSearchDialog() {
   if (!open) return null;
 
   const go = async (result: SearchResult) => {
-    await openFile(result.path, result.name);
+    await openFile(result.path, result.name, { tab: "replace" });
     setActiveView("editor");
     close();
     window.setTimeout(() => {

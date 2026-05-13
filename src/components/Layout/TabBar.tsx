@@ -149,7 +149,7 @@ export function TabBar() {
 
   const onActivate = (path: string, name: string) => {
     if (path === activePath) return;
-    void openFile(path, name);
+    void openFile(path, name, { tab: "preserve" });
     // Se o user clicou numa aba enquanto estava no canvas/home, a
     // expectativa e' "abrir o arquivo" — e arquivo eh editor.
     const view = useAppStore.getState().activeView;
@@ -161,7 +161,7 @@ export function TabBar() {
     if (path === activePath) {
       if (next) {
         const tab = useAppStore.getState().openTabs.find((t) => t.path === next);
-        if (tab) void openFile(tab.path, tab.name);
+        if (tab) void openFile(tab.path, tab.name, { tab: "preserve" });
       } else {
         // Sem aba pra ativar — flush antes de zerar pra preservar a
         // ultima janela de digitacao via useAutoSave subscribe.

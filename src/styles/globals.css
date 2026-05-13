@@ -2,14 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─────────────────────────────────────────
-   Tema — Light (papel/sépia sutil) e Dark (cinza neutro quente)
-   ─────────────────────────────────────────
-   O dark é neutro — grafite com leve warmth pra não ficar clínico.
-   Evitamos marrom: a sensação é "caderno de couro preto" e não
-   "papel envelhecido". O accent continua âmbar pra manter
-   personalidade editorial em ambos os temas.
-─────────────────────────────────────────── */
 :root,
 [data-theme="light"] {
   --bg-app: #f4f2ed;
@@ -36,6 +28,10 @@
   --accent-soft: rgba(160, 120, 80, 0.18);
   --danger: #a04040;
   --success: #6b8e4e;
+  --text-selection-bg: rgba(160, 120, 80, 0.24);
+  --heading-rule: #c9a05a;
+  --folder-color: #9b744f;
+  --folder-color-open: #a07850;
 
   --dot-grid: #d6d2cb;
   --marquee-fill: rgba(160, 120, 80, 0.08);
@@ -48,44 +44,6 @@
   --shadow-md: 0 3px 10px rgba(30, 28, 25, 0.12);
 }
 
-[data-theme="dark"] {
-  /* Grafite neutro com 2% de warmth — não é azul-cinza (frio) nem marrom */
-  --bg-app: #1b1c1e;
-  --bg-panel: #232427;
-  --bg-panel-2: #292a2d;
-  --bg-hover: #33353a;
-  --bg-active: #3e4046;
-  --bg-selected: #4a463a;
-  --bg-inverse: #e8e6e1;
-  --bg-code: #2e2f33;
-
-  --text-primary: #e6e4df;
-  --text-secondary: #b9b6af;
-  --text-muted: #8a8680;
-  --text-placeholder: #5e5a54;
-  --text-inverse: #1b1c1e;
-
-  --border: #3a3b40;
-  --border-subtle: #2d2e32;
-  --border-strong: #55565c;
-
-  --accent: #c9a05a;
-  --accent-2: #d8b67a;
-  --accent-soft: rgba(201, 160, 90, 0.2);
-  --danger: #d26a6a;
-  --success: #9abd7b;
-
-  --dot-grid: #2d2e32;
-  --marquee-fill: rgba(201, 160, 90, 0.1);
-  --marquee-stroke: rgba(201, 160, 90, 0.7);
-  --selection-ring: rgba(201, 160, 90, 0.75);
-  --canvas-text-auto: #f2f0ec;
-  --canvas-text-placeholder: rgba(242, 240, 236, 0.36);
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
-}
-
 [data-paper="creme"] {
   --bg-app: #f7f0df;
   --bg-panel: #fffaf0;
@@ -93,15 +51,33 @@
   --bg-hover: #e8dcc4;
   --bg-active: #ddcfb5;
   --bg-selected: #ead9b8;
+  --bg-inverse: #3a2d1f;
   --bg-code: #eee2cb;
   --text-primary: #2d261d;
   --text-secondary: #5f5345;
   --text-muted: #887a69;
   --text-placeholder: #b2a48e;
+  --text-inverse: #fffaf0;
   --border: #d7c7aa;
   --border-subtle: #e7d9bf;
   --border-strong: #a89675;
+  --accent: #9f7448;
+  --accent-2: #c79a55;
+  --accent-soft: rgba(159, 116, 72, 0.2);
+  --danger: #a04b3d;
+  --success: #6f8650;
+  --text-selection-bg: rgba(159, 116, 72, 0.24);
+  --heading-rule: #c79a55;
+  --folder-color: #9f7448;
+  --folder-color-open: #b9874f;
   --dot-grid: #ddcfb5;
+  --marquee-fill: rgba(159, 116, 72, 0.08);
+  --marquee-stroke: rgba(159, 116, 72, 0.7);
+  --selection-ring: rgba(159, 116, 72, 0.58);
+  --canvas-text-auto: #2d261d;
+  --canvas-text-placeholder: rgba(45, 38, 29, 0.42);
+  --shadow-sm: 0 1px 2px rgba(58, 45, 31, 0.09);
+  --shadow-md: 0 4px 12px rgba(58, 45, 31, 0.14);
 }
 
 [data-paper="sepia"] {
@@ -111,15 +87,33 @@
   --bg-hover: #d6c49c;
   --bg-active: #c9b58c;
   --bg-selected: #d7bf8f;
+  --bg-inverse: #3e2f1a;
   --bg-code: #ddcba7;
   --text-primary: #352a1b;
   --text-secondary: #645237;
   --text-muted: #826f4f;
   --text-placeholder: #aa966f;
+  --text-inverse: #f8ebcb;
   --border: #c4ad82;
   --border-subtle: #d7c39a;
   --border-strong: #927b55;
+  --accent: #8b6337;
+  --accent-2: #b98a48;
+  --accent-soft: rgba(139, 99, 55, 0.2);
+  --danger: #93483a;
+  --success: #657d45;
+  --text-selection-bg: rgba(139, 99, 55, 0.24);
+  --heading-rule: #b98a48;
+  --folder-color: #8b6337;
+  --folder-color-open: #a8753f;
   --dot-grid: #d4bd91;
+  --marquee-fill: rgba(139, 99, 55, 0.09);
+  --marquee-stroke: rgba(139, 99, 55, 0.72);
+  --selection-ring: rgba(139, 99, 55, 0.6);
+  --canvas-text-auto: #352a1b;
+  --canvas-text-placeholder: rgba(53, 42, 27, 0.42);
+  --shadow-sm: 0 1px 2px rgba(62, 47, 26, 0.1);
+  --shadow-md: 0 4px 12px rgba(62, 47, 26, 0.16);
 }
 
 [data-paper="gray"] {
@@ -128,16 +122,40 @@
   --bg-panel-2: #dad7d0;
   --bg-hover: #d0ccc4;
   --bg-active: #c2bdb3;
-  --bg-selected: #d8cfbd;
+  --bg-selected: #d4dde9;
+  --bg-inverse: #272522;
   --bg-code: #d7d3ca;
   --text-primary: #1f1e1c;
   --text-secondary: #4f4c47;
   --text-muted: #77726b;
   --text-placeholder: #9c968d;
+  --text-inverse: #f3f1ec;
   --border: #c4bfb6;
   --border-subtle: #d5d0c7;
   --border-strong: #938d83;
+  /* Paleta gray usa accent AZUL-AÇO frio, propositalmente sem nenhuma
+     vermelhidão/laranja. Antes era #7c6b54 (marrom-cinza) que no
+     fundo cinza-neutro o olho ainda lia como "ferrugem laranja" — o
+     que destoava do resto da paleta. Azul-aço neutro garante que
+     wikilink/underline/seleção fiquem visualmente alinhados com o
+     fundo frio. */
+  --accent: #5d7b9c;
+  --accent-2: #7a96b3;
+  --accent-soft: rgba(93, 123, 156, 0.18);
+  --danger: #984f4b;
+  --success: #657c58;
+  --text-selection-bg: rgba(93, 123, 156, 0.22);
+  --heading-rule: #7a96b3;
+  --folder-color: #6c7a8a;
+  --folder-color-open: #5d7b9c;
   --dot-grid: #cbc6bd;
+  --marquee-fill: rgba(93, 123, 156, 0.08);
+  --marquee-stroke: rgba(93, 123, 156, 0.68);
+  --selection-ring: rgba(93, 123, 156, 0.56);
+  --canvas-text-auto: #1f1e1c;
+  --canvas-text-placeholder: rgba(31, 30, 28, 0.4);
+  --shadow-sm: 0 1px 2px rgba(39, 37, 34, 0.08);
+  --shadow-md: 0 4px 12px rgba(39, 37, 34, 0.13);
 }
 
 [data-paper="midnight"] {
@@ -146,19 +164,73 @@
   --bg-panel-2: #222b3a;
   --bg-hover: #2b3649;
   --bg-active: #344158;
-  --bg-selected: #3e4250;
+  --bg-selected: #2d3d5c;
+  --bg-inverse: #eef2f7;
   --bg-code: #202a3a;
   --text-primary: #eef2f7;
   --text-secondary: #c3cad6;
   --text-muted: #8d97a8;
   --text-placeholder: #5d6878;
+  --text-inverse: #141922;
   --border: #334054;
   --border-subtle: #273244;
   --border-strong: #536076;
-  --accent: #d9b36a;
-  --accent-2: #e2c48d;
+  /* Accent FRIO coerente com a paleta de noite. Antes era amarelo-ouro
+     #d9b36a que destoava da paleta azul-noite. Azul-céu noturno
+     mantém o accent visível sem brigar com o tom geral. */
+  --accent: #82aaff;
+  --accent-2: #8ec5ff;
+  --accent-soft: rgba(130, 170, 255, 0.2);
+  --danger: #e06c75;
+  --success: #98c379;
   --dot-grid: #2a3548;
+  --text-selection-bg: rgba(130, 170, 255, 0.27);
+  --heading-rule: #8ec5ff;
+  --folder-color: #8fa3c8;
+  --folder-color-open: #82aaff;
+  --marquee-fill: rgba(130, 170, 255, 0.1);
+  --marquee-stroke: rgba(130, 170, 255, 0.72);
+  --selection-ring: rgba(130, 170, 255, 0.74);
   --canvas-text-auto: #f3f5f8;
+  --canvas-text-placeholder: rgba(243, 245, 248, 0.36);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.46);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.58);
+}
+
+[data-paper="tokyo"] {
+  --bg-app: #1a1b26;
+  --bg-panel: #1f2335;
+  --bg-panel-2: #24283b;
+  --bg-hover: #2f354d;
+  --bg-active: #3b4261;
+  --bg-selected: #283457;
+  --bg-inverse: #c0caf5;
+  --bg-code: #171923;
+  --text-primary: #c0caf5;
+  --text-secondary: #a9b1d6;
+  --text-muted: #7aa2f7;
+  --text-placeholder: #565f89;
+  --text-inverse: #16161e;
+  --border: #3b4261;
+  --border-subtle: #292e42;
+  --border-strong: #565f89;
+  --accent: #bb9af7;
+  --accent-2: #7dcfff;
+  --accent-soft: rgba(187, 154, 247, 0.18);
+  --danger: #f7768e;
+  --success: #9ece6a;
+  --text-selection-bg: rgba(122, 162, 247, 0.28);
+  --heading-rule: #7dcfff;
+  --folder-color: #7aa2f7;
+  --folder-color-open: #bb9af7;
+  --dot-grid: #292e42;
+  --marquee-fill: rgba(187, 154, 247, 0.1);
+  --marquee-stroke: rgba(187, 154, 247, 0.75);
+  --selection-ring: rgba(187, 154, 247, 0.75);
+  --canvas-text-auto: #c0caf5;
+  --canvas-text-placeholder: rgba(192, 202, 245, 0.38);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.55);
 }
 
 @layer base {
@@ -176,6 +248,10 @@
     overflow: hidden;
   }
 
+  #root {
+    zoom: var(--app-zoom, 1);
+  }
+
   body {
     background-color: var(--bg-panel);
     color: var(--text-primary);
@@ -190,6 +266,11 @@
   textarea,
   select {
     font: inherit;
+  }
+
+  ::selection {
+    background: var(--text-selection-bg);
+    color: var(--text-primary);
   }
 
   button:focus-visible,
@@ -218,6 +299,42 @@
 }
 
 /* ─────────────────────────────────────────
+   Form controls — selects / dropdowns
+───────────────────────────────────────── */
+/* `color-scheme` instrui o webview (Chromium) a renderizar o popup
+   nativo do <select> com paleta clara ou escura — sem isso, em temas
+   escuros o popup aparece branco gritante. Definido em :root e
+   sobrescrito pelos temas escuros. */
+:root,
+[data-theme="light"],
+[data-paper="creme"],
+[data-paper="sepia"],
+[data-paper="gray"] {
+  color-scheme: light;
+}
+[data-paper="midnight"],
+[data-paper="tokyo"] {
+  color-scheme: dark;
+}
+
+/* Custom appearance pro <select> nativo: tira a seta default do OS
+   e injeta uma SVG que segue o accent atual. O popup expandido continua
+   nativo (mas agora respeitando color-scheme acima). */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%23808080' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M2.5 4.5l3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 11px;
+  padding-right: 26px !important;
+}
+select:focus-visible {
+  border-color: var(--accent) !important;
+}
+
+/* ─────────────────────────────────────────
    Wikilinks — `[[note]]` style Obsidian
 ───────────────────────────────────────── */
 /* Visual de link interno: cor accent + underline tracejado pra
@@ -243,8 +360,8 @@
 /* Cada variante sobrepoe `--editor-paper-bg`/`--editor-paper-text` no
    wrapper do EditorContent. O Editor consome essas vars no inline style
    pra que o efeito so' aplique a' coluna do texto (chrome continua
-   seguindo o theme atual). "default" nao define = fallback pro
-   `--bg-app`/`--text-primary` do tema.
+   seguindo o tema visual ativo). "default" nao define = fallback pro
+   `--bg-app`/`--text-primary`.
 
    Contraste minimo AA verificado em todos os pares (text/bg). */
 [data-paper="creme"] {
@@ -270,6 +387,12 @@
   --editor-paper-text: #dde2ea;
   --editor-paper-text-muted: #8b94a4;
   --editor-paper-text-placeholder: #5f6878;
+}
+[data-paper="tokyo"] {
+  --editor-paper-bg: #1a1b26;
+  --editor-paper-text: #c0caf5;
+  --editor-paper-text-muted: #7aa2f7;
+  --editor-paper-text-placeholder: #565f89;
 }
 
 /* ─────────────────────────────────────────
@@ -370,7 +493,7 @@
   color: var(--text-primary) !important;
   letter-spacing: -0.03em;
   padding-bottom: 0.6rem;
-  border-bottom: 2px solid var(--accent-2);
+  border-bottom: 2px solid var(--heading-rule);
 }
 
 .ProseMirror h1:first-child { margin-top: 0; }
@@ -385,7 +508,7 @@
   color: var(--text-primary) !important;
   letter-spacing: -0.01em;
   padding-left: 0.75rem;
-  border-left: 3px solid var(--accent-2);
+  border-left: 3px solid var(--heading-rule);
 }
 
 .ProseMirror h3 {
@@ -573,9 +696,7 @@
   line-height: 1.6;
 }
 
-.ProseMirror ::selection {
-  background: var(--accent-soft);
-}
+.ProseMirror ::selection { background: var(--text-selection-bg); }
 
 .ProseMirror .solon-spell-error {
   text-decoration-line: underline;

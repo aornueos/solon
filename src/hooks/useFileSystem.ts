@@ -31,6 +31,11 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 const IGNORED_TREE_DIRS = new Set(["node_modules", "target", "dist", "out"]);
 const MAX_TREE_DEPTH = 24;
 
+type OpenFileTabMode = "new" | "replace" | "preserve";
+export interface OpenFileOptions {
+  tab?: OpenFileTabMode;
+}
+
 /** Mensagem humana a partir de um erro arbitrário do Tauri. */
 function describeError(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -172,7 +177,9 @@ export function useFileSystem() {
   }, [setRootFolder, setFileTree, setSidebarOrder]);
 
   const openFile = useCallback(
-    async (path: string, name: string) => {
+    async (path: string, name: string, options: OpenFileOptions = {}) => {
+      const tabMode = options.tab ?? "new";
+      const previousActivePath = useAppStore.getState().activeFilePath;
       // Flush sync de qualquer trabalho pendente do Editor antes de trocar
       // de arquivo. Sem isso, o turndown debounced (180ms) rodaria depois
       // do setActiveFile e o setFileBody do antigo gravaria por cima do
@@ -186,9 +193,11 @@ export function useFileSystem() {
           const content = await readTextFile(path);
           const { meta, body } = parseDocument(content);
           setActiveFile(path, name, body, meta);
-          // Aba acompanha o arquivo aberto. Idempotente — se a aba ja
-          // existe, addTab e' no-op (so foca via setActiveFile acima).
-          useAppStore.getState().addTab(path, name);
+          if (tabMode === "replace") {
+            useAppStore.getState().replaceActiveTab(path, name, previousActivePath);
+          } else if (tabMode === "new") {
+            useAppStore.getState().addTab(path, name);
+          }
           useAppStore.getState().pushRecentFile(path, name);
         } catch (err) {
           console.error("Erro ao abrir arquivo:", err);
@@ -214,7 +223,11 @@ export function useFileSystem() {
           `# ${name.replace(".md", "")}\n`;
         const { meta, body } = parseDocument(content);
         setActiveFile(path, name, body, meta);
-        useAppStore.getState().addTab(path, name);
+        if (tabMode === "replace") {
+          useAppStore.getState().replaceActiveTab(path, name, previousActivePath);
+        } else if (tabMode === "new") {
+          useAppStore.getState().addTab(path, name);
+        }
         useAppStore.getState().pushRecentFile(path, name);
       }
     },
@@ -391,7 +404,7 @@ export function useFileSystem() {
           }));
         }
         await refresh();
-        await openFile(full, finalName);
+        await openFile(full, finalName, { tab: "replace" });
       } catch (err) {
         console.error("Erro ao criar arquivo:", err);
         useAppStore
@@ -448,7 +461,7 @@ export function useFileSystem() {
         const ok = await atomicWriteTextFile(newPath, content);
         if (!ok) throw new Error("falha ao gravar a cópia");
         await refresh();
-        await openFile(newPath, candidate);
+        await openFile(newPath, candidate, { tab: "replace" });
       } catch (err) {
         console.error("Erro ao duplicar arquivo:", err);
         useAppStore
@@ -631,7 +644,7 @@ export function useFileSystem() {
           // a primeira disponivel.
           const remaining = useAppStore.getState().openTabs[0];
           if (remaining) {
-            await openFile(remaining.path, remaining.name);
+            await openFile(remaining.path, remaining.name, { tab: "preserve" });
           } else {
             useAppStore.setState({
               activeFilePath: null,

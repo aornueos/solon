@@ -6,13 +6,13 @@ import {
   ListTree,
   FileText,
   LayoutGrid,
-  Moon,
-  Sun,
   Minus,
   Square,
   Copy,
   X,
   Settings as SettingsIcon,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAppStore } from "../../store/useAppStore";
@@ -43,6 +43,7 @@ const isTauri = (): boolean =>
  */
 function useWindowControls() {
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const available = isTauri();
 
   useEffect(() => {
@@ -53,10 +54,14 @@ function useWindowControls() {
       try {
         const win = getCurrentWindow();
         const initial = await win.isMaximized();
+        const fullscreen = await win.isFullscreen();
         if (alive) setIsMaximized(initial);
+        if (alive) setIsFullscreen(fullscreen);
         unlisten = await win.onResized(async () => {
           const m = await win.isMaximized();
+          const f = await win.isFullscreen();
           if (alive) setIsMaximized(m);
+          if (alive) setIsFullscreen(f);
         });
       } catch {
         // Defensivo — se a chamada falhar mesmo com __TAURI_INTERNALS__
@@ -87,8 +92,18 @@ function useWindowControls() {
     if (!available) return;
     getCurrentWindow().close().catch((e) => console.error("close:", e));
   };
+  const toggleFullscreen = () => {
+    if (!available) return;
+    const win = getCurrentWindow();
+    win
+      .isFullscreen()
+      .then((current) =>
+        win.setFullscreen(!current).then(() => setIsFullscreen(!current)),
+      )
+      .catch((e) => console.error("setFullscreen:", e));
+  };
 
-  return { available, isMaximized, minimize, toggleMaximize, close };
+  return { available, isMaximized, isFullscreen, minimize, toggleMaximize, toggleFullscreen, close };
 }
 
 export function Titlebar() {
@@ -107,12 +122,10 @@ export function Titlebar() {
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
   const toggleFocusMode = useAppStore((s) => s.toggleFocusMode);
-  const theme = useAppStore((s) => s.theme);
-  const toggleTheme = useAppStore((s) => s.toggleTheme);
   const openSettings = useAppStore((s) => s.openSettings);
 
   const status = SCENE_STATUSES.find((s) => s.value === sceneMeta.status);
-  const { available, isMaximized, minimize, toggleMaximize, close } =
+  const { available, isMaximized, isFullscreen, minimize, toggleMaximize, toggleFullscreen, close } =
     useWindowControls();
 
   const onTitlebarDoubleClick = (e: React.MouseEvent) => {
@@ -245,19 +258,18 @@ export function Titlebar() {
           className="w-px h-3.5 mx-1"
           style={{ background: "var(--border-subtle)" }}
         />
-        <IconBtn
-          onClick={toggleTheme}
-          title={
-            theme === "dark"
-              ? "Mudar para tema claro (Ctrl+Shift+L)"
-              : "Mudar para tema escuro (Ctrl+Shift+L)"
-          }
-        >
-          {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-        </IconBtn>
         <IconBtn onClick={toggleFocusMode} active={focusMode} title="Modo Foco (F11)">
           <Focus size={14} />
         </IconBtn>
+        {available && (
+          <IconBtn
+            onClick={toggleFullscreen}
+            active={isFullscreen}
+            title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+          >
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </IconBtn>
+        )}
         <IconBtn onClick={openSettings} title="Preferências (Ctrl+,)">
           <SettingsIcon size={14} />
         </IconBtn>

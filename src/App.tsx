@@ -19,14 +19,12 @@ export default function App() {
   // Seletores granulares: destructure direto de `useAppStore()` assinaria
   // a cada mudança de qualquer field do store (wordCount, cards, toasts...),
   // re-renderizando o App inteiro e todos os seus filhos a cada keystroke.
-  const theme = useAppStore((s) => s.theme);
   const editorPaper = useAppStore((s) => s.editorPaper);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
   const toggleFocusMode = useAppStore((s) => s.toggleFocusMode);
   const setActiveView = useAppStore((s) => s.setActiveView);
-  const toggleTheme = useAppStore((s) => s.toggleTheme);
   const setUpdateStatus = useAppStore((s) => s.setUpdateStatus);
   const openSettings = useAppStore((s) => s.openSettings);
   const openCommandPalette = useAppStore((s) => s.openCommandPalette);
@@ -36,17 +34,39 @@ export default function App() {
   const openExport = useAppStore((s) => s.openExport);
   const openScratchpad = useAppStore((s) => s.openScratchpad);
   const toggleReadingMode = useAppStore((s) => s.toggleReadingMode);
-  const { restoreLastFolder, refresh, openFile, createUntitled } = useFileSystem();
+  const appZoom = useAppStore((s) => s.appZoom);
+  const setAppZoom = useAppStore((s) => s.setAppZoom);
+  const { restoreLastFolder, refresh, openFile, createUntitled, openFolder } = useFileSystem();
 
-  // Aplica tema no <html data-theme="...">
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.setAttribute("data-theme", "light");
     if (editorPaper === "default") {
       document.documentElement.removeAttribute("data-paper");
     } else {
       document.documentElement.setAttribute("data-paper", editorPaper);
     }
-  }, [editorPaper, theme]);
+  }, [editorPaper]);
+
+  useEffect(() => {
+    const scale = appZoom / 100;
+    if (!isTauriRuntime()) {
+      document.documentElement.style.setProperty("--app-zoom", String(scale));
+      return;
+    }
+    document.documentElement.style.setProperty("--app-zoom", "1");
+    let alive = true;
+    void import("@tauri-apps/api/webview")
+      .then(({ getCurrentWebview }) => {
+        if (!alive) return;
+        return getCurrentWebview().setZoom(scale);
+      })
+      .catch((err) => {
+        console.warn("[zoom] setZoom failed:", err);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [appZoom]);
 
   useAutoSave();
   useCrashRecovery();
@@ -59,7 +79,7 @@ export default function App() {
       const requested = requestedFileFromUrl();
       if (!requested) return;
       useAppStore.setState({ openTabs: [] });
-      await openFile(requested.path, requested.name);
+      await openFile(requested.path, requested.name, { tab: "new" });
       setActiveView(requested.view);
     });
   }, [openFile, restoreLastFolder, setActiveView]);
@@ -132,6 +152,56 @@ export default function App() {
   // Atalhos globais de painel
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const ctrl = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      const native = isTauriRuntime();
+
+      if (ctrl && !e.shiftKey && key === "p") {
+        e.preventDefault();
+        openCommandPalette();
+        return;
+      }
+      if (ctrl && e.shiftKey && key === "p") {
+        e.preventDefault();
+        openCommandPalette();
+        return;
+      }
+      if (native && ctrl && !e.shiftKey && key === "o") {
+        e.preventDefault();
+        void openFolder();
+        return;
+      }
+      if (native && ctrl && !e.shiftKey && key === "r") {
+        e.preventDefault();
+        refresh();
+        return;
+      }
+      if (native && e.key === "F5") {
+        e.preventDefault();
+        refresh();
+        return;
+      }
+      if (native && ctrl && !e.shiftKey && key === "l") {
+        e.preventDefault();
+        openCommandPalette();
+        return;
+      }
+      if (ctrl && (e.key === "+" || e.key === "=")) {
+        e.preventDefault();
+        setAppZoom(useAppStore.getState().appZoom + 10);
+        return;
+      }
+      if (ctrl && e.key === "-") {
+        e.preventDefault();
+        setAppZoom(useAppStore.getState().appZoom - 10);
+        return;
+      }
+      if (ctrl && e.key === "0") {
+        e.preventDefault();
+        setAppZoom(100);
+        return;
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key === "\\") {
         e.preventDefault();
         toggleSidebar();
@@ -166,19 +236,37 @@ export default function App() {
       }
       if (e.key === "F11") {
         e.preventDefault();
-        // Se reading mode esta ligado, F11 PRIORIZA sair de reading
-        // (panic-key behavior). Sem isso, o user em reading sem chrome
-        // visivel apertaria F11 esperando algum efeito e nao acharia
-        // o atalho real (Ctrl+Shift+R).
+        // F11 alterna tela cheia REAL do SO (esconde titlebar do Windows
+        // etc) — convencao classica. Antes F11 so' togglava `focusMode`
+        // (esconde sidebar/inspector dentro do app); fora do app nada
+        // mudava, e o user reportou "F11 nao funciona". Agora o F11
+        // pede setFullscreen do Tauri; se reading mode esta ligado,
+        // F11 sai dele primeiro (panic-key behavior). Focus mode
+        // continua acessivel via botao na titlebar/Command Palette.
         if (useAppStore.getState().readingMode) {
           toggleReadingMode();
+          return;
+        }
+        if (isTauriRuntime()) {
+          void (async () => {
+            try {
+              const { getCurrentWindow } = await import("@tauri-apps/api/window");
+              const win = getCurrentWindow();
+              const current = await win.isFullscreen();
+              await win.setFullscreen(!current);
+            } catch (err) {
+              console.error("F11 fullscreen failed:", err);
+              // Fallback: se a API de fullscreen falhar (permissao
+              // faltando, etc) cai pro toggleFocusMode antigo pra
+              // pelo menos algo acontecer.
+              toggleFocusMode();
+            }
+          })();
         } else {
+          // Em dev/browser puro nao tem API Tauri — toggle focus mode
+          // como antes.
           toggleFocusMode();
         }
-      }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "l" || e.key === "L")) {
-        e.preventDefault();
-        toggleTheme();
       }
       // Ctrl+, abre preferencias — convencao de macOS/VSCode/Obsidian.
       if ((e.ctrlKey || e.metaKey) && e.key === ",") {
@@ -219,8 +307,7 @@ export default function App() {
       // PANIC KEY — Ctrl+Shift+Esc reseta TODOS os modos especiais e
       // restaura o chrome ao default. Pensado pra cenarios onde o user
       // fica "preso" num modo (reading sem chrome visivel) sem saber
-      // como sair. Nao toca em settings persistidas (typewriter,
-      // theme, paper) — so' nos modos transientes.
+      // como sair. Nao toca em ajustes persistidos — so' nos modos transientes.
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "Escape") {
         e.preventDefault();
         useAppStore.setState({
@@ -268,7 +355,7 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "t") {
         e.preventDefault();
         const tab = useAppStore.getState().reopenClosedTab();
-        if (tab) void openFile(tab.path, tab.name);
+        if (tab) void openFile(tab.path, tab.name, { tab: "preserve" });
         return;
       }
       // Ctrl+W fecha aba ativa. Se nao houver aba ativa, no-op (browser
@@ -281,7 +368,7 @@ export default function App() {
         const next = closeTab(activeFilePath);
         if (next) {
           const tab = useAppStore.getState().openTabs.find((t) => t.path === next);
-          if (tab) void openFile(tab.path, tab.name);
+          if (tab) void openFile(tab.path, tab.name, { tab: "preserve" });
         } else if (openTabs.length <= 1) {
           // Era a unica aba: limpa o arquivo ativo (mesmo comportamento
           // do botao ✕ na ultima aba). Flush ANTES de zerar pra que
@@ -310,7 +397,7 @@ export default function App() {
         const nextIdx = (idx + dir + openTabs.length) % openTabs.length;
         const next = openTabs[nextIdx];
         if (next && next.path !== activeFilePath) {
-          void openFile(next.path, next.name);
+          void openFile(next.path, next.name, { tab: "preserve" });
         }
       }
     };
@@ -322,7 +409,6 @@ export default function App() {
     toggleInspector,
     toggleFocusMode,
     setActiveView,
-    toggleTheme,
     openSettings,
     openCommandPalette,
     openGlobalSearch,
@@ -333,6 +419,9 @@ export default function App() {
     toggleReadingMode,
     openFile,
     createUntitled,
+    openFolder,
+    refresh,
+    setAppZoom,
   ]);
 
   return <AppLayout />;
