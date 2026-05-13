@@ -33,19 +33,27 @@ export function Inspector() {
   // mudou (nova pasta, arquivos criados/deletados/renomeados). Cache
   // sobrevive enquanto a arvore for a mesma — re-indexar a cada
   // re-render do Inspector queimaria I/O.
-  const indexFingerprint = fileTree;
+  //
+  // Debounce 500ms: o `fileTree` ganha nova ref em CADA refresh()
+  // (delete/create/rename — frequente em sessoes de organizacao).
+  // Sem debounce, criar 5 arquivos seguidos dispararia 5 builds de
+  // index full em paralelo, cada um lendo todos os arquivos. Coalesce
+  // num unico build apos a ultima mudanca.
   useEffect(() => {
     if (!activeFilePath) return;
     let cancelled = false;
-    void (async () => {
-      const idx = await buildBacklinkIndex(indexFingerprint);
-      if (cancelled) return;
-      setBacklinkIndex(idx);
-    })();
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const idx = await buildBacklinkIndex(fileTree);
+        if (cancelled) return;
+        setBacklinkIndex(idx);
+      })();
+    }, 500);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [indexFingerprint, activeFilePath, setBacklinkIndex]);
+  }, [fileTree, activeFilePath, setBacklinkIndex]);
 
   const backlinks = useMemo(() => {
     if (!backlinkIndex || !activeFilePath) return [];

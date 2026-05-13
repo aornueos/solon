@@ -20,6 +20,7 @@ export default function App() {
   // a cada mudança de qualquer field do store (wordCount, cards, toasts...),
   // re-renderizando o App inteiro e todos os seus filhos a cada keystroke.
   const theme = useAppStore((s) => s.theme);
+  const editorPaper = useAppStore((s) => s.editorPaper);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
@@ -40,7 +41,12 @@ export default function App() {
   // Aplica tema no <html data-theme="...">
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
+    if (editorPaper === "default") {
+      document.documentElement.removeAttribute("data-paper");
+    } else {
+      document.documentElement.setAttribute("data-paper", editorPaper);
+    }
+  }, [editorPaper, theme]);
 
   useAutoSave();
   useCrashRecovery();

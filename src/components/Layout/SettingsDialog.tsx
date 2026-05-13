@@ -71,8 +71,6 @@ export function SettingsDialog() {
   const setEditorFontFamily = useAppStore((s) => s.setEditorFontFamily);
   const editorPaper = useAppStore((s) => s.editorPaper);
   const setEditorPaper = useAppStore((s) => s.setEditorPaper);
-  const typewriterMode = useAppStore((s) => s.typewriterMode);
-  const setTypewriterMode = useAppStore((s) => s.setTypewriterMode);
   const startView = useAppStore((s) => s.startView);
   const setStartView = useAppStore((s) => s.setStartView);
   const autoSaveEnabled = useAppStore((s) => s.autoSaveEnabled);
@@ -226,7 +224,7 @@ export function SettingsDialog() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="w-full max-w-3xl rounded-lg shadow-xl flex flex-col max-h-[85vh]"
+        className="w-full max-w-4xl rounded-lg shadow-xl flex flex-col max-h-[85vh]"
         style={{
           background: "var(--bg-panel)",
           border: "1px solid var(--border)",
@@ -265,7 +263,7 @@ export function SettingsDialog() {
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto px-5 py-5 flex flex-col gap-6">
+        <div className="overflow-y-auto px-5 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Aparencia */}
           <Section title="Aparência">
             <Row label="Tema">
@@ -397,8 +395,8 @@ export function SettingsDialog() {
             </Row>
 
             <Row
-              label="Papel do editor"
-              hint="Tom de fundo da coluna do texto (não afeta sidebar/painéis)."
+              label="Tema visual"
+              hint="Aplica o tom ao editor e ao chrome do app."
             >
               <SegmentedControl
                 value={editorPaper}
@@ -413,17 +411,6 @@ export function SettingsDialog() {
 
           {/* Editor */}
           <Section title="Editor">
-            <Row
-              label="Modo máquina de escrever"
-              hint="Mantém o cursor no meio da tela; o texto rola por baixo."
-            >
-              <Toggle
-                checked={typewriterMode}
-                onChange={setTypewriterMode}
-                label={typewriterMode ? "Ligado" : "Desligado"}
-              />
-            </Row>
-
             <Row
               label="Auto-save"
               hint="Ctrl+S sempre salva."
@@ -740,9 +727,15 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-4">
+    <section
+      className="flex flex-col gap-3 rounded-lg p-4"
+      style={{
+        background: "var(--bg-panel-2)",
+        border: "1px solid var(--border-subtle)",
+      }}
+    >
       <h3
-        className="text-[0.6rem] uppercase tracking-[0.22em] font-semibold"
+        className="text-[0.62rem] uppercase tracking-[0.2em] font-semibold"
         style={{ color: "var(--text-muted)" }}
       >
         {title}
@@ -764,8 +757,11 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-4">
+    <div
+      className="rounded-md px-2.5 py-2"
+      style={{ background: "color-mix(in srgb, var(--bg-panel) 55%, transparent)" }}
+    >
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {icon && (
             <span
@@ -776,7 +772,7 @@ function Row({
             </span>
           )}
           <span
-            className="text-[0.82rem] font-medium"
+            className="text-[0.78rem] font-medium"
             style={{ color: "var(--text-primary)" }}
           >
             {label}
@@ -786,7 +782,7 @@ function Row({
       </div>
       {hint && (
         <p
-          className="text-[0.7rem] leading-snug"
+          className="text-[0.68rem] leading-snug mt-1"
           style={{
             color: "var(--text-muted)",
             paddingLeft: icon ? "1.25rem" : 0,
@@ -810,7 +806,7 @@ function SegmentedControl<T extends string>({
 }) {
   return (
     <div
-      className="inline-flex p-0.5 rounded-md"
+      className="inline-flex flex-wrap justify-end gap-0.5 p-0.5 rounded-md"
       style={{ background: "var(--bg-hover)" }}
     >
       {options.map((opt) => {

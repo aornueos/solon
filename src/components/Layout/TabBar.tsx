@@ -49,6 +49,27 @@ export function TabBar() {
     el.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activePath]);
 
+  // Wheel vertical (sem shift) é convertido em horizontal scroll —
+  // convencao de browsers/IDEs com tabbar. Sem isso, user precisa
+  // segurar Shift ou clicar e arrastar a scrollbar minuscula pra
+  // chegar em abas off-screen. `passive: false` pra poder preventDefault
+  // o scroll vertical default; sem isso o webview rola a pagina toda.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      // So' age se a tabbar de fato overflow-a horizontalmente (scrollLeft
+      // funcional) e o user nao esta usando shift (que ja' significa horiz).
+      if (e.shiftKey) return;
+      if (el.scrollWidth <= el.clientWidth) return;
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
   if (tabs.length === 0) return null;
 
   const onActivate = (path: string, name: string) => {

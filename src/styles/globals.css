@@ -86,6 +86,81 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
 }
 
+[data-paper="creme"] {
+  --bg-app: #f7f0df;
+  --bg-panel: #fffaf0;
+  --bg-panel-2: #f1e6d0;
+  --bg-hover: #e8dcc4;
+  --bg-active: #ddcfb5;
+  --bg-selected: #ead9b8;
+  --bg-code: #eee2cb;
+  --text-primary: #2d261d;
+  --text-secondary: #5f5345;
+  --text-muted: #887a69;
+  --text-placeholder: #b2a48e;
+  --border: #d7c7aa;
+  --border-subtle: #e7d9bf;
+  --border-strong: #a89675;
+  --dot-grid: #ddcfb5;
+}
+
+[data-paper="sepia"] {
+  --bg-app: #ecdfc0;
+  --bg-panel: #f8ebcb;
+  --bg-panel-2: #e2d1ad;
+  --bg-hover: #d6c49c;
+  --bg-active: #c9b58c;
+  --bg-selected: #d7bf8f;
+  --bg-code: #ddcba7;
+  --text-primary: #352a1b;
+  --text-secondary: #645237;
+  --text-muted: #826f4f;
+  --text-placeholder: #aa966f;
+  --border: #c4ad82;
+  --border-subtle: #d7c39a;
+  --border-strong: #927b55;
+  --dot-grid: #d4bd91;
+}
+
+[data-paper="gray"] {
+  --bg-app: #e5e3de;
+  --bg-panel: #f3f1ec;
+  --bg-panel-2: #dad7d0;
+  --bg-hover: #d0ccc4;
+  --bg-active: #c2bdb3;
+  --bg-selected: #d8cfbd;
+  --bg-code: #d7d3ca;
+  --text-primary: #1f1e1c;
+  --text-secondary: #4f4c47;
+  --text-muted: #77726b;
+  --text-placeholder: #9c968d;
+  --border: #c4bfb6;
+  --border-subtle: #d5d0c7;
+  --border-strong: #938d83;
+  --dot-grid: #cbc6bd;
+}
+
+[data-paper="midnight"] {
+  --bg-app: #141922;
+  --bg-panel: #1c2330;
+  --bg-panel-2: #222b3a;
+  --bg-hover: #2b3649;
+  --bg-active: #344158;
+  --bg-selected: #3e4250;
+  --bg-code: #202a3a;
+  --text-primary: #eef2f7;
+  --text-secondary: #c3cad6;
+  --text-muted: #8d97a8;
+  --text-placeholder: #5d6878;
+  --border: #334054;
+  --border-subtle: #273244;
+  --border-strong: #536076;
+  --accent: #d9b36a;
+  --accent-2: #e2c48d;
+  --dot-grid: #2a3548;
+  --canvas-text-auto: #f3f5f8;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -212,11 +287,41 @@
   opacity: 1 !important;
   color: var(--text-primary) !important;
 }
-/* Scrollbar horizontal da TabBar fica mais discreta (2px) — raramente
-   precisa rolar e a barra default de 6px no rodape da aba parece
-   "rasgo" no design. */
-.solon-tab + *::-webkit-scrollbar,
-[role="tablist"]::-webkit-scrollbar { height: 2px; }
+/* Scrollbar horizontal da TabBar. Antes era 2px sem thumb/track
+   custom — herdava o estilo global e ficava com cor `--border` que
+   no rodape da tabbar parece "rasgo bruto" no design (especialmente
+   em webview). Solucao: scrollbar 3px com thumb sutil, track
+   transparente, raio arredondado pra ficar coerente com o resto do
+   chrome. scrollbar-width: thin pra Firefox; webkit overrides
+   propriamente. */
+[role="tablist"] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+[role="tablist"]::-webkit-scrollbar { height: 3px; width: 0; }
+[role="tablist"]::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 0 6px;
+}
+[role="tablist"]::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+  transition: background 120ms ease;
+}
+[role="tablist"]::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+.solon-editor-toolbar--hover {
+  opacity: 0;
+  filter: saturate(0.85);
+  transition: opacity 120ms ease, filter 120ms ease;
+}
+.solon-editor-toolbar--hover:hover,
+.solon-editor-toolbar--hover:focus-within {
+  opacity: 1;
+  filter: saturate(1);
+}
 
 /* ─────────────────────────────────────────
    Editor ProseMirror

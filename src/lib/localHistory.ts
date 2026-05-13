@@ -112,9 +112,10 @@ export async function createSnapshotBeforeWrite({
   nextContent: string;
 }): Promise<void> {
   if (!isTauri() || !rootFolder) return;
-  const { exists, mkdir, readTextFile, writeTextFile, remove } = await import(
+  const { exists, mkdir, readTextFile, remove } = await import(
     "@tauri-apps/plugin-fs"
   );
+  const { atomicWriteTextFile } = await import("./atomicWrite");
 
   if (!(await exists(filePath))) return;
   const current = await readTextFile(filePath);
@@ -133,7 +134,9 @@ export async function createSnapshotBeforeWrite({
     }
   }
 
-  await writeTextFile(joinPath(dir, `${timestampName()}.md`), current);
+  // Atomic: snapshot vira o ponto de restauracao confiavel. Crash
+  // durante escrita corromperia o snapshot e quebraria recovery.
+  await atomicWriteTextFile(joinPath(dir, `${timestampName()}.md`), current);
 
   const all = await listSnapshots(rootFolder, filePath);
   for (const item of all.slice(MAX_SNAPSHOTS_PER_FILE)) {
@@ -165,9 +168,15 @@ export async function previewSnapshot(path: string): Promise<{
 }
 
 export async function restoreSnapshot(filePath: string, snapshotPath: string): Promise<string> {
-  const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+  const { atomicWriteTextFile } = await import("./atomicWrite");
   const content = await readSnapshot(snapshotPath);
-  await writeTextFile(filePath, content);
+  // CRITICO: estamos sobrescrevendo o arquivo original com conteudo
+  // do snapshot. Atomic write garante que crash no meio da escrita
+  // nao deixa o original truncado (perda dupla — versao atual + snapshot).
+  const ok = await atomicWriteTextFile(filePath, content);
+  if (!ok) {
+    throw new Error("Falha ao restaurar snapshot — arquivo original preservado.");
+  }
   return content;
 }
 

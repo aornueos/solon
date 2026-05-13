@@ -299,6 +299,18 @@ function sanitizeEditorHtml(html: string): string {
   });
 }
 
+function normalizeNestedMarks(html: string): string {
+  let next = html;
+  let prev = "";
+  while (next !== prev) {
+    prev = next;
+    next = next
+      .replace(/<(strong|em|s|code)(\s[^>]*)?>\s*<\1(?:\s[^>]*)?>/gi, "<$1$2>")
+      .replace(/<\/(strong|em|s|code)>\s*<\/\1>/gi, "</$1>");
+  }
+  return next;
+}
+
 /**
  * Substitui ocorrencias de `[[name]]` por `<a class="wikilink" ...>...</a>`
  * ANTES do marked parsear. Sem isso, o marked pode entender o conteudo
@@ -337,7 +349,7 @@ export function markdownToHtml(md: string): string {
     new RegExp(`<p([^>]*)>${EM_SPACE}`, "g"),
     '<p data-indent="true"$1>',
   );
-  return sanitizeEditorHtml(withIndent);
+  return normalizeNestedMarks(sanitizeEditorHtml(withIndent));
 }
 
 export function htmlToMarkdown(html: string): string {

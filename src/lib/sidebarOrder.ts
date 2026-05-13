@@ -134,15 +134,14 @@ export async function saveOrder(
 ): Promise<void> {
   if (!isTauri()) return;
   try {
-    const { writeTextFile, mkdir, exists } = await import(
-      "@tauri-apps/plugin-fs"
-    );
+    const { mkdir, exists } = await import("@tauri-apps/plugin-fs");
+    const { atomicWriteTextFile } = await import("./atomicWrite");
     const dir = joinPath(rootFolder, ORDER_DIR);
     if (!(await exists(dir))) {
       await mkdir(dir, { recursive: true });
     }
     const orderPath = joinPath(dir, ORDER_FILENAME);
-    await writeTextFile(orderPath, JSON.stringify(order, null, 2));
+    await atomicWriteTextFile(orderPath, JSON.stringify(order, null, 2));
   } catch (err) {
     console.error("[sidebarOrder] save failed:", err);
   }

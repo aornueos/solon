@@ -6,6 +6,8 @@ import { renameCanvasSidecar, deleteCanvasSidecar } from "../lib/canvas";
 import { createSnapshotBeforeWrite } from "../lib/localHistory";
 import { flushEditor } from "../lib/editorRef";
 import { scanRecoveryDrafts } from "../lib/crashRecovery";
+import { atomicWriteTextFile } from "../lib/atomicWrite";
+import { clearImageUrlCache } from "../lib/canvasImages";
 import {
   applyOrder,
   loadOrder,
@@ -98,6 +100,12 @@ export function useFileSystem() {
         const { open } = await import("@tauri-apps/plugin-dialog");
         const selected = await open({ directory: true, multiple: false });
         if (selected && typeof selected === "string") {
+          // Troca de projeto: invalida o cache de URLs de imagem (blob:)
+          // do projeto anterior. Sem isso, blob URLs apontando pra
+          // arquivos de outro projeto vazam memoria ate' o app fechar
+          // E (pior) podem colidir se dois projetos tiverem nomes de
+          // asset iguais.
+          clearImageUrlCache();
           setRootFolder(selected);
           // Carrega a ordem manual ANTES do tree pra que o primeiro
           // setFileTree ja' venha ordenado. Sem isso, user veria o
@@ -193,85 +201,45 @@ export function useFileSystem() {
 
   const saveFile = useCallback(
     async (path: string, content: string) => {
-      if (isTauri) {
-        try {
-          const { writeTextFile, rename, remove, exists } = await import(
-            "@tauri-apps/plugin-fs"
-          );
-          const { rootFolder, localHistoryEnabled } = useAppStore.getState();
-          if (localHistoryEnabled) {
-            await createSnapshotBeforeWrite({
-              rootFolder,
-              filePath: path,
-              nextContent: content,
-            });
-          }
-          // Escrita atomica: grava em `<path>.solon-tmp`, depois rename
-          // por cima do original. Se o processo crashar no meio, o
-          // original fica intacto e o `.solon-tmp` orfao pode ser
-          // descartado no proximo boot (ou ignorado — fica no FS sem
-          // mal).
-          //
-          // ANTES: `writeTextFile(path, content)` direto. Em crash
-          // durante a escrita o arquivo ficava truncado pela metade —
-          // pior cenario de data loss possivel (parece que salvou, mas
-          // metade do livro virou \0).
-          //
-          // O `rename` do plugin-fs faz syscall atomica no mesmo
-          // filesystem (todos os casos comuns: salvar onde ja' tem o
-          // .md). Cross-filesystem cai em copy+delete que nao e
-          // atomico, mas isso so' ocorre se o user mover o projeto pra
-          // disco diferente durante a sessao — caso raro e nao-critico.
-          const tmpPath = `${path}.solon-tmp`;
-          try {
-            // Limpa qualquer tmp orfao de uma sessao anterior — `rename`
-            // alguns SOs falha se o destino ja existe (Windows nao
-            // sobrescreve por default).
-            if (await exists(tmpPath)) {
-              await remove(tmpPath);
-            }
-          } catch {
-            /* tmp limpa best-effort */
-          }
-          await writeTextFile(tmpPath, content);
-          try {
-            await rename(tmpPath, path);
-          } catch (renameErr) {
-            // Fallback: se o rename falhar (FS readonly, antivirus
-            // lockou, etc), tenta escrita direta. Volta ao
-            // comportamento antigo — nao atomico mas a chance de crash
-            // entre as 2 chamadas e' baixa.
-            await writeTextFile(path, content);
-            try {
-              await remove(tmpPath);
-            } catch {
-              /* deixa o tmp; nao bloqueia o save */
-            }
-            console.warn("[save] rename atomico falhou, fallback direto:", renameErr);
-          }
-          // Apos save bem-sucedido, limpa o draft de crash recovery (se
-          // houver). O ciclo de "draft → save" fecha aqui.
-          try {
-            const { clearRecoveryDraft } = await import("../lib/crashRecovery");
-            await clearRecoveryDraft(rootFolder, path);
-          } catch {
-            /* recovery e' best-effort — falhas silenciosas */
-          }
-        } catch (err) {
-          console.error("Erro ao salvar arquivo:", err);
-          // Save falha silenciosa = usuário acha que salvou e perde o
-          // trabalho. Surface obrigatório: o toast fica 8s, mais longo que
-          // o default, pra dar tempo de agir antes de confiar que salvou.
-          const name = path.split(/[\\/]/).pop() ?? path;
-          useAppStore
-            .getState()
-            .pushToast(
-              "error",
-              `Falha ao salvar ${name}: ${describeError(err)}`,
-              8000,
-            );
-          throw err;
+      if (!isTauri) return;
+      try {
+        const { rootFolder, localHistoryEnabled } = useAppStore.getState();
+        if (localHistoryEnabled) {
+          await createSnapshotBeforeWrite({
+            rootFolder,
+            filePath: path,
+            nextContent: content,
+          });
         }
+        // Escrita atomica: lib/atomicWrite escreve em
+        // `<path>.<rand>.solon-tmp` e renomeia por cima. Crash durante
+        // a escrita NUNCA deixa o arquivo destino truncado.
+        const ok = await atomicWriteTextFile(path, content);
+        if (!ok) {
+          throw new Error("falha ao gravar (FS readonly ou bloqueio)");
+        }
+        // Apos save bem-sucedido, limpa o draft de crash recovery (se
+        // houver). O ciclo de "draft → save" fecha aqui.
+        try {
+          const { clearRecoveryDraft } = await import("../lib/crashRecovery");
+          await clearRecoveryDraft(rootFolder, path);
+        } catch {
+          /* recovery e' best-effort — falhas silenciosas */
+        }
+      } catch (err) {
+        console.error("Erro ao salvar arquivo:", err);
+        // Save falha silenciosa = usuário acha que salvou e perde o
+        // trabalho. Surface obrigatório: o toast fica 8s, mais longo que
+        // o default, pra dar tempo de agir antes de confiar que salvou.
+        const name = path.split(/[\\/]/).pop() ?? path;
+        useAppStore
+          .getState()
+          .pushToast(
+            "error",
+            `Falha ao salvar ${name}: ${describeError(err)}`,
+            8000,
+          );
+        throw err;
       }
     },
     []
@@ -370,7 +338,7 @@ export function useFileSystem() {
       const finalName = name.endsWith(".md") || name.endsWith(".txt") ? name : `${name}.md`;
       const full = joinPath(parentDir, finalName);
       try {
-        const { writeTextFile, exists } = await import("@tauri-apps/plugin-fs");
+        const { exists } = await import("@tauri-apps/plugin-fs");
         if (await exists(full)) {
           useAppStore
             .getState()
@@ -381,7 +349,10 @@ export function useFileSystem() {
         // cuida da experiencia inicial via Placeholder ("Comece a escrever..."),
         // o que e mais respeitoso pra ficcao: nem sempre a primeira linha
         // e um titulo de capitulo (cena curta, fragmento, nota).
-        await writeTextFile(full, "");
+        // Conteudo vazio mas usamos atomic write por consistencia —
+        // garante que o arquivo aparece no FS apenas quando completo
+        // (zero risco de stub corrompido em crash).
+        await atomicWriteTextFile(full, "");
         // Garante que a pasta destino fica EXPANDIDA apos refresh — sem
         // isso, criar dentro de pasta fechada deixa o user sem ver o
         // novo arquivo. Adicionamos o parentDir ao expanded set ANTES
@@ -419,7 +390,7 @@ export function useFileSystem() {
     async (sourcePath: string) => {
       if (!isTauri) return;
       try {
-        const { readTextFile, writeTextFile, exists } = await import(
+        const { readTextFile, exists } = await import(
           "@tauri-apps/plugin-fs"
         );
         if (!(await exists(sourcePath))) {
@@ -443,7 +414,10 @@ export function useFileSystem() {
           if (n > 999) break;
         }
         const newPath = joinPath(parent, candidate);
-        await writeTextFile(newPath, content);
+        // Atomic write: pra arquivos grandes (capitulo de livro), crash
+        // durante a copia deixaria o destino truncado — perda real.
+        const ok = await atomicWriteTextFile(newPath, content);
+        if (!ok) throw new Error("falha ao gravar a cópia");
         await refresh();
         await openFile(newPath, candidate);
       } catch (err) {
@@ -832,7 +806,7 @@ export function useFileSystem() {
     }
     if (!isTauri) return;
     try {
-      const { exists, writeTextFile } = await import("@tauri-apps/plugin-fs");
+      const { exists } = await import("@tauri-apps/plugin-fs");
       const base = "Sem título";
       let name = `${base}.md`;
       let n = 1;
@@ -842,7 +816,7 @@ export function useFileSystem() {
         if (n > 999) break; // sanity guard — quase impossivel mas evita loop
       }
       const full = joinPath(rootFolder, name);
-      await writeTextFile(full, "");
+      await atomicWriteTextFile(full, "");
       await refresh();
       await openFile(full, name);
     } catch (err) {

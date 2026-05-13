@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FilePlus2, Send, X } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
+import { atomicWriteTextFile } from "../../lib/atomicWrite";
 
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -41,16 +42,23 @@ export function Scratchpad() {
     if (!isTauri) return;
     setSaving(true);
     try {
-      const { exists, writeTextFile } = await import("@tauri-apps/plugin-fs");
+      const { exists } = await import("@tauri-apps/plugin-fs");
       const base = "Scratch";
       let name = `${base}.md`;
       let n = 1;
       while (await exists(joinPath(rootFolder, name))) {
         n += 1;
         name = `${base} ${n}.md`;
+        if (n > 999) break; // sanity guard
       }
       const path = joinPath(rootFolder, name);
-      await writeTextFile(path, `${text.trim()}\n`);
+      // Atomic: nota acabada de criar com conteudo importante do user.
+      // Sem atomic, crash durante o write deixa arquivo truncado.
+      const ok = await atomicWriteTextFile(path, `${text.trim()}\n`);
+      if (!ok) {
+        pushToast("error", "Falha ao salvar a nota.");
+        return;
+      }
       await refresh();
       await openFile(path, name);
       setText("");

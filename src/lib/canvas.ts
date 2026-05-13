@@ -48,8 +48,8 @@ export async function saveCanvas(
     return;
   }
   try {
-    const { writeTextFile } = await import("@tauri-apps/plugin-fs");
-    await writeTextFile(canvasPathFor(filePath), JSON.stringify(doc, null, 2));
+    const { atomicWriteTextFile } = await import("./atomicWrite");
+    await atomicWriteTextFile(canvasPathFor(filePath), JSON.stringify(doc, null, 2));
   } catch (err) {
     console.error("Erro ao salvar canvas:", err);
   }

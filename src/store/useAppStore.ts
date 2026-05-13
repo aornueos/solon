@@ -33,6 +33,7 @@ export interface Toast {
 }
 
 export type EditorFontFamily = "serif" | "sans" | "mono";
+export type EditorToolbarMode = "fixed" | "hover";
 
 /** Variantes de "papel" do editor — vide doc no AppState.editorPaper. */
 export type EditorPaper = "default" | "creme" | "sepia" | "gray" | "midnight";
@@ -316,6 +317,7 @@ interface AppState {
    *  de Ulysses/iA Writer pra concentracao. Padding virtual no topo
    *  e fundo permite centralizar mesmo em docs curtos. */
   typewriterMode: boolean;
+  editorToolbarMode: EditorToolbarMode;
   /** Mostra contadores e formato na StatusBar. */
   showStatusStats: boolean;
   /** Mostra caminho completo do arquivo na StatusBar. */
@@ -415,6 +417,7 @@ interface AppState {
   setEditorFontFamily: (v: EditorFontFamily) => void;
   setEditorPaper: (v: EditorPaper) => void;
   setTypewriterMode: (v: boolean) => void;
+  setEditorToolbarMode: (v: EditorToolbarMode) => void;
   setShowStatusStats: (v: boolean) => void;
   setShowStatusPath: (v: boolean) => void;
   setCanvasGridEnabled: (v: boolean) => void;
@@ -540,6 +543,7 @@ const DEFAULT_EDITOR_INDENT_SIZE: "small" | "normal" | "large" = "normal";
 const DEFAULT_EDITOR_FONT_FAMILY: EditorFontFamily = "serif";
 const DEFAULT_EDITOR_PAPER: EditorPaper = "default";
 const DEFAULT_TYPEWRITER_MODE = false;
+const DEFAULT_EDITOR_TOOLBAR_MODE: EditorToolbarMode = "fixed";
 const DEFAULT_SHOW_STATUS_STATS = true;
 const DEFAULT_SHOW_STATUS_PATH = true;
 const DEFAULT_CANVAS_GRID_ENABLED = true;
@@ -564,6 +568,7 @@ const EDITOR_INDENT_SIZE_KEY = "solon:editorIndentSize";
 const EDITOR_FONT_FAMILY_KEY = "solon:editorFontFamily";
 const EDITOR_PAPER_KEY = "solon:editorPaper";
 const TYPEWRITER_MODE_KEY = "solon:typewriterMode";
+const EDITOR_TOOLBAR_MODE_KEY = "solon:editorToolbarMode";
 const SHOW_STATUS_STATS_KEY = "solon:showStatusStats";
 const SHOW_STATUS_PATH_KEY = "solon:showStatusPath";
 const CANVAS_GRID_ENABLED_KEY = "solon:canvasGridEnabled";
@@ -688,6 +693,14 @@ function loadEditorPaper(): EditorPaper {
   return DEFAULT_EDITOR_PAPER;
 }
 
+function loadEditorToolbarMode(): EditorToolbarMode {
+  try {
+    const v = localStorage.getItem(EDITOR_TOOLBAR_MODE_KEY);
+    if (v === "fixed" || v === "hover") return v;
+  } catch {}
+  return DEFAULT_EDITOR_TOOLBAR_MODE;
+}
+
 function loadNumberOption<T extends readonly number[]>(
   key: string,
   values: T,
@@ -795,7 +808,7 @@ export const useAppStore = create<AppState>((set) => ({
   outlineWidth: 260,
   isSidebarOpen: true,
   isOutlineOpen: true,
-  isInspectorOpen: true,
+  isInspectorOpen: false,
   focusMode: false,
   readingMode: false,
   wordCount: 0,
@@ -832,6 +845,7 @@ export const useAppStore = create<AppState>((set) => ({
   editorFontFamily: loadEditorFontFamily(),
   editorPaper: loadEditorPaper(),
   typewriterMode: loadBoolPref(TYPEWRITER_MODE_KEY, DEFAULT_TYPEWRITER_MODE),
+  editorToolbarMode: loadEditorToolbarMode(),
   showStatusStats: loadBoolPref(SHOW_STATUS_STATS_KEY, DEFAULT_SHOW_STATUS_STATS),
   showStatusPath: loadBoolPref(SHOW_STATUS_PATH_KEY, DEFAULT_SHOW_STATUS_PATH),
   canvasGridEnabled: loadBoolPref(CANVAS_GRID_ENABLED_KEY, DEFAULT_CANVAS_GRID_ENABLED),
@@ -1216,6 +1230,7 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.removeItem(EDITOR_FONT_FAMILY_KEY);
       localStorage.removeItem(EDITOR_PAPER_KEY);
       localStorage.removeItem(TYPEWRITER_MODE_KEY);
+      localStorage.removeItem(EDITOR_TOOLBAR_MODE_KEY);
       localStorage.removeItem(SHOW_STATUS_STATS_KEY);
       localStorage.removeItem(SHOW_STATUS_PATH_KEY);
       localStorage.removeItem(CANVAS_GRID_ENABLED_KEY);
@@ -1244,6 +1259,7 @@ export const useAppStore = create<AppState>((set) => ({
       editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
       editorPaper: DEFAULT_EDITOR_PAPER,
       typewriterMode: DEFAULT_TYPEWRITER_MODE,
+      editorToolbarMode: DEFAULT_EDITOR_TOOLBAR_MODE,
       showStatusStats: DEFAULT_SHOW_STATUS_STATS,
       showStatusPath: DEFAULT_SHOW_STATUS_PATH,
       canvasGridEnabled: DEFAULT_CANVAS_GRID_ENABLED,
@@ -1359,6 +1375,16 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ typewriterMode: v });
+  },
+
+  setEditorToolbarMode: (v) => {
+    if (v !== "fixed" && v !== "hover") return;
+    try {
+      localStorage.setItem(EDITOR_TOOLBAR_MODE_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ editorToolbarMode: v });
   },
 
   setShowStatusStats: (v) => {

@@ -410,10 +410,13 @@ export function Editor() {
     if (!editor || !typewriterMode) return;
     const scroller = scrollRef.current;
     if (!scroller) return;
+    let raf: number | null = null;
     const recenter = () => {
       // rAF garante que a layout passou pelo ciclo apos a edicao (caret
       // pode ter ido pra linha nova).
-      requestAnimationFrame(() => {
+      if (raf != null) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        raf = null;
         try {
           const { from } = editor.state.selection;
           const coords = editor.view.coordsAtPos(from);
@@ -421,7 +424,7 @@ export function Editor() {
           const desiredY = rect.top + rect.height / 2;
           const delta = coords.top - desiredY;
           if (Math.abs(delta) > 1) {
-            scroller.scrollBy({ top: delta, behavior: "instant" as ScrollBehavior });
+            scroller.scrollTop += delta;
           }
         } catch {
           /* posicoes podem invalidar durante hot-reload — ignora */
@@ -433,6 +436,7 @@ export function Editor() {
     // Re-centra ao ligar — o cursor pode estar em qualquer lugar.
     recenter();
     return () => {
+      if (raf != null) cancelAnimationFrame(raf);
       editor.off("selectionUpdate", recenter);
       editor.off("update", recenter);
     };

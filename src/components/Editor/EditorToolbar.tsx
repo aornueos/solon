@@ -24,9 +24,13 @@ import {
   AlignRight,
   AlignJustify,
   Highlighter,
+  Keyboard,
+  Eye,
+  Pin,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
+import { useAppStore } from "../../store/useAppStore";
 
 interface Props {
   editor: Editor;
@@ -45,8 +49,31 @@ interface ToolSpec {
 
 export function EditorToolbar({ editor }: Props) {
   const [tableMenu, setTableMenu] = useState(false);
+  const typewriterMode = useAppStore((s) => s.typewriterMode);
+  const setTypewriterMode = useAppStore((s) => s.setTypewriterMode);
+  const toolbarMode = useAppStore((s) => s.editorToolbarMode);
+  const setToolbarMode = useAppStore((s) => s.setEditorToolbarMode);
+  const openContextMenu = useAppStore((s) => s.openContextMenu);
 
   const inTable = editor.isActive("table");
+
+  const onToolbarContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    openContextMenu(e.clientX, e.clientY, [
+      {
+        label: "Toolbar fixa",
+        icon: <Pin size={13} />,
+        checked: toolbarMode === "fixed",
+        onClick: () => setToolbarMode("fixed"),
+      },
+      {
+        label: "Mostrar só ao passar o mouse",
+        icon: <Eye size={13} />,
+        checked: toolbarMode === "hover",
+        onClick: () => setToolbarMode("hover"),
+      },
+    ]);
+  };
 
   const historyTools: ToolSpec[] = [
     {
@@ -165,12 +192,24 @@ export function EditorToolbar({ editor }: Props) {
 
   return (
     <div
-      className="flex items-center gap-0.5 px-4 py-1.5"
+      className={clsx(
+        "solon-editor-toolbar flex items-center gap-0.5 px-4 py-1.5",
+        toolbarMode === "hover" && "solon-editor-toolbar--hover",
+      )}
+      onContextMenu={onToolbarContextMenu}
       style={{
         borderBottom: "1px solid var(--border-subtle)",
         background: "var(--bg-panel-2)",
       }}
     >
+      <ToolBtn
+        title="Máquina de escrever"
+        active={typewriterMode}
+        onClick={() => setTypewriterMode(!typewriterMode)}
+      >
+        <Keyboard size={15} />
+      </ToolBtn>
+      <Divider />
       <ToolGroup editor={editor} tools={historyTools} />
       <Divider />
       <ToolGroup editor={editor} tools={headingTools} />
