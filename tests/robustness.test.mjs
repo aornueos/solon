@@ -148,6 +148,7 @@ describe("project path safety", () => {
     assert.equal(isProjectNotePath(root, "C:\\Projeto\\Livro\\Cena.md"), true);
     assert.equal(isProjectNotePath(root, "C:\\Projeto\\Livro\\asset.png"), false);
     assert.equal(isProjectNotePath(root, "C:\\Projeto\\Outro\\Cena.md"), false);
+    assert.equal(isProjectNotePath(root, "C:\\Projeto\\Livro\\..\\Outro\\Cena.md"), false);
   });
 
   it("rejects unsafe entry names", () => {

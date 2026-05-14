@@ -20167,8 +20167,12 @@ var RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
 function normalizeProjectPath(path) {
   return path.replace(/\\/g, "/").replace(/\/+$/, "");
 }
+function hasTraversalSegment(path) {
+  return path.replace(/\\/g, "/").split("/").some((segment) => segment === "..");
+}
 function isInsideProject(rootFolder, path) {
   if (!rootFolder || !path) return false;
+  if (hasTraversalSegment(rootFolder) || hasTraversalSegment(path)) return false;
   const root = normalizeProjectPath(rootFolder).toLowerCase();
   const target = normalizeProjectPath(path).toLowerCase();
   return target === root || target.startsWith(`${root}/`);
@@ -23889,6 +23893,7 @@ describe("project path safety", () => {
     assert.equal(isProjectNotePath(root, "C:\\Projeto\\Livro\\Cena.md"), true);
     assert.equal(isProjectNotePath(root, "C:\\Projeto\\Livro\\asset.png"), false);
     assert.equal(isProjectNotePath(root, "C:\\Projeto\\Outro\\Cena.md"), false);
+    assert.equal(isProjectNotePath(root, "C:\\Projeto\\Livro\\..\\Outro\\Cena.md"), false);
   });
   it("rejects unsafe entry names", () => {
     assert.equal(isSafeEntryName("Cena 1.md", "file"), true);
