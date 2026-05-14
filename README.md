@@ -222,31 +222,6 @@ npm run test:robustness
 npm run kill
 ```
 
-## Releases
-
-Pushing a tag `v*`, such as `v0.8.7`, triggers `.github/workflows/release.yml`.
-
-The release workflow:
-
-1. Builds the bundles on each target in the matrix.
-2. Signs them with the Ed25519 key from `TAURI_SIGNING_PRIVATE_KEY`.
-3. Uploads the installers, `.sig` files, and `latest.json` as release assets.
-4. Makes installed apps detect the new version through the `latest.json` URL configured in `src-tauri/tauri.conf.json`.
-
-To cut a release locally:
-
-```bash
-npm run version:set patch
-npm run release:prepare
-git add package.json package-lock.json src src-tauri scripts
-git commit -m "release: vX.Y.Z"
-git tag vX.Y.Z
-git push origin main
-git push origin vX.Y.Z
-```
-
-The required GitHub secrets are documented in the header of `.github/workflows/release.yml`.
-
 ## Configuration
 
 Most behavior is configured from `Settings` with `Ctrl+,`.
