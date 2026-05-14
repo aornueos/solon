@@ -13,7 +13,7 @@ Built with **Tauri 2 + React + TipTap**. Notes live on your disk as plain `.md` 
 
 Most writing and note-taking apps fall into one of two traps.
 
-Some are beautiful Markdown editors, but stop at the page. They are clean, focused, and pleasant — until the project becomes a novel, with chapters, references, characters, structure, notes, and visual planning.
+Some are beautiful Markdown editors, but stop at the page. They are clean, focused, and pleasant, until the project becomes a novel, with chapters, references, characters, structure, notes, and visual planning.
 
 Others are powerful knowledge-management systems, but they treat writing like a database: graphs, backlinks, dashboards, templates, plugins, daily notes, and an endless architecture around the actual text.
 
@@ -106,7 +106,7 @@ Download `Solon_x.y.z_x64-setup.exe` (or the MSI), run it. The app then auto-upd
 
 ### macOS / Linux
 
-Not currently distributed — the release workflow targets `windows-latest` only. Building from source works on both (see below); a multi-OS release matrix is on the roadmap.
+Not currently distributed, the release workflow targets `windows-latest` only. Building from source works on both (see below); a multi-OS release matrix is on the roadmap.
 
 ---
 
@@ -202,7 +202,7 @@ npm install
 npm run tauri dev   # opens the desktop app with HMR
 ```
 
-`npm run dev` alone starts the Vite dev server in the browser — most filesystem features won't work there (no `__TAURI_INTERNALS__`), but it's useful for UI iteration.
+`npm run dev` alone starts the Vite dev server in the browser, most filesystem features won't work there (no `__TAURI_INTERNALS__`), but it's useful for UI iteration.
 
 ### Build
 
@@ -281,12 +281,12 @@ User preferences live in `localStorage` and follow the `solon:*` key prefix.
 
 ## Contributing
 
-This is a personal project — issues and pull requests are welcome but treated case by case. Please open an issue describing the change before opening a PR.
+This is a personal project, issues and pull requests are welcome but treated case by case. Please open an issue describing the change before opening a PR.
 
 ### Code style
 
 - TypeScript with strict mode. `tsc --noEmit` must pass.
-- Comments explain **why**, not what — leave room for the next reader to make a different call.
+- Comments explain **why**, not what, leave room for the next reader to make a different call.
 - Performance: the editor runs at keystroke frequency. Subscriptions to the Zustand store should select primitives or stable refs only; broad `useAppStore()` calls in hot components will re-render the world.
 - Filesystem operations: writes must use `lib/atomicWrite.ts`; paths must pass `assertInsideProject` from `lib/pathSecurity.ts`.
 
