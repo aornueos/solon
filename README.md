@@ -251,7 +251,7 @@ Deliberately out of scope:
 * Templated pages.
 * Plugins.
 * Productivity tracking with streaks, session timers, or heatmaps.
-* Real time collaboration. Solon is single author by design.
+* Real time collaboration, maybe, in the future.
 
 ## Contributing
 
