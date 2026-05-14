@@ -19,6 +19,7 @@ import {
   FileDown,
   Palette,
   Maximize2,
+  ShieldCheck,
 } from "lucide-react";
 import { EDITOR_PAPERS, useAppStore, FileNode } from "../../store/useAppStore";
 import { useCanvasStore } from "../../store/useCanvasStore";
@@ -68,6 +69,7 @@ export function CommandPalette() {
   const openSettings = useAppStore((s) => s.openSettings);
   const openGlobalSearch = useAppStore((s) => s.openGlobalSearch);
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
+  const openWorkspaceHealth = useAppStore((s) => s.openWorkspaceHealth);
   const openExport = useAppStore((s) => s.openExport);
   const openShortcuts = useAppStore((s) => s.openShortcuts);
   const openScratchpad = useAppStore((s) => s.openScratchpad);
@@ -134,7 +136,7 @@ export function CommandPalette() {
       },
       {
         id: "reopen-tab",
-        label: "Reabrir ultima aba fechada",
+        label: "Reabrir última aba fechada",
         hint: "Ctrl+Shift+T",
         icon: <FileText size={15} />,
         run: async () => {
@@ -217,7 +219,7 @@ export function CommandPalette() {
       },
       {
         id: "outline",
-        label: "Alternar indice",
+        label: "Alternar índice",
         hint: "Ctrl+J",
         icon: <ListTree size={15} />,
         run: toggleOutline,
@@ -231,7 +233,7 @@ export function CommandPalette() {
       },
       {
         id: "settings",
-        label: "Preferencias",
+        label: "Preferências",
         hint: "Ctrl+,",
         icon: <Settings size={15} />,
         run: openSettings,
@@ -245,10 +247,17 @@ export function CommandPalette() {
       },
       {
         id: "local-history",
-        label: "Historico local",
+        label: "Histórico local",
         hint: "Ctrl+Alt+H",
         icon: <FileText size={15} />,
         run: openLocalHistory,
+      },
+      {
+        id: "workspace-health",
+        label: "Saúde do projeto",
+        hint: "links, imagens e notas vazias",
+        icon: <ShieldCheck size={15} />,
+        run: openWorkspaceHealth,
       },
       {
         id: "export-pdf",
@@ -292,6 +301,7 @@ export function CommandPalette() {
       openFolder,
       openGlobalSearch,
       openLocalHistory,
+      openWorkspaceHealth,
       openExport,
       openShortcuts,
       openScratchpad,

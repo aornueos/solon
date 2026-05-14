@@ -352,6 +352,14 @@ export function useFileSystem() {
         }
       }
 
+      const splitPane = useAppStore.getState().splitPane;
+      if (
+        splitPane.kind === "reference" &&
+        (!isProjectNotePath(last, splitPane.path) || !(await exists(splitPane.path)))
+      ) {
+        useAppStore.getState().closeSplitPane();
+      }
+
       // Crash recovery: varre .solon/.recovery em busca de drafts cujo
       // conteudo diverge do que esta no disco. Se houver, abre o dialog
       // perguntando se o user quer recuperar. Roda apos restore do

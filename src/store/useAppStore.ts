@@ -244,6 +244,8 @@ interface AppState {
   showGlobalSearch: boolean;
   /** Dialog de historico local do arquivo ativo. */
   showLocalHistory: boolean;
+  /** Dialog de saúde do workspace: links quebrados, imagens ausentes e notas vazias. */
+  showWorkspaceHealth: boolean;
   /** Estado do auto-save — usado pela StatusBar pra dar feedback discreto.
    *  `dirty`: ha alteracoes no buffer que ainda nao foram persistidas.
    *  `saving`: write em andamento.
@@ -334,6 +336,7 @@ interface AppState {
   /** Comportamentos de conveniencia. */
   openLastFileOnStartup: boolean;
   autoExpandMovedFolders: boolean;
+  restoreWorkspaceLayout: boolean;
   /** View pra qual o app abre no boot. Default 'home' (landing). User
    *  que abre o app varias vezes ao dia pode preferir 'editor' direto. */
   startView: "home" | "editor" | "canvas";
@@ -407,6 +410,8 @@ interface AppState {
   closeGlobalSearch: () => void;
   openLocalHistory: () => void;
   closeLocalHistory: () => void;
+  openWorkspaceHealth: () => void;
+  closeWorkspaceHealth: () => void;
   setSaveStatus: (s: AppState["saveStatus"]) => void;
   setProjectStats: (s: { wordCount: number; fileCount: number } | null) => void;
   setEditorZoom: (zoom: number) => void;
@@ -434,6 +439,7 @@ interface AppState {
   setLocalHistoryEnabled: (v: boolean) => void;
   setOpenLastFileOnStartup: (v: boolean) => void;
   setAutoExpandMovedFolders: (v: boolean) => void;
+  setRestoreWorkspaceLayout: (v: boolean) => void;
   setStartView: (v: "home" | "editor" | "canvas") => void;
   openSettings: () => void;
   closeSettings: () => void;
@@ -462,6 +468,9 @@ interface AppState {
 }
 
 const OPEN_TABS_KEY = "solon:openTabs";
+const CLOSED_TABS_KEY = "solon:closedTabs";
+const SPLIT_PANE_KEY = "solon:splitPane";
+const LAST_ACTIVE_VIEW_KEY = "solon:lastActiveView";
 const RECENT_FILES_KEY = "solon:recentFiles";
 const RECENT_FILES_MAX = 8;
 const IS_DETACHED_WINDOW =
@@ -526,6 +535,87 @@ function saveOpenTabs(tabs: OpenTab[]): void {
 }
 // Defaults explicitos pra preferencias — usados na inicializacao e em
 // `resetSettings`. Em um lugar so pra evitar dessincronia.
+function loadClosedTabs(): OpenTab[] {
+  if (
+    IS_DETACHED_WINDOW ||
+    !loadBoolPref(RESTORE_WORKSPACE_LAYOUT_KEY, DEFAULT_RESTORE_WORKSPACE_LAYOUT)
+  ) {
+    return [];
+  }
+  try {
+    const raw = localStorage.getItem(CLOSED_TABS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (t): t is OpenTab =>
+          t && typeof t.path === "string" && typeof t.name === "string",
+      )
+      .filter((t, i, arr) => arr.findIndex((x) => x.path === t.path) === i)
+      .slice(0, 12);
+  } catch {
+    return [];
+  }
+}
+
+function saveClosedTabs(tabs: OpenTab[]): void {
+  if (IS_DETACHED_WINDOW) return;
+  try {
+    localStorage.setItem(CLOSED_TABS_KEY, JSON.stringify(tabs.slice(0, 12)));
+  } catch {
+    /* storage cheio — ignora */
+  }
+}
+
+function loadSplitPane(): SplitPaneState {
+  if (
+    IS_DETACHED_WINDOW ||
+    !loadBoolPref(RESTORE_WORKSPACE_LAYOUT_KEY, DEFAULT_RESTORE_WORKSPACE_LAYOUT)
+  ) {
+    return { kind: "none" };
+  }
+  try {
+    const raw = localStorage.getItem(SPLIT_PANE_KEY);
+    if (!raw) return { kind: "none" };
+    const parsed = JSON.parse(raw) as Partial<SplitPaneState>;
+    if (parsed.kind === "canvas") return { kind: "canvas" };
+    if (
+      parsed.kind === "reference" &&
+      typeof parsed.path === "string" &&
+      typeof parsed.name === "string"
+    ) {
+      return { kind: "reference", path: parsed.path, name: parsed.name };
+    }
+  } catch {
+    /* ignora */
+  }
+  return { kind: "none" };
+}
+
+function saveSplitPane(pane: SplitPaneState): void {
+  if (IS_DETACHED_WINDOW) return;
+  try {
+    localStorage.setItem(SPLIT_PANE_KEY, JSON.stringify(pane));
+  } catch {
+    /* storage cheio — ignora */
+  }
+}
+
+function loadInitialActiveView(): "home" | "editor" | "canvas" {
+  const configured = loadStartView();
+  if (!loadBoolPref(RESTORE_WORKSPACE_LAYOUT_KEY, DEFAULT_RESTORE_WORKSPACE_LAYOUT)) {
+    return configured;
+  }
+  try {
+    const v = localStorage.getItem(LAST_ACTIVE_VIEW_KEY);
+    if (v === "home" || v === "editor" || v === "canvas") return v;
+  } catch {
+    /* ignora */
+  }
+  return configured;
+}
+
 const DEFAULT_EDITOR_ZOOM = 100;
 const DEFAULT_APP_ZOOM = 100;
 const DEFAULT_AUTO_SAVE = true;
@@ -552,6 +642,7 @@ const DEFAULT_CANVAS_COLOR = "";
 const DEFAULT_LOCAL_HISTORY_ENABLED = true;
 const DEFAULT_OPEN_LAST_FILE_ON_STARTUP = true;
 const DEFAULT_AUTO_EXPAND_MOVED_FOLDERS = true;
+const DEFAULT_RESTORE_WORKSPACE_LAYOUT = true;
 const DEFAULT_START_VIEW: "home" | "editor" | "canvas" = "home";
 const EDITOR_ZOOM_KEY = "solon:editorZoom";
 const APP_ZOOM_KEY = "solon:appZoom";
@@ -579,6 +670,7 @@ const CANVAS_DEFAULT_COLOR_KEY = "solon:canvasDefaultColor";
 const LOCAL_HISTORY_ENABLED_KEY = "solon:localHistoryEnabled";
 const OPEN_LAST_FILE_ON_STARTUP_KEY = "solon:openLastFileOnStartup";
 const AUTO_EXPAND_MOVED_FOLDERS_KEY = "solon:autoExpandMovedFolders";
+const RESTORE_WORKSPACE_LAYOUT_KEY = "solon:restoreWorkspaceLayout";
 const START_VIEW_KEY = "solon:startView";
 
 /** Larguras suportadas pra coluna do editor (em px). */
@@ -798,8 +890,8 @@ export const useAppStore = create<AppState>((set) => ({
   fileBody: "",
   sceneMeta: {},
   openTabs: loadOpenTabs(),
-  closedTabs: [],
-  splitPane: { kind: "none" },
+  closedTabs: loadClosedTabs(),
+  splitPane: loadSplitPane(),
   scratchpadOpen: false,
   scratchpadText: "",
   floatingInspector: {
@@ -826,13 +918,14 @@ export const useAppStore = create<AppState>((set) => ({
   charCount: 0,
   // ActiveView inicial respeita a pref `startView` (default "home").
   // Se o user escolheu abrir direto no editor/canvas, comeca por la'.
-  activeView: loadStartView(),
+  activeView: loadInitialActiveView(),
   toasts: [],
   activeDialog: null,
   updateStatus: { kind: "idle" },
   showUpdateDialog: false,
   showGlobalSearch: false,
   showLocalHistory: false,
+  showWorkspaceHealth: false,
   saveStatus: "idle",
   lastSavedAt: null,
   projectStats: null,
@@ -893,6 +986,10 @@ export const useAppStore = create<AppState>((set) => ({
   autoExpandMovedFolders: loadBoolPref(
     AUTO_EXPAND_MOVED_FOLDERS_KEY,
     DEFAULT_AUTO_EXPAND_MOVED_FOLDERS,
+  ),
+  restoreWorkspaceLayout: loadBoolPref(
+    RESTORE_WORKSPACE_LAYOUT_KEY,
+    DEFAULT_RESTORE_WORKSPACE_LAYOUT,
   ),
   startView: loadStartView(),
 
@@ -966,11 +1063,13 @@ export const useAppStore = create<AppState>((set) => ({
       } else {
         nextActive = s.activeFilePath;
       }
+      const nextClosed = closed
+        ? [closed, ...s.closedTabs.filter((t) => t.path !== closed.path)].slice(0, 12)
+        : s.closedTabs;
+      saveClosedTabs(nextClosed);
       return {
         openTabs: next,
-        closedTabs: closed
-          ? [closed, ...s.closedTabs.filter((t) => t.path !== closed.path)].slice(0, 12)
-          : s.closedTabs,
+        closedTabs: nextClosed,
       };
     });
     return nextActive;
@@ -1011,6 +1110,7 @@ export const useAppStore = create<AppState>((set) => ({
         ? s.openTabs
         : [...s.openTabs, tab];
       saveOpenTabs(nextTabs);
+      saveClosedTabs(rest);
       return { openTabs: nextTabs, closedTabs: rest };
     });
     return reopened;
@@ -1037,8 +1137,15 @@ export const useAppStore = create<AppState>((set) => ({
       return { openTabs: next };
     }),
 
-  setSplitPane: (pane) => set({ splitPane: pane }),
-  closeSplitPane: () => set({ splitPane: { kind: "none" } }),
+  setSplitPane: (pane) => {
+    saveSplitPane(pane);
+    set({ splitPane: pane });
+  },
+  closeSplitPane: () => {
+    const pane: SplitPaneState = { kind: "none" };
+    saveSplitPane(pane);
+    set({ splitPane: pane });
+  },
   openScratchpad: () => set({ scratchpadOpen: true }),
   closeScratchpad: () => set({ scratchpadOpen: false }),
   setScratchpadText: (text) => set({ scratchpadText: text }),
@@ -1110,9 +1217,24 @@ export const useAppStore = create<AppState>((set) => ({
   toggleInspector: () => set((s) => ({ isInspectorOpen: !s.isInspectorOpen })),
   toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
   toggleReadingMode: () => set((s) => ({ readingMode: !s.readingMode })),
-  setActiveView: (v) => set({ activeView: v }),
+  setActiveView: (v) => {
+    try {
+      localStorage.setItem(LAST_ACTIVE_VIEW_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ activeView: v });
+  },
   toggleActiveView: () =>
-    set((s) => ({ activeView: s.activeView === "editor" ? "canvas" : "editor" })),
+    set((s) => {
+      const next = s.activeView === "editor" ? "canvas" : "editor";
+      try {
+        localStorage.setItem(LAST_ACTIVE_VIEW_KEY, next);
+      } catch {
+        /* ignora */
+      }
+      return { activeView: next };
+    }),
   setWordCount: (w, c) =>
     set((s) => (s.wordCount === w && s.charCount === c ? s : { wordCount: w, charCount: c })),
 
@@ -1193,6 +1315,8 @@ export const useAppStore = create<AppState>((set) => ({
   closeGlobalSearch: () => set({ showGlobalSearch: false }),
   openLocalHistory: () => set({ showLocalHistory: true }),
   closeLocalHistory: () => set({ showLocalHistory: false }),
+  openWorkspaceHealth: () => set({ showWorkspaceHealth: true }),
+  closeWorkspaceHealth: () => set({ showWorkspaceHealth: false }),
 
   setSaveStatus: (s) =>
     set((curr) =>
@@ -1286,6 +1410,7 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.removeItem(LOCAL_HISTORY_ENABLED_KEY);
       localStorage.removeItem(OPEN_LAST_FILE_ON_STARTUP_KEY);
       localStorage.removeItem(AUTO_EXPAND_MOVED_FOLDERS_KEY);
+      localStorage.removeItem(RESTORE_WORKSPACE_LAYOUT_KEY);
       localStorage.removeItem(START_VIEW_KEY);
     } catch {
       /* ignora */
@@ -1317,6 +1442,7 @@ export const useAppStore = create<AppState>((set) => ({
       localHistoryEnabled: DEFAULT_LOCAL_HISTORY_ENABLED,
       openLastFileOnStartup: DEFAULT_OPEN_LAST_FILE_ON_STARTUP,
       autoExpandMovedFolders: DEFAULT_AUTO_EXPAND_MOVED_FOLDERS,
+      restoreWorkspaceLayout: DEFAULT_RESTORE_WORKSPACE_LAYOUT,
       startView: DEFAULT_START_VIEW,
     });
   },
@@ -1551,6 +1677,20 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ autoExpandMovedFolders: v });
+  },
+
+  setRestoreWorkspaceLayout: (v) => {
+    try {
+      localStorage.setItem(RESTORE_WORKSPACE_LAYOUT_KEY, v ? "1" : "0");
+      if (!v) {
+        localStorage.removeItem(SPLIT_PANE_KEY);
+        localStorage.removeItem(LAST_ACTIVE_VIEW_KEY);
+        localStorage.removeItem(CLOSED_TABS_KEY);
+      }
+    } catch {
+      /* ignora */
+    }
+    set({ restoreWorkspaceLayout: v, splitPane: v ? loadSplitPane() : { kind: "none" } });
   },
 
   setStartView: (v) => {

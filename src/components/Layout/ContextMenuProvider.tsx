@@ -13,6 +13,7 @@ import {
   Settings,
   FileDown,
   BookOpen,
+  ShieldCheck,
 } from "lucide-react";
 import { useAppStore, ContextMenuItem } from "../../store/useAppStore";
 import { findWordAtCoords, replaceRange, getCurrentEditor } from "../../lib/editorRef";
@@ -442,6 +443,11 @@ function genericItems({
       onClick: () => useAppStore.getState().openGlobalSearch(),
     },
     {
+      label: "Saúde do projeto",
+      icon: <ShieldCheck size={12} />,
+      onClick: () => useAppStore.getState().openWorkspaceHealth(),
+    },
+    {
       label: "Modo leitura",
       icon: <BookOpen size={12} />,
       shortcut: "Ctrl+Shift+R",
@@ -454,7 +460,7 @@ function genericItems({
       onClick: () => useAppStore.getState().openExport(),
     },
     {
-      label: "Preferencias",
+      label: "Preferências",
       icon: <Settings size={12} />,
       shortcut: "Ctrl+,",
       onClick: () => useAppStore.getState().openSettings(),

@@ -50,7 +50,14 @@ import { resolveEditorImageHtml, saveImageForEditor } from "../../lib/editorImag
 import { loadSnippets } from "../../lib/snippets";
 
 const EDITOR_SCROLL_POSITIONS_KEY = "solon:editorScrollPositions";
+const EDITOR_SELECTIONS_KEY = "solon:editorSelections";
 const MAX_EDITOR_SCROLL_POSITIONS = 200;
+const MAX_EDITOR_SELECTIONS = 200;
+
+interface EditorSelectionMemory {
+  from: number;
+  to: number;
+}
 
 function loadEditorScrollPositions(): Record<string, number> {
   try {
@@ -92,6 +99,60 @@ function rememberEditorScroll(path: string, scrollTop: number): void {
 
 function readEditorScroll(path: string): number {
   return loadEditorScrollPositions()[path] ?? 0;
+}
+
+function loadEditorSelections(): Record<string, EditorSelectionMemory> {
+  try {
+    const raw = localStorage.getItem(EDITOR_SELECTIONS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const entries = Object.entries(parsed)
+      .filter((entry): entry is [string, EditorSelectionMemory] => {
+        const value = entry[1] as Partial<EditorSelectionMemory>;
+        return (
+          typeof entry[0] === "string" &&
+          typeof value?.from === "number" &&
+          typeof value?.to === "number" &&
+          Number.isFinite(value.from) &&
+          Number.isFinite(value.to) &&
+          value.from >= 0 &&
+          value.to >= 0
+        );
+      })
+      .slice(-MAX_EDITOR_SELECTIONS);
+    return Object.fromEntries(entries);
+  } catch {
+    return {};
+  }
+}
+
+function rememberEditorSelection(
+  path: string,
+  selection: EditorSelectionMemory,
+): void {
+  try {
+    const selections = loadEditorSelections();
+    delete selections[path];
+    const next = {
+      ...selections,
+      [path]: {
+        from: Math.max(0, Math.round(selection.from)),
+        to: Math.max(0, Math.round(selection.to)),
+      },
+    };
+    const entries = Object.entries(next).slice(-MAX_EDITOR_SELECTIONS);
+    localStorage.setItem(
+      EDITOR_SELECTIONS_KEY,
+      JSON.stringify(Object.fromEntries(entries)),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function readEditorSelection(path: string): EditorSelectionMemory | null {
+  return loadEditorSelections()[path] ?? null;
 }
 
 export function Editor() {
@@ -146,6 +207,8 @@ export function Editor() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const visiblePathRef = useRef<string | null>(null);
   const scrollSaveTimerRef = useRef<number | null>(null);
+  const selectionSaveTimerRef = useRef<number | null>(null);
+  const editorInstanceRef = useRef<ReturnType<typeof useEditor>>(null);
   const snippetsRef = useRef<Record<string, string>>({});
 
   const saveVisibleScroll = () => {
@@ -169,6 +232,28 @@ export function Editor() {
     }, 120);
   };
 
+  const saveVisibleSelection = () => {
+    const path = visiblePathRef.current;
+    const currentEditor = editorInstanceRef.current;
+    if (!path || !currentEditor) return;
+    const { from, to } = currentEditor.state.selection;
+    rememberEditorSelection(path, { from, to });
+  };
+
+  const scheduleSelectionMemory = () => {
+    const path = visiblePathRef.current;
+    const currentEditor = editorInstanceRef.current;
+    if (!path || !currentEditor || isLoadingRef.current) return;
+    if (selectionSaveTimerRef.current != null) {
+      window.clearTimeout(selectionSaveTimerRef.current);
+    }
+    const { from, to } = currentEditor.state.selection;
+    selectionSaveTimerRef.current = window.setTimeout(() => {
+      selectionSaveTimerRef.current = null;
+      rememberEditorSelection(path, { from, to });
+    }, 120);
+  };
+
   useEffect(() => {
     return () => {
       if (scrollSaveTimerRef.current != null) {
@@ -176,6 +261,11 @@ export function Editor() {
         scrollSaveTimerRef.current = null;
       }
       saveVisibleScroll();
+      if (selectionSaveTimerRef.current != null) {
+        window.clearTimeout(selectionSaveTimerRef.current);
+        selectionSaveTimerRef.current = null;
+      }
+      saveVisibleSelection();
     };
   }, []);
 
@@ -300,6 +390,7 @@ export function Editor() {
       }, 180);
     },
   });
+  editorInstanceRef.current = editor;
 
   // Mantem flushUpdateRef apontando pra uma funcao que cancela o timer
   // pendente e roda o trabalho agora. Chamado quando o user troca de
@@ -332,14 +423,31 @@ export function Editor() {
   // do usuário. Lemos o body via getState no momento da troca.
   useEffect(() => {
     if (!editor) return;
+    editor.on("selectionUpdate", scheduleSelectionMemory);
+    editor.on("update", scheduleSelectionMemory);
+    return () => {
+      if (selectionSaveTimerRef.current != null) {
+        window.clearTimeout(selectionSaveTimerRef.current);
+        selectionSaveTimerRef.current = null;
+      }
+      saveVisibleSelection();
+      editor.off("selectionUpdate", scheduleSelectionMemory);
+      editor.off("update", scheduleSelectionMemory);
+    };
+  }, [editor, activeFilePath]);
+
+  useEffect(() => {
+    if (!editor) return;
     if (!activeFilePath) {
       saveVisibleScroll();
+      saveVisibleSelection();
       visiblePathRef.current = null;
       lastLoadedPathRef.current = null;
       return;
     }
     if (lastLoadedPathRef.current === activeFilePath) return;
     saveVisibleScroll();
+    saveVisibleSelection();
     // CUIDADO: NAO chamar flushUpdateRef aqui. Quando este effect roda,
     // `activeFilePath` ja' mudou pro arquivo NOVO, mas o editor ainda
     // tem o conteudo do arquivo ANTIGO. Se a gente flushasse, o turndown
@@ -374,7 +482,14 @@ export function Editor() {
       setWordCount(words, text.length);
 
       const restoreTop = readEditorScroll(activeFilePath);
+      const restoreSelection = readEditorSelection(activeFilePath);
       raf = requestAnimationFrame(() => {
+        if (restoreSelection) {
+          const maxPos = editor.state.doc.content.size;
+          const from = Math.max(1, Math.min(maxPos, restoreSelection.from));
+          const to = Math.max(from, Math.min(maxPos, restoreSelection.to));
+          editor.commands.setTextSelection({ from, to });
+        }
         if (scrollRef.current) {
           scrollRef.current.scrollTop = restoreTop;
         }

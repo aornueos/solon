@@ -16,6 +16,7 @@ import { ExportDialog } from "./ExportDialog";
 import { CommandPalette } from "./CommandPalette";
 import { GlobalSearchDialog } from "./GlobalSearchDialog";
 import { LocalHistoryDialog } from "./LocalHistoryDialog";
+import { WorkspaceHealthDialog } from "./WorkspaceHealthDialog";
 import { ContextMenuLayer } from "./ContextMenuLayer";
 import { ContextMenuProvider } from "./ContextMenuProvider";
 import { ReferencePane } from "./ReferencePane";
@@ -254,6 +255,7 @@ export function AppLayout() {
       <CommandPalette />
       <GlobalSearchDialog />
       <LocalHistoryDialog />
+      <WorkspaceHealthDialog />
       <UpdateNotesDialog />
       <SettingsDialog />
       <RecoveryDialog />

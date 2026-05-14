@@ -8,6 +8,7 @@ import { FloatingText } from "./FloatingText";
 import { ImageNode } from "./ImageNode";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { CanvasSidePanel } from "./CanvasSidePanel";
+import { CanvasMinimap } from "./CanvasMinimap";
 import {
   CANVAS_TOOL_ORDER,
   CanvasStroke,
@@ -804,6 +805,7 @@ export function CanvasView() {
 
       <CanvasToolbar />
       <CanvasSidePanel />
+      <CanvasMinimap />
 
       {/* World container */}
       <div

@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import {
-  X,
+  ExternalLink,
+  Loader2,
+  Monitor,
   RotateCcw,
   Save,
+  ShieldCheck,
   Sparkles,
   SpellCheck,
-  Type,
-  Loader2,
   Trash2,
-  ExternalLink,
-  Monitor,
+  Type,
+  X,
 } from "lucide-react";
 import {
   EDITOR_FONT_FAMILIES,
@@ -34,18 +35,8 @@ import {
   RELEASES_URL,
 } from "../../lib/updater";
 
-/**
- * Dialog de Preferencias.
- *
- * Tipografia: 100% sans-serif (Inter), pra harmonizar com o Inspector
- * e a Sidebar — locais de UI utilitaria do app. Antes era serif/itálico
- * misturado com sans, dando dissonancia visual com o resto. Settings e'
- * configuracao, nao conteudo editorial — comportamento e' "ferramenta",
- * nao "livro".
- *
- * Persistencia: cada setter da store grava no localStorage diretamente.
- * O dialog so' le/escreve via store.
- */
+const APP_VERSION = __APP_VERSION__;
+
 export function SettingsDialog() {
   const show = useAppStore((s) => s.showSettings);
   const close = useAppStore((s) => s.closeSettings);
@@ -58,9 +49,7 @@ export function SettingsDialog() {
   const editorLineHeight = useAppStore((s) => s.editorLineHeight);
   const setEditorLineHeight = useAppStore((s) => s.setEditorLineHeight);
   const editorParagraphSpacing = useAppStore((s) => s.editorParagraphSpacing);
-  const setEditorParagraphSpacing = useAppStore(
-    (s) => s.setEditorParagraphSpacing,
-  );
+  const setEditorParagraphSpacing = useAppStore((s) => s.setEditorParagraphSpacing);
   const editorIndentSize = useAppStore((s) => s.editorIndentSize);
   const setEditorIndentSize = useAppStore((s) => s.setEditorIndentSize);
   const editorFontFamily = useAppStore((s) => s.editorFontFamily);
@@ -89,17 +78,20 @@ export function SettingsDialog() {
   const setOpenLastFileOnStartup = useAppStore((s) => s.setOpenLastFileOnStartup);
   const autoExpandMovedFolders = useAppStore((s) => s.autoExpandMovedFolders);
   const setAutoExpandMovedFolders = useAppStore((s) => s.setAutoExpandMovedFolders);
+  const restoreWorkspaceLayout = useAppStore((s) => s.restoreWorkspaceLayout);
+  const setRestoreWorkspaceLayout = useAppStore((s) => s.setRestoreWorkspaceLayout);
+  const openWorkspaceHealth = useAppStore((s) => s.openWorkspaceHealth);
   const setUpdateStatus = useAppStore((s) => s.setUpdateStatus);
   const pushToast = useAppStore((s) => s.pushToast);
   const resetSettings = useAppStore((s) => s.resetSettings);
 
-  // Re-le o tamanho do dicionario pessoal toda vez que o dialog abre.
-  // Snapshot na abertura — store nao tracka isso reativamente.
   const [personalDictSize, setPersonalDictSize] = useState(0);
   const [personalDictWords, setPersonalDictWords] = useState<string[]>([]);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [lastUpdateCheck, setLastUpdateCheck] = useState<number | null>(null);
   const [skippedVersion, setSkippedVersion] = useState<string | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
   useEffect(() => {
     if (!show) return;
     const refresh = () => {
@@ -110,21 +102,15 @@ export function SettingsDialog() {
     };
     refresh();
     window.addEventListener("solon:spellcheck-dict-changed", refresh);
-    return () =>
-      window.removeEventListener("solon:spellcheck-dict-changed", refresh);
+    return () => window.removeEventListener("solon:spellcheck-dict-changed", refresh);
   }, [show]);
 
-  // Estado local pro botao "Verificar atualizacoes" (loading + cooldown).
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
-
-  // Esc fecha o dialog.
   useEffect(() => {
     if (!show) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close();
-      }
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -138,45 +124,30 @@ export function SettingsDialog() {
     setUpdateStatus({ kind: "checking" });
     try {
       const result = await checkForUpdate({ force: true });
+      setLastUpdateCheck(getLastUpdateCheck());
       if (result.kind === "available") {
         setUpdateStatus({ kind: "available", info: result.info });
-        setUpdateMessage(`Solon ${result.info.version} disponivel para instalar.`);
-        setLastUpdateCheck(getLastUpdateCheck());
-        pushToast(
-          "info",
-          `Solon ${result.info.version} disponível — confira no banner.`,
-        );
+        setUpdateMessage(`Solon ${result.info.version} disponível para instalar.`);
+        pushToast("info", `Solon ${result.info.version} disponível no banner.`);
       } else if (result.kind === "skipped") {
         setUpdateStatus({ kind: "idle" });
-        setUpdateMessage(`Solon ${result.version} esta ignorado por enquanto.`);
-        setLastUpdateCheck(getLastUpdateCheck());
-        pushToast(
-          "info",
-          `Versão ${result.version} foi ignorada anteriormente.`,
-        );
+        setUpdateMessage(`Solon ${result.version} está ignorado por enquanto.`);
+        pushToast("info", `Versão ${result.version} foi ignorada anteriormente.`);
       } else if (result.kind === "error") {
         setUpdateStatus({ kind: "idle" });
         setUpdateMessage(result.message);
-        setLastUpdateCheck(getLastUpdateCheck());
         pushToast("error", "Erro ao verificar atualizações.");
       } else if (result.kind === "unconfigured") {
         setUpdateStatus({ kind: "idle" });
         setUpdateMessage(result.message);
-        setLastUpdateCheck(getLastUpdateCheck());
         pushToast("info", result.message);
       } else if (result.kind === "unsupported") {
         setUpdateStatus({ kind: "idle" });
-        setUpdateMessage("Disponivel apenas no app desktop instalado.");
-        setLastUpdateCheck(getLastUpdateCheck());
-        pushToast(
-          "info",
-          "Atualizações estão disponíveis apenas no app desktop.",
-        );
+        setUpdateMessage("Disponível apenas no app desktop instalado.");
+        pushToast("info", "Atualizações estão disponíveis apenas no app desktop.");
       } else {
-        // 'none' — esta na ultima versao
         setUpdateStatus({ kind: "idle" });
-        setUpdateMessage("Voce esta na versao mais recente.");
-        setLastUpdateCheck(getLastUpdateCheck());
+        setUpdateMessage("Você está na versão mais recente.");
         pushToast("success", "Você está na versão mais recente.");
       }
     } finally {
@@ -188,7 +159,7 @@ export function SettingsDialog() {
     clearPersonalDict();
     setPersonalDictSize(getPersonalDictSize());
     setPersonalDictWords(getPersonalDictWords());
-    pushToast("success", "Dicionario pessoal limpo.");
+    pushToast("success", "Dicionário pessoal limpo.");
   };
 
   const onRemovePersonalWord = (word: string) => {
@@ -200,7 +171,7 @@ export function SettingsDialog() {
   const onClearSkippedVersion = () => {
     clearSkippedVersion();
     setSkippedVersion(null);
-    pushToast("success", "Versao ignorada liberada.");
+    pushToast("success", "Versão ignorada liberada.");
   };
 
   const openReleaseChannel = async () => {
@@ -224,490 +195,323 @@ export function SettingsDialog() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="w-full max-w-4xl rounded-lg shadow-xl flex flex-col max-h-[85vh]"
+        className="w-full max-w-5xl max-h-[86vh] rounded-lg shadow-xl flex flex-col overflow-hidden"
         style={{
           background: "var(--bg-panel)",
           border: "1px solid var(--border)",
           color: "var(--text-primary)",
         }}
       >
-        {/* Header — utilitario, mesma estetica de Inspector/Sidebar.
-            Antes era 'PREFERÊNCIAS' grande em serif, destoava do resto. */}
         <div
-          className="px-5 py-3 flex items-center justify-between"
+          className="px-5 py-4 flex items-center justify-between gap-4"
           style={{ borderBottom: "1px solid var(--border-subtle)" }}
         >
-          <h2
-            id="settings-title"
-            className="text-[0.7rem] font-semibold uppercase tracking-widest"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Preferências
-          </h2>
+          <div className="min-w-0">
+            <h2 id="settings-title" className="text-[0.95rem] font-semibold">
+              Ajustes
+            </h2>
+            <p className="text-[0.7rem] mt-0.5" style={{ color: "var(--text-muted)" }}>
+              Preferências de escrita, interface e projeto.
+            </p>
+          </div>
           <button
             onClick={close}
-            title="Fechar (Esc)"
-            className="p-1 rounded transition-colors"
-            style={{ color: "var(--text-muted)" }}
-            onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLElement).style.background =
-                "var(--bg-hover)")
-            }
-            onMouseLeave={(e) =>
-              ((e.currentTarget as HTMLElement).style.background =
-                "transparent")
-            }
+            title="Fechar"
+            aria-label="Fechar ajustes"
+            className="h-8 w-8 rounded-md flex items-center justify-center transition-colors"
+            style={{ color: "var(--text-muted)", background: "var(--bg-hover)" }}
           >
             <X size={14} />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="overflow-y-auto px-5 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Aparencia */}
-          <Section title="Aparência">
-            <Row
-              label="Tema visual"
-              hint={EDITOR_PAPERS.find((option) => option.value === editorPaper)?.hint}
-            >
-              <SelectControl
-                value={editorPaper}
-                options={EDITOR_PAPERS.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-                onChange={(v) => setEditorPaper(v)}
-              />
-            </Row>
-
-            <Row
-              label="Zoom do app"
-              hint={`${appZoom}%`}
-              icon={<Monitor size={11} />}
-            >
-              <div className="flex items-center gap-2 w-full">
-                <button
-                  title="Diminuir interface"
-                  onClick={() => setAppZoom(appZoom - 10)}
-                  disabled={appZoom <= 80}
-                  className="px-2 py-0.5 rounded text-[0.72rem] font-mono transition-opacity disabled:opacity-30"
-                  style={{
-                    background: "var(--bg-hover)",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  -
-                </button>
-                <input
-                  type="range"
-                  min={80}
-                  max={160}
-                  step={10}
-                  value={appZoom}
-                  onChange={(e) => setAppZoom(parseInt(e.target.value, 10))}
-                  className="flex-1"
-                  style={{ accentColor: "var(--accent)" }}
+        <div className="overflow-y-auto px-5 py-5">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <Section title="Aparência" description="Tema, escala e medida visual.">
+              <Row label="Tema visual" hint={themeHint(editorPaper)}>
+                <SelectControl
+                  value={editorPaper}
+                  options={EDITOR_PAPERS.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  onChange={setEditorPaper}
                 />
-                <button
-                  title="Aumentar interface"
-                  onClick={() => setAppZoom(appZoom + 10)}
-                  disabled={appZoom >= 160}
-                  className="px-2 py-0.5 rounded text-[0.72rem] font-mono transition-opacity disabled:opacity-30"
-                  style={{
-                    background: "var(--bg-hover)",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  +
-                </button>
-                <button
-                  title="100%"
-                  onClick={() => setAppZoom(100)}
-                  className="px-1.5 py-0.5 rounded text-[0.65rem]"
-                  style={{
-                    border: "1px solid var(--border)",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  100%
-                </button>
-              </div>
-            </Row>
-
-            <Row
-              label="Zoom do texto"
-              hint={`${editorZoom}%`}
-              icon={<Type size={11} />}
-            >
-              <div className="flex items-center gap-2 w-full">
-                <button
-                  title="Diminuir"
-                  onClick={() => setEditorZoom(editorZoom - 5)}
-                  disabled={editorZoom <= 75}
-                  className="px-2 py-0.5 rounded text-[0.72rem] font-mono transition-opacity disabled:opacity-30"
-                  style={{
-                    background: "var(--bg-hover)",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  A−
-                </button>
-                <input
-                  type="range"
-                  min={75}
-                  max={200}
-                  step={5}
-                  value={editorZoom}
-                  onChange={(e) => setEditorZoom(parseInt(e.target.value, 10))}
-                  className="flex-1"
-                  style={{ accentColor: "var(--accent)" }}
-                />
-                <button
-                  title="Aumentar"
-                  onClick={() => setEditorZoom(editorZoom + 5)}
-                  disabled={editorZoom >= 200}
-                  className="px-2 py-0.5 rounded text-[0.78rem] font-mono transition-opacity disabled:opacity-30"
-                  style={{
-                    background: "var(--bg-hover)",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  A+
-                </button>
-                <button
-                  title="100%"
-                  onClick={() => setEditorZoom(100)}
-                  className="px-1.5 py-0.5 rounded text-[0.65rem]"
-                  style={{
-                    border: "1px solid var(--border)",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  100%
-                </button>
-              </div>
-            </Row>
-
-            <Row label="Largura do editor" hint={`${editorMaxWidth}px`}>
-              <SelectControl
-                value={String(editorMaxWidth)}
-                options={EDITOR_MAX_WIDTHS.map((w) => ({
-                  value: String(w),
-                  label: `${w}px`,
-                }))}
-                onChange={(v) => setEditorMaxWidth(parseInt(v, 10))}
-              />
-            </Row>
-
-            <Row label="Espaçamento" hint={getLineHeightLabel(editorLineHeight)}>
-              <SelectControl
-                value={editorLineHeight}
-                options={EDITOR_LINE_HEIGHTS.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-                onChange={(v) => setEditorLineHeight(v)}
-              />
-            </Row>
-
-          </Section>
-
-          <Section title="Escrita">
-            <Row
-              label="Entre parágrafos"
-              hint={getParagraphSpacingLabel(editorParagraphSpacing)}
-            >
-              <SelectControl
-                value={editorParagraphSpacing}
-                options={EDITOR_PARAGRAPH_SPACING.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-                onChange={(v) => setEditorParagraphSpacing(v)}
-              />
-            </Row>
-
-            <Row
-              label="Recuo do Tab"
-              hint={getIndentSizeLabel(editorIndentSize)}
-            >
-              <SelectControl
-                value={editorIndentSize}
-                options={EDITOR_INDENT_SIZES.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-                onChange={(v) => setEditorIndentSize(v)}
-              />
-            </Row>
-
-            <Row label="Fonte padrão">
-              <SelectControl
-                value={editorFontFamily}
-                options={EDITOR_FONT_FAMILIES.map((option) => ({
-                  value: option.value,
-                  label: option.label,
-                }))}
-                onChange={(v) => setEditorFontFamily(v)}
-              />
-            </Row>
-
-          </Section>
-
-          {/* Editor */}
-          <Section title="Editor">
-            <Row
-              label="Auto-save"
-              hint="Ctrl+S sempre salva."
-              icon={<Save size={11} />}
-            >
-              <Toggle
-                checked={autoSaveEnabled}
-                onChange={setAutoSaveEnabled}
-                label={autoSaveEnabled ? "Ativado" : "Desativado"}
-              />
-            </Row>
-
-            <Row
-              label="Ortografia (pt-BR)"
-              hint={
-                personalDictSize > 0
-                  ? `${personalDictSize} ${personalDictSize === 1 ? "palavra" : "palavras"} no dicionário.`
-                  : undefined
-              }
-              icon={<SpellCheck size={11} />}
-            >
-              <Toggle
-                checked={spellcheckEnabled}
-                onChange={setSpellcheckEnabled}
-                label={spellcheckEnabled ? "Ativado" : "Desativado"}
-              />
-            </Row>
-            {personalDictSize > 0 && (
-              <div
-                className="rounded-md p-2 flex flex-col gap-2"
-                style={{
-                  border: "1px solid var(--border-subtle)",
-                  background: "var(--bg-panel-2)",
-                }}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div
-                      className="text-[0.78rem] font-medium"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      Dicionario pessoal
-                    </div>
-                    <div
-                      className="text-[0.68rem]"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {personalDictSize} {personalDictSize === 1 ? "palavra" : "palavras"} adicionadas.
-                    </div>
-                  </div>
-                  <button
-                    onClick={onClearPersonalDict}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[0.72rem] transition-colors"
-                    style={{
-                      border: "1px solid var(--border)",
-                      color: "var(--text-secondary)",
-                      background: "var(--bg-panel)",
-                    }}
-                  >
-                    <Trash2 size={11} />
-                    Limpar
-                  </button>
-                </div>
-                <div className="max-h-28 overflow-y-auto flex flex-wrap gap-1">
-                  {personalDictWords.map((word) => (
-                    <button
-                      key={word}
-                      title="Remover palavra"
-                      onClick={() => onRemovePersonalWord(word)}
-                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.68rem]"
-                      style={{
-                        background: "var(--bg-panel)",
-                        border: "1px solid var(--border-subtle)",
-                        color: "var(--text-secondary)",
-                      }}
-                    >
-                      {word}
-                      <X size={10} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Section>
-
-          <Section title="Interface">
-            <Row label="Ao abrir">
-              <SelectControl
-                value={startView}
-                options={[
-                  { value: "home", label: "Início" },
-                  { value: "editor", label: "Editor" },
-                  { value: "canvas", label: "Canvas" },
-                ]}
-                onChange={(v) => setStartView(v as "home" | "editor" | "canvas")}
-              />
-            </Row>
-
-            <Row label="Toolbar do editor">
-              <SelectControl
-                value={editorToolbarMode}
-                options={[
-                  { value: "fixed", label: "Fixa" },
-                  { value: "hover", label: "Hover" },
-                ]}
-                onChange={(v) => setEditorToolbarMode(v)}
-              />
-            </Row>
-
-            <Row label="Abrir último arquivo">
-              <Toggle
-                checked={openLastFileOnStartup}
-                onChange={setOpenLastFileOnStartup}
-                label={openLastFileOnStartup ? "Ativado" : "Desativado"}
-              />
-            </Row>
-
-            <Row label="Estatísticas na barra inferior">
-              <Toggle
-                checked={showStatusStats}
-                onChange={setShowStatusStats}
-                label={showStatusStats ? "Ativado" : "Desativado"}
-              />
-            </Row>
-
-            <Row label="Caminho do arquivo na barra inferior">
-              <Toggle
-                checked={showStatusPath}
-                onChange={setShowStatusPath}
-                label={showStatusPath ? "Ativado" : "Desativado"}
-              />
-            </Row>
-
-            <Row
-              label="Acoes extras na barra superior"
-              hint="Mantem explorador, indice, preferencias e controles da janela."
-            >
-              <Toggle
-                checked={showTitlebarActions}
-                onChange={setShowTitlebarActions}
-                label={showTitlebarActions ? "Ativado" : "Desativado"}
-              />
-            </Row>
-          </Section>
-
-          <Section title="Comportamento">
-            <Row label="Expandir pasta após mover">
-              <Toggle
-                checked={autoExpandMovedFolders}
-                onChange={setAutoExpandMovedFolders}
-                label={autoExpandMovedFolders ? "Ativado" : "Desativado"}
-              />
-            </Row>
-
-            <Row label="Histórico local">
-              <Toggle
-                checked={localHistoryEnabled}
-                onChange={setLocalHistoryEnabled}
-                label={localHistoryEnabled ? "Ativado" : "Desativado"}
-              />
-            </Row>
-          </Section>
-
-          {/* Atualizações */}
-          <Section title="Atualizações">
-            <Row
-              label="Versão atual"
-              hint={
-                lastUpdateCheck
-                  ? `Checado ${formatDateTime(lastUpdateCheck)}`
-                  : undefined
-              }
-            >
-              <span
-                className="text-[0.72rem] tabular-nums"
-                style={{ color: "var(--text-muted)" }}
-              >
-                v{APP_VERSION}
-              </span>
-            </Row>
-            <Row
-              label="Verificar no boot"
-              icon={<Sparkles size={11} />}
-            >
-              <Toggle
-                checked={autoCheckUpdates}
-                onChange={setAutoCheckUpdates}
-                label={autoCheckUpdates ? "Ativado" : "Desativado"}
-              />
-            </Row>
-            <Row
-              label="Verificar agora"
-              hint={updateMessage ?? undefined}
-            >
-              <button
-                onClick={onCheckUpdates}
-                disabled={checkingUpdate}
-                className="inline-flex items-center gap-2 px-3 py-1 rounded text-[0.78rem] font-medium transition-colors disabled:opacity-60"
-                style={{
-                  background: "var(--bg-inverse)",
-                  color: "var(--text-inverse, #fff)",
-                }}
-              >
-                {checkingUpdate ? (
-                  <>
-                    <Loader2 size={12} className="animate-spin" />
-                    Verificando…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={12} />
-                    Verificar
-                  </>
-                )}
-              </button>
-            </Row>
-            {skippedVersion && (
-              <Row
-                label="Versão ignorada"
-                hint={`Solon ${skippedVersion}`}
-              >
-                <button
-                  onClick={onClearSkippedVersion}
-                  className="px-2.5 py-1 rounded text-[0.72rem]"
-                  style={{
-                    border: "1px solid var(--border)",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  Liberar
-                </button>
               </Row>
-            )}
-            <Row label="Canal de release">
-              <button
-                onClick={openReleaseChannel}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[0.72rem]"
-                style={{
-                  border: "1px solid var(--border)",
-                  color: "var(--text-secondary)",
-                }}
+
+              <RangeRow
+                label="Zoom do app"
+                icon={<Monitor size={12} />}
+                value={appZoom}
+                suffix="%"
+                min={80}
+                max={160}
+                step={10}
+                onChange={setAppZoom}
+                onReset={() => setAppZoom(100)}
+              />
+
+              <RangeRow
+                label="Zoom do texto"
+                icon={<Type size={12} />}
+                value={editorZoom}
+                suffix="%"
+                min={75}
+                max={200}
+                step={5}
+                onChange={setEditorZoom}
+                onReset={() => setEditorZoom(100)}
+              />
+
+              <Row label="Largura do editor" hint={`${editorMaxWidth}px`}>
+                <SelectControl
+                  value={String(editorMaxWidth)}
+                  options={EDITOR_MAX_WIDTHS.map((w) => ({
+                    value: String(w),
+                    label: `${w}px`,
+                  }))}
+                  onChange={(v) => setEditorMaxWidth(parseInt(v, 10))}
+                />
+              </Row>
+            </Section>
+
+            <Section title="Escrita" description="Ritmo do texto e tipografia padrão.">
+              <Row label="Fonte padrão">
+                <SelectControl
+                  value={editorFontFamily}
+                  options={EDITOR_FONT_FAMILIES.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  onChange={setEditorFontFamily}
+                />
+              </Row>
+
+              <Row label="Espaçamento de linha" hint={getLineHeightLabel(editorLineHeight)}>
+                <SelectControl
+                  value={editorLineHeight}
+                  options={EDITOR_LINE_HEIGHTS.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  onChange={setEditorLineHeight}
+                />
+              </Row>
+
+              <Row
+                label="Entre parágrafos"
+                hint={getParagraphSpacingLabel(editorParagraphSpacing)}
               >
-                <ExternalLink size={11} />
-                GitHub
-              </button>
-            </Row>
-          </Section>
+                <SelectControl
+                  value={editorParagraphSpacing}
+                  options={EDITOR_PARAGRAPH_SPACING.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  onChange={setEditorParagraphSpacing}
+                />
+              </Row>
+
+              <Row label="Recuo do Tab" hint={getIndentSizeLabel(editorIndentSize)}>
+                <SelectControl
+                  value={editorIndentSize}
+                  options={EDITOR_INDENT_SIZES.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  onChange={setEditorIndentSize}
+                />
+              </Row>
+            </Section>
+
+            <Section title="Editor" description="Salvamento, ortografia e ferramentas.">
+              <Row label="Auto-save" hint="Ctrl+S continua disponível a qualquer momento." icon={<Save size={12} />}>
+                <Toggle
+                  checked={autoSaveEnabled}
+                  onChange={setAutoSaveEnabled}
+                  label={autoSaveEnabled ? "Ativado" : "Desativado"}
+                />
+              </Row>
+
+              <Row
+                label="Ortografia pt-BR"
+                hint={
+                  personalDictSize > 0
+                    ? `${personalDictSize} ${personalDictSize === 1 ? "palavra" : "palavras"} no dicionário.`
+                    : "Sublinhado e sugestões do revisor interno."
+                }
+                icon={<SpellCheck size={12} />}
+              >
+                <Toggle
+                  checked={spellcheckEnabled}
+                  onChange={setSpellcheckEnabled}
+                  label={spellcheckEnabled ? "Ativado" : "Desativado"}
+                />
+              </Row>
+
+              <Row label="Toolbar do editor">
+                <SelectControl
+                  value={editorToolbarMode}
+                  options={[
+                    { value: "fixed", label: "Fixa" },
+                    { value: "hover", label: "Ao passar o mouse" },
+                  ]}
+                  onChange={setEditorToolbarMode}
+                />
+              </Row>
+
+              {personalDictSize > 0 && (
+                <DictionaryPanel
+                  words={personalDictWords}
+                  size={personalDictSize}
+                  onClear={onClearPersonalDict}
+                  onRemove={onRemovePersonalWord}
+                />
+              )}
+            </Section>
+
+            <Section title="Interface" description="O que aparece quando o Solon abre.">
+              <Row label="Ao abrir">
+                <SelectControl
+                  value={startView}
+                  options={[
+                    { value: "home", label: "Início" },
+                    { value: "editor", label: "Editor" },
+                    { value: "canvas", label: "Canvas" },
+                  ]}
+                  onChange={(v) => setStartView(v as "home" | "editor" | "canvas")}
+                />
+              </Row>
+
+              <Row label="Abrir último arquivo">
+                <Toggle
+                  checked={openLastFileOnStartup}
+                  onChange={setOpenLastFileOnStartup}
+                  label={openLastFileOnStartup ? "Ativado" : "Desativado"}
+                />
+              </Row>
+
+              <Row
+                label="Restaurar sessão"
+                hint="Reabre layout, split pane, última visão e abas fechadas recentes."
+              >
+                <Toggle
+                  checked={restoreWorkspaceLayout}
+                  onChange={setRestoreWorkspaceLayout}
+                  label={restoreWorkspaceLayout ? "Ativado" : "Desativado"}
+                />
+              </Row>
+
+              <Row label="Ações extras na barra superior">
+                <Toggle
+                  checked={showTitlebarActions}
+                  onChange={setShowTitlebarActions}
+                  label={showTitlebarActions ? "Ativado" : "Desativado"}
+                />
+              </Row>
+
+              <Row label="Estatísticas na barra inferior">
+                <Toggle
+                  checked={showStatusStats}
+                  onChange={setShowStatusStats}
+                  label={showStatusStats ? "Ativado" : "Desativado"}
+                />
+              </Row>
+
+              <Row label="Caminho do arquivo na barra inferior">
+                <Toggle
+                  checked={showStatusPath}
+                  onChange={setShowStatusPath}
+                  label={showStatusPath ? "Ativado" : "Desativado"}
+                />
+              </Row>
+            </Section>
+
+            <Section title="Projeto" description="Organização, histórico e verificações.">
+              <Row
+                label="Saúde do projeto"
+                hint="Verifica links internos, imagens inline e notas vazias."
+                icon={<ShieldCheck size={12} />}
+              >
+                <ActionButton
+                  onClick={() => {
+                    close();
+                    openWorkspaceHealth();
+                  }}
+                >
+                  Verificar
+                </ActionButton>
+              </Row>
+
+              <Row label="Expandir pasta após mover">
+                <Toggle
+                  checked={autoExpandMovedFolders}
+                  onChange={setAutoExpandMovedFolders}
+                  label={autoExpandMovedFolders ? "Ativado" : "Desativado"}
+                />
+              </Row>
+
+              <Row label="Histórico local" hint="Mantém snapshots antes de sobrescrever notas.">
+                <Toggle
+                  checked={localHistoryEnabled}
+                  onChange={setLocalHistoryEnabled}
+                  label={localHistoryEnabled ? "Ativado" : "Desativado"}
+                />
+              </Row>
+            </Section>
+
+            <Section title="Atualizações" description="Versão instalada e canal de release.">
+              <Row
+                label="Versão atual"
+                hint={lastUpdateCheck ? `Checado ${formatDateTime(lastUpdateCheck)}` : undefined}
+              >
+                <span className="text-[0.72rem] tabular-nums" style={{ color: "var(--text-muted)" }}>
+                  v{APP_VERSION}
+                </span>
+              </Row>
+
+              <Row label="Verificar ao abrir" icon={<Sparkles size={12} />}>
+                <Toggle
+                  checked={autoCheckUpdates}
+                  onChange={setAutoCheckUpdates}
+                  label={autoCheckUpdates ? "Ativado" : "Desativado"}
+                />
+              </Row>
+
+              <Row label="Verificar agora" hint={updateMessage ?? undefined}>
+                <ActionButton onClick={onCheckUpdates} disabled={checkingUpdate} strong>
+                  {checkingUpdate ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Verificando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={12} />
+                      Verificar
+                    </>
+                  )}
+                </ActionButton>
+              </Row>
+
+              {skippedVersion && (
+                <Row label="Versão ignorada" hint={`Solon ${skippedVersion}`}>
+                  <ActionButton onClick={onClearSkippedVersion}>Liberar</ActionButton>
+                </Row>
+              )}
+
+              <Row label="Canal de release">
+                <ActionButton onClick={openReleaseChannel}>
+                  <ExternalLink size={11} />
+                  GitHub
+                </ActionButton>
+              </Row>
+            </Section>
+          </div>
         </div>
 
-        {/* Footer */}
         <div
-          className="px-5 py-3 flex items-center justify-between"
+          className="px-5 py-3 flex items-center justify-between gap-3"
           style={{ borderTop: "1px solid var(--border-subtle)" }}
         >
           <button
@@ -718,26 +522,16 @@ export function SettingsDialog() {
             <RotateCcw size={11} />
             Restaurar padrões
           </button>
-          <div
-            className="text-[0.65rem] tabular-nums"
-            style={{ color: "var(--text-placeholder)" }}
-          >
+          <div className="text-[0.65rem] tabular-nums" style={{ color: "var(--text-placeholder)" }}>
             v{APP_VERSION}
           </div>
           <button
             onClick={close}
-            className="px-3 py-1 rounded text-[0.78rem] font-medium transition-colors"
+            className="px-3 py-1.5 rounded-md text-[0.76rem] font-medium transition-colors"
             style={{
               background: "var(--accent)",
               color: "var(--text-inverse, #fff)",
             }}
-            onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLElement).style.filter =
-                "brightness(0.92)")
-            }
-            onMouseLeave={(e) =>
-              ((e.currentTarget as HTMLElement).style.filter = "")
-            }
           >
             Fechar
           </button>
@@ -747,64 +541,90 @@ export function SettingsDialog() {
   );
 }
 
-/**
- * Versao do app, injetada em build-time via `vite.config.ts`.
- */
-const APP_VERSION = __APP_VERSION__;
-
-function formatDateTime(timestamp: number): string {
-  try {
-    return new Date(timestamp).toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "data indisponivel";
-  }
-}
-
-function getLineHeightLabel(value: string): string {
-  if (value === "compact") return "Mais denso";
-  if (value === "relaxed") return "Mais aberto";
-  return "Equilibrado";
-}
-
-function getParagraphSpacingLabel(value: string): string {
-  if (value === "tight") return "Blocos mais próximos";
-  if (value === "airy") return "Mais respiro";
-  return "Equilibrado";
-}
-
-function getIndentSizeLabel(value: string): string {
-  if (value === "small") return "Recuo curto";
-  if (value === "large") return "Recuo amplo";
-  return "Recuo clássico";
+function DictionaryPanel({
+  words,
+  size,
+  onClear,
+  onRemove,
+}: {
+  words: string[];
+  size: number;
+  onClear: () => void;
+  onRemove: (word: string) => void;
+}) {
+  return (
+    <div
+      className="rounded-md p-3 flex flex-col gap-2"
+      style={{
+        border: "1px solid var(--border-subtle)",
+        background: "color-mix(in srgb, var(--bg-panel) 70%, transparent)",
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[0.78rem] font-medium">Dicionário pessoal</div>
+          <div className="text-[0.68rem]" style={{ color: "var(--text-muted)" }}>
+            {size} {size === 1 ? "palavra adicionada" : "palavras adicionadas"}
+          </div>
+        </div>
+        <ActionButton onClick={onClear}>
+          <Trash2 size={11} />
+          Limpar
+        </ActionButton>
+      </div>
+      <div className="max-h-28 overflow-y-auto flex flex-wrap gap-1">
+        {words.map((word) => (
+          <button
+            key={word}
+            title="Remover palavra"
+            onClick={() => onRemove(word)}
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.68rem]"
+            style={{
+              background: "var(--bg-panel)",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {word}
+            <X size={10} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function Section({
   title,
+  description,
   children,
 }: {
   title: string;
+  description?: string;
   children: React.ReactNode;
 }) {
   return (
     <section
-      className="flex flex-col gap-3 rounded-lg p-4"
+      className="rounded-lg p-4 flex flex-col gap-3"
       style={{
         background: "var(--bg-panel-2)",
         border: "1px solid var(--border-subtle)",
       }}
     >
-      <h3
-        className="text-[0.62rem] uppercase tracking-[0.2em] font-semibold"
-        style={{ color: "var(--text-muted)" }}
-      >
-        {title}
-      </h3>
-      {children}
+      <div>
+        <h3
+          className="text-[0.66rem] uppercase tracking-[0.18em] font-semibold"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {title}
+        </h3>
+        {description && (
+          <p className="text-[0.68rem] mt-1 leading-snug" style={{ color: "var(--text-placeholder)" }}>
+            {description}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col gap-2">{children}</div>
     </section>
   );
 }
@@ -822,25 +642,17 @@ function Row({
 }) {
   return (
     <div
-      className="rounded-md px-2.5 py-2"
-      style={{ background: "color-mix(in srgb, var(--bg-panel) 55%, transparent)" }}
+      className="rounded-md px-3 py-2.5"
+      style={{ background: "color-mix(in srgb, var(--bg-panel) 64%, transparent)" }}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {icon && (
-            <span
-              style={{ color: "var(--text-muted)" }}
-              className="flex-shrink-0"
-            >
+            <span className="flex-shrink-0" style={{ color: "var(--text-muted)" }}>
               {icon}
             </span>
           )}
-          <span
-            className="text-[0.78rem] font-medium"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {label}
-          </span>
+          <span className="text-[0.78rem] font-medium truncate">{label}</span>
         </div>
         <div className="flex-shrink-0 flex items-center">{children}</div>
       </div>
@@ -859,6 +671,56 @@ function Row({
   );
 }
 
+function RangeRow({
+  label,
+  icon,
+  value,
+  suffix,
+  min,
+  max,
+  step,
+  onChange,
+  onReset,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  value: number;
+  suffix: string;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  onReset: () => void;
+}) {
+  return (
+    <Row label={label} hint={`${value}${suffix}`} icon={icon}>
+      <div className="flex items-center gap-2 w-56 max-w-[42vw]">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseInt(e.target.value, 10))}
+          className="flex-1"
+          style={{ accentColor: "var(--accent)" }}
+        />
+        <button
+          title="Restaurar 100%"
+          onClick={onReset}
+          className="px-1.5 py-0.5 rounded text-[0.65rem]"
+          style={{
+            border: "1px solid var(--border)",
+            color: "var(--text-muted)",
+          }}
+        >
+          100%
+        </button>
+      </div>
+    </Row>
+  );
+}
+
 function SelectControl<T extends string>({
   value,
   options,
@@ -872,7 +734,7 @@ function SelectControl<T extends string>({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value as T)}
-      className="min-w-[132px] rounded-md px-2.5 py-1 text-[0.74rem] outline-none"
+      className="min-w-[152px] rounded-md px-2.5 py-1.5 text-[0.74rem] outline-none"
       style={{
         background: "var(--bg-panel)",
         color: "var(--text-primary)",
@@ -895,7 +757,7 @@ function Toggle({
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
-  label?: string;
+  label: string;
 }) {
   return (
     <button
@@ -903,13 +765,11 @@ function Toggle({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className="inline-flex items-center gap-2 transition-opacity"
+      className="inline-flex items-center gap-2"
     >
       <span
         className="relative inline-block w-8 h-[18px] rounded-full transition-colors"
-        style={{
-          background: checked ? "var(--accent)" : "var(--border)",
-        }}
+        style={{ background: checked ? "var(--accent)" : "var(--border)" }}
       >
         <span
           className="absolute top-0.5 left-0.5 w-[14px] h-[14px] rounded-full transition-transform"
@@ -920,16 +780,74 @@ function Toggle({
           }}
         />
       </span>
-      {label && (
-        <span
-          className="text-[0.72rem]"
-          style={{
-            color: checked ? "var(--text-primary)" : "var(--text-muted)",
-          }}
-        >
-          {label}
-        </span>
-      )}
+      <span
+        className="text-[0.72rem]"
+        style={{ color: checked ? "var(--text-primary)" : "var(--text-muted)" }}
+      >
+        {label}
+      </span>
     </button>
   );
+}
+
+function ActionButton({
+  children,
+  onClick,
+  disabled,
+  strong,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  strong?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[0.72rem] font-medium transition-opacity disabled:opacity-60"
+      style={{
+        background: strong ? "var(--bg-inverse)" : "var(--bg-panel)",
+        color: strong ? "var(--text-inverse, #fff)" : "var(--text-secondary)",
+        border: strong ? "1px solid var(--bg-inverse)" : "1px solid var(--border)",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function themeHint(value: string): string | undefined {
+  return EDITOR_PAPERS.find((option) => option.value === value)?.hint;
+}
+
+function formatDateTime(timestamp: number): string {
+  try {
+    return new Date(timestamp).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "data indisponível";
+  }
+}
+
+function getLineHeightLabel(value: string): string {
+  if (value === "compact") return "Mais denso";
+  if (value === "relaxed") return "Mais aberto";
+  return "Equilibrado";
+}
+
+function getParagraphSpacingLabel(value: string): string {
+  if (value === "tight") return "Blocos mais próximos";
+  if (value === "airy") return "Mais respiro";
+  return "Equilibrado";
+}
+
+function getIndentSizeLabel(value: string): string {
+  if (value === "small") return "Recuo curto";
+  if (value === "large") return "Recuo amplo";
+  return "Recuo clássico";
 }

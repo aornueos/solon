@@ -354,7 +354,7 @@ export function CanvasSidePanel() {
         </div>
       </PanelSection>
 
-      <PanelSection title="Cor padrao">
+      <PanelSection title="Cor padrão">
         <div className="flex items-center gap-1.5">
           <Palette size={13} style={{ color: "var(--text-muted)" }} />
           <div className="flex items-center gap-1">
@@ -416,18 +416,18 @@ export function CanvasSidePanel() {
       {selectionCount > 0 && (
         <PanelSection title="Selecionado">
           <div className="grid grid-cols-3 gap-1">
-            <IconChoice title="Duplicar selecao" onClick={duplicateSelected}>
+            <IconChoice title="Duplicar seleção" onClick={duplicateSelected}>
               <CopyPlus size={13} />
             </IconChoice>
-            <IconChoice title="Limpar selecao" onClick={() => select(null)}>
+            <IconChoice title="Limpar seleção" onClick={() => select(null)}>
               <RotateCcw size={13} />
             </IconChoice>
-            <IconChoice title="Excluir selecao" danger onClick={removeSelected}>
+            <IconChoice title="Excluir seleção" danger onClick={removeSelected}>
               <Trash2 size={13} />
             </IconChoice>
           </div>
           <span className="text-[0.66rem]" style={{ color: "var(--text-muted)" }}>
-            Cor, linha e texto tambem aplicam ao item selecionado.
+            Cor, linha e texto também aplicam ao item selecionado.
           </span>
         </PanelSection>
       )}

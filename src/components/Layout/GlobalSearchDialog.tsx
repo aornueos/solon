@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileText, Search, X } from "lucide-react";
+import { FileText, FolderOpen, Search, X } from "lucide-react";
 import { FileNode, useAppStore } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { parseDocument } from "../../lib/frontmatter";
 
 interface SearchResult {
+  kind: "file" | "folder" | "content";
   path: string;
   name: string;
-  line: number;
+  line?: number;
   snippet: string;
 }
 
@@ -19,12 +20,14 @@ export function GlobalSearchDialog() {
   const close = useAppStore((s) => s.closeGlobalSearch);
   const fileTree = useAppStore((s) => s.fileTree);
   const setActiveView = useAppStore((s) => s.setActiveView);
+  const setFileTree = useAppStore((s) => s.setFileTree);
   const { openFile } = useFileSystem();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const files = useMemo(() => flattenFiles(fileTree), [fileTree]);
+  const folders = useMemo(() => flattenFolders(fileTree), [fileTree]);
 
   useEffect(() => {
     if (!open) return;
@@ -35,14 +38,14 @@ export function GlobalSearchDialog() {
   }, [open]);
 
   useEffect(() => {
-    if (!open || query.trim().length < 2) {
+    if (!open || query.trim().length < 1) {
       setResults([]);
       return;
     }
     let alive = true;
     const id = window.setTimeout(async () => {
       setSearching(true);
-      const found = await searchFiles(files, query);
+      const found = await searchProject(files, folders, query);
       if (!alive) return;
       setResults(found);
       setSearching(false);
@@ -51,11 +54,17 @@ export function GlobalSearchDialog() {
       alive = false;
       window.clearTimeout(id);
     };
-  }, [files, open, query]);
+  }, [files, folders, open, query]);
 
   if (!open) return null;
 
   const go = async (result: SearchResult) => {
+    if (result.kind === "folder") {
+      setFileTree(expandFolderPath(useAppStore.getState().fileTree, result.path));
+      useAppStore.setState({ isSidebarOpen: true });
+      close();
+      return;
+    }
     await openFile(result.path, result.name, { tab: "replace" });
     setActiveView("editor");
     close();
@@ -107,8 +116,8 @@ export function GlobalSearchDialog() {
           className="max-h-[460px] overflow-y-auto py-1"
           style={{ borderTop: "1px solid var(--border-subtle)" }}
         >
-          {query.trim().length < 2 ? (
-            <Empty text="Digite pelo menos 2 letras." />
+          {query.trim().length < 1 ? (
+            <Empty text="Digite para buscar notas, pastas e conteúdo." />
           ) : searching ? (
             <Empty text="Buscando..." />
           ) : results.length === 0 ? (
@@ -121,15 +130,21 @@ export function GlobalSearchDialog() {
                 className="w-full flex items-start gap-3 px-4 py-2.5 text-left"
                 style={{ color: "var(--text-primary)" }}
               >
-                <FileText size={15} style={{ color: "var(--text-muted)", marginTop: 2 }} />
+                {result.kind === "folder" ? (
+                  <FolderOpen size={15} style={{ color: "var(--text-muted)", marginTop: 2 }} />
+                ) : (
+                  <FileText size={15} style={{ color: "var(--text-muted)", marginTop: 2 }} />
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="text-[0.82rem] font-medium truncate">
                       {result.name.replace(/\.(md|txt)$/i, "")}
                     </span>
-                    <span className="text-[0.68rem]" style={{ color: "var(--text-muted)" }}>
-                      linha {result.line}
-                    </span>
+                    {result.line && (
+                      <span className="text-[0.68rem]" style={{ color: "var(--text-muted)" }}>
+                        linha {result.line}
+                      </span>
+                    )}
                   </span>
                   <span className="block text-[0.74rem] truncate" style={{ color: "var(--text-secondary)" }}>
                     {result.snippet}
@@ -161,11 +176,66 @@ function flattenFiles(nodes: FileNode[]): FileNode[] {
   return out;
 }
 
-async function searchFiles(files: FileNode[], query: string): Promise<SearchResult[]> {
-  if (!isTauri()) return [];
-  const { readTextFile } = await import("@tauri-apps/plugin-fs");
+function flattenFolders(nodes: FileNode[]): FileNode[] {
+  const out: FileNode[] = [];
+  for (const node of nodes) {
+    if (node.type === "folder") out.push(node);
+    if (node.children) out.push(...flattenFolders(node.children));
+  }
+  return out;
+}
+
+function expandFolderPath(nodes: FileNode[], path: string): FileNode[] {
+  let changed = false;
+  const next = nodes.map((node) => {
+    if (node.path === path && node.type === "folder") {
+      changed = true;
+      return { ...node, expanded: true };
+    }
+    if (!node.children) return node;
+    const children = expandFolderPath(node.children, path);
+    if (children !== node.children) {
+      changed = true;
+      return { ...node, expanded: true, children };
+    }
+    return node;
+  });
+  return changed ? next : nodes;
+}
+
+async function searchProject(
+  files: FileNode[],
+  folders: FileNode[],
+  query: string,
+): Promise<SearchResult[]> {
   const normalized = normalize(query);
   const results: SearchResult[] = [];
+  let folderMatches = 0;
+  for (const folder of folders) {
+    if (!normalize(`${folder.name} ${folder.path}`).includes(normalized)) continue;
+    if (folderMatches >= 8) continue;
+    results.push({
+      kind: "folder",
+      path: folder.path,
+      name: folder.name,
+      snippet: compactPath(folder.path),
+    });
+    folderMatches += 1;
+  }
+  let fileMatches = 0;
+  for (const file of files) {
+    if (!normalize(`${file.name} ${file.path}`).includes(normalized)) continue;
+    if (fileMatches >= 16) continue;
+    results.push({
+      kind: "file",
+      path: file.path,
+      name: file.name,
+      snippet: compactPath(file.path),
+    });
+    fileMatches += 1;
+  }
+  if (!isTauri() || normalized.length < 2) return results.slice(0, 80);
+  const { readTextFile } = await import("@tauri-apps/plugin-fs");
   // Paraleliza leitura em chunks. Antes era serie pura — projeto com
   // 200 arquivos travava o dialog uns 8-12s. Chunk de 16 da' boa
   // sobreposicao IPC sem saturar. Para cedo se atingiu 80 matches
@@ -195,6 +265,7 @@ async function searchFiles(files: FileNode[], query: string): Promise<SearchResu
         const line = lines[j].trim();
         if (!line || !normalize(line).includes(normalized)) continue;
         results.push({
+          kind: "content",
           path: file.path,
           name: file.name,
           line: j + 1,
@@ -212,4 +283,10 @@ function normalize(value: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+}
+
+function compactPath(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  if (parts.length <= 3) return path;
+  return `.../${parts.slice(-3).join("/")}`;
 }

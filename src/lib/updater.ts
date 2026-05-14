@@ -146,7 +146,7 @@ export async function checkForUpdate(
       return {
         kind: "error",
         message:
-          "Nao foi possivel acessar o canal de atualizacoes. Verifique a conexao e tente novamente.",
+          "Não foi possível acessar o canal de atualizações. Verifique a conexão e tente novamente.",
       };
     }
     return { kind: "error", message };
