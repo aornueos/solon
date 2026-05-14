@@ -1,17 +1,6 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
 
-/**
- * Cheatsheet de atalhos. Abre via Ctrl+/ (ou via Command Palette). Lista
- * agrupada por contexto (navegacao, edicao, canvas) — referencial, nao
- * configuravel. Atalhos sao hardcoded em App.tsx e nos handlers locais.
- *
- * Mantemos a tabela aqui (e nao gerada do codigo) deliberadamente: a
- * cheatsheet deve ter as descricoes em portugues, agrupamento curado, e
- * pular atalhos que so' fazem sentido em contexto especifico (ex:
- * Tab/Shift+Tab dentro de list items). Sincronizacao automatica daria
- * uma lista 2x maior e menos util.
- */
 interface Shortcut {
   keys: string;
   label: string;
@@ -33,41 +22,46 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "Ctrl + Alt + H", label: "Histórico local" },
       { keys: "Ctrl + 1", label: "Ir para editor" },
       { keys: "Ctrl + 2", label: "Ir para canvas" },
+      { keys: "Ctrl + 3", label: "Ir para início" },
     ],
   },
   {
     title: "Abas",
     items: [
-      { keys: "Ctrl + T", label: "Nova aba (nota Sem título)" },
+      { keys: "Ctrl + T", label: "Nova nota vazia" },
+      { keys: "Ctrl + Shift + N", label: "Scratchpad efêmero" },
       { keys: "Ctrl + W", label: "Fechar aba ativa" },
       { keys: "Ctrl + Tab", label: "Próxima aba" },
       { keys: "Ctrl + Shift + Tab", label: "Aba anterior" },
-      { keys: "Botão do meio do mouse", label: "Fechar aba (na barra) / abrir em segundo plano (no sidebar)" },
+      { keys: "Ctrl + Shift + T", label: "Reabrir última aba fechada" },
+      { keys: "Botão do meio", label: "Fechar aba ou abrir nota em segundo plano" },
     ],
   },
   {
     title: "Editor",
     items: [
-      { keys: "Ctrl + S", label: "Salvar (auto-save já roda a cada 1,2s)" },
+      { keys: "Ctrl + S", label: "Salvar" },
       { keys: "Ctrl + Z / Ctrl + Y", label: "Desfazer / Refazer" },
       { keys: "Ctrl + B / I / Shift+S", label: "Negrito / Itálico / Tachado" },
       { keys: "Ctrl + Scroll", label: "Zoom do texto" },
-      { keys: "Tab (em heading)", label: "Demote — H2 vira H3" },
-      { keys: "Shift + Tab (em heading)", label: "Promote — H3 vira H2" },
-      { keys: "Tab (em parágrafo)", label: "Indenta primeira linha (estilo romance)" },
+      { keys: "Tab (heading)", label: "Demote heading" },
+      { keys: "Shift + Tab (heading)", label: "Promote heading" },
+      { keys: "Tab (parágrafo)", label: "Indentar primeira linha" },
       { keys: "Ctrl + Shift + E", label: "Exportar para PDF" },
     ],
   },
   {
     title: "Painéis",
     items: [
-      { keys: "Ctrl + \\", label: "Alternar explorador (Sidebar)" },
-      { keys: "Ctrl + J", label: "Alternar índice (Outline)" },
-      { keys: "Ctrl + Alt + I", label: "Alternar inspector (Cena)" },
-      { keys: "F11", label: "Tela cheia (ou: sai do modo leitura se ativo)" },
-      { keys: "Ctrl + Shift + R", label: "Modo leitura (esconde todo o chrome)" },
-      { keys: "Ctrl + Shift + Esc", label: "Pânico: reseta todos os modos especiais" },
+      { keys: "Ctrl + \\", label: "Alternar explorador" },
+      { keys: "Ctrl + J", label: "Alternar índice" },
+      { keys: "Ctrl + Alt + I", label: "Alternar inspector" },
+      { keys: "F11", label: "Tela cheia" },
+      { keys: "Ctrl + Shift + R", label: "Modo leitura" },
+      { keys: "Paleta", label: "Modo foco" },
+      { keys: "Ctrl + Shift + Esc", label: "Pânico: resetar modos especiais" },
       { keys: "Ctrl + ,", label: "Preferências" },
+      { keys: "Ctrl + Shift + L", label: "Alternar tema visual" },
       { keys: "Ctrl + + / - / 0", label: "Zoom do aplicativo" },
       { keys: "Ctrl + /", label: "Esta janela de atalhos" },
     ],
@@ -76,9 +70,9 @@ const GROUPS: ShortcutGroup[] = [
     title: "Canvas",
     items: [
       { keys: "V / P / T / A / E", label: "Selecionar / Desenhar / Texto / Seta / Borracha" },
-      { keys: "1 a 5", label: "Mesmas ferramentas pela ordem da toolbar" },
+      { keys: "1 a 5", label: "Ferramentas pela ordem da toolbar" },
       { keys: "N", label: "Novo card" },
-      { keys: "F", label: "Enquadrar tudo (fit)" },
+      { keys: "F", label: "Enquadrar tudo" },
       { keys: "Ctrl + D", label: "Duplicar seleção" },
       { keys: "Ctrl + A", label: "Selecionar tudo" },
       { keys: "Delete / Backspace", label: "Excluir seleção" },

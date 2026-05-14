@@ -319,6 +319,8 @@ interface AppState {
   showStatusStats: boolean;
   /** Mostra caminho completo do arquivo na StatusBar. */
   showStatusPath: boolean;
+  /** Mostra a fileira de acoes extras da Titlebar. */
+  showTitlebarActions: boolean;
   /** Preferencias do canvas. */
   canvasGridEnabled: boolean;
   canvasSnapToGrid: boolean;
@@ -421,6 +423,7 @@ interface AppState {
   setEditorToolbarMode: (v: EditorToolbarMode) => void;
   setShowStatusStats: (v: boolean) => void;
   setShowStatusPath: (v: boolean) => void;
+  setShowTitlebarActions: (v: boolean) => void;
   setCanvasGridEnabled: (v: boolean) => void;
   setCanvasSnapToGrid: (v: boolean) => void;
   setCanvasGridSize: (v: number) => void;
@@ -538,6 +541,7 @@ const DEFAULT_TYPEWRITER_MODE = false;
 const DEFAULT_EDITOR_TOOLBAR_MODE: EditorToolbarMode = "fixed";
 const DEFAULT_SHOW_STATUS_STATS = true;
 const DEFAULT_SHOW_STATUS_PATH = true;
+const DEFAULT_SHOW_TITLEBAR_ACTIONS = true;
 const DEFAULT_CANVAS_GRID_ENABLED = true;
 const DEFAULT_CANVAS_SNAP_TO_GRID = false;
 const DEFAULT_CANVAS_GRID_SIZE = 24;
@@ -564,6 +568,7 @@ const TYPEWRITER_MODE_KEY = "solon:typewriterMode";
 const EDITOR_TOOLBAR_MODE_KEY = "solon:editorToolbarMode";
 const SHOW_STATUS_STATS_KEY = "solon:showStatusStats";
 const SHOW_STATUS_PATH_KEY = "solon:showStatusPath";
+const SHOW_TITLEBAR_ACTIONS_KEY = "solon:showTitlebarActions";
 const CANVAS_GRID_ENABLED_KEY = "solon:canvasGridEnabled";
 const CANVAS_SNAP_TO_GRID_KEY = "solon:canvasSnapToGrid";
 const CANVAS_GRID_SIZE_KEY = "solon:canvasGridSize";
@@ -854,6 +859,10 @@ export const useAppStore = create<AppState>((set) => ({
   editorToolbarMode: loadEditorToolbarMode(),
   showStatusStats: loadBoolPref(SHOW_STATUS_STATS_KEY, DEFAULT_SHOW_STATUS_STATS),
   showStatusPath: loadBoolPref(SHOW_STATUS_PATH_KEY, DEFAULT_SHOW_STATUS_PATH),
+  showTitlebarActions: loadBoolPref(
+    SHOW_TITLEBAR_ACTIONS_KEY,
+    DEFAULT_SHOW_TITLEBAR_ACTIONS,
+  ),
   canvasGridEnabled: loadBoolPref(CANVAS_GRID_ENABLED_KEY, DEFAULT_CANVAS_GRID_ENABLED),
   canvasSnapToGrid: loadBoolPref(CANVAS_SNAP_TO_GRID_KEY, DEFAULT_CANVAS_SNAP_TO_GRID),
   canvasGridSize: loadNumberOption(
@@ -1266,6 +1275,7 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.removeItem(EDITOR_TOOLBAR_MODE_KEY);
       localStorage.removeItem(SHOW_STATUS_STATS_KEY);
       localStorage.removeItem(SHOW_STATUS_PATH_KEY);
+      localStorage.removeItem(SHOW_TITLEBAR_ACTIONS_KEY);
       localStorage.removeItem(CANVAS_GRID_ENABLED_KEY);
       localStorage.removeItem(CANVAS_SNAP_TO_GRID_KEY);
       localStorage.removeItem(CANVAS_GRID_SIZE_KEY);
@@ -1296,6 +1306,7 @@ export const useAppStore = create<AppState>((set) => ({
       editorToolbarMode: DEFAULT_EDITOR_TOOLBAR_MODE,
       showStatusStats: DEFAULT_SHOW_STATUS_STATS,
       showStatusPath: DEFAULT_SHOW_STATUS_PATH,
+      showTitlebarActions: DEFAULT_SHOW_TITLEBAR_ACTIONS,
       canvasGridEnabled: DEFAULT_CANVAS_GRID_ENABLED,
       canvasSnapToGrid: DEFAULT_CANVAS_SNAP_TO_GRID,
       canvasGridSize: DEFAULT_CANVAS_GRID_SIZE,
@@ -1437,6 +1448,15 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ showStatusPath: v });
+  },
+
+  setShowTitlebarActions: (v) => {
+    try {
+      localStorage.setItem(SHOW_TITLEBAR_ACTIONS_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ showTitlebarActions: v });
   },
 
   setCanvasGridEnabled: (v) => {

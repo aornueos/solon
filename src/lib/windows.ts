@@ -1,6 +1,6 @@
 import type { OpenTab } from "../store/useAppStore";
 
-const isTauri =
+export const isTauriRuntime = (): boolean =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 function safeLabelPart(value: string): string {
@@ -34,7 +34,7 @@ export async function openTabInNewWindow(
   });
   const url = `index.html?${query.toString()}`;
 
-  if (!isTauri) {
+  if (!isTauriRuntime()) {
     window.open(`${window.location.origin}/?${query.toString()}`, "_blank", "noopener");
     return;
   }
@@ -57,4 +57,35 @@ export async function openTabInNewWindow(
     void win.once("tauri://created", () => resolve());
     void win.once("tauri://error", (event) => reject(event.payload));
   });
+}
+
+export async function setAppFullscreen(next?: boolean): Promise<boolean | null> {
+  if (isTauriRuntime()) {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const win = getCurrentWindow();
+    const current = await win.isFullscreen();
+    const desired = typeof next === "boolean" ? next : !current;
+    if (desired !== current) await win.setFullscreen(desired);
+    document.documentElement.toggleAttribute("data-solon-fullscreen", desired);
+    return desired;
+  }
+
+  const doc = document;
+  const desired = typeof next === "boolean" ? next : !doc.fullscreenElement;
+  if (desired && !doc.fullscreenElement) {
+    await document.documentElement.requestFullscreen?.();
+    document.documentElement.toggleAttribute("data-solon-fullscreen", true);
+    return true;
+  }
+  if (!desired && doc.fullscreenElement) {
+    await doc.exitFullscreen?.();
+    document.documentElement.toggleAttribute("data-solon-fullscreen", false);
+    return false;
+  }
+  document.documentElement.toggleAttribute("data-solon-fullscreen", desired);
+  return desired;
+}
+
+export function toggleAppFullscreen(): Promise<boolean | null> {
+  return setAppFullscreen();
 }

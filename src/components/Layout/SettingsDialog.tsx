@@ -81,6 +81,8 @@ export function SettingsDialog() {
   const setShowStatusStats = useAppStore((s) => s.setShowStatusStats);
   const showStatusPath = useAppStore((s) => s.showStatusPath);
   const setShowStatusPath = useAppStore((s) => s.setShowStatusPath);
+  const showTitlebarActions = useAppStore((s) => s.showTitlebarActions);
+  const setShowTitlebarActions = useAppStore((s) => s.setShowTitlebarActions);
   const localHistoryEnabled = useAppStore((s) => s.localHistoryEnabled);
   const setLocalHistoryEnabled = useAppStore((s) => s.setLocalHistoryEnabled);
   const openLastFileOnStartup = useAppStore((s) => s.openLastFileOnStartup);
@@ -584,6 +586,17 @@ export function SettingsDialog() {
                 checked={showStatusPath}
                 onChange={setShowStatusPath}
                 label={showStatusPath ? "Ativado" : "Desativado"}
+              />
+            </Row>
+
+            <Row
+              label="Acoes extras na barra superior"
+              hint="Mantem explorador, indice, preferencias e controles da janela."
+            >
+              <Toggle
+                checked={showTitlebarActions}
+                onChange={setShowTitlebarActions}
+                label={showTitlebarActions ? "Ativado" : "Desativado"}
               />
             </Row>
           </Section>

@@ -13,10 +13,15 @@ import {
   Settings as SettingsIcon,
   Maximize2,
   Minimize2,
+  Search,
+  FileDown,
+  BookOpen,
+  HelpCircle,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAppStore } from "../../store/useAppStore";
 import { SCENE_STATUSES } from "../../types/scene";
+import { toggleAppFullscreen } from "../../lib/windows";
 import clsx from "clsx";
 
 /**
@@ -56,12 +61,24 @@ function useWindowControls() {
         const initial = await win.isMaximized();
         const fullscreen = await win.isFullscreen();
         if (alive) setIsMaximized(initial);
-        if (alive) setIsFullscreen(fullscreen);
+        if (alive) {
+          setIsFullscreen(fullscreen);
+          document.documentElement.toggleAttribute(
+            "data-solon-fullscreen",
+            fullscreen,
+          );
+        }
         unlisten = await win.onResized(async () => {
           const m = await win.isMaximized();
           const f = await win.isFullscreen();
           if (alive) setIsMaximized(m);
-          if (alive) setIsFullscreen(f);
+          if (alive) {
+            setIsFullscreen(f);
+            document.documentElement.toggleAttribute(
+              "data-solon-fullscreen",
+              f,
+            );
+          }
         });
       } catch {
         // Defensivo — se a chamada falhar mesmo com __TAURI_INTERNALS__
@@ -94,12 +111,10 @@ function useWindowControls() {
   };
   const toggleFullscreen = () => {
     if (!available) return;
-    const win = getCurrentWindow();
-    win
-      .isFullscreen()
-      .then((current) =>
-        win.setFullscreen(!current).then(() => setIsFullscreen(!current)),
-      )
+    toggleAppFullscreen()
+      .then((next) => {
+        if (typeof next === "boolean") setIsFullscreen(next);
+      })
       .catch((e) => console.error("setFullscreen:", e));
   };
 
@@ -122,7 +137,13 @@ export function Titlebar() {
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
   const toggleFocusMode = useAppStore((s) => s.toggleFocusMode);
+  const toggleReadingMode = useAppStore((s) => s.toggleReadingMode);
+  const readingMode = useAppStore((s) => s.readingMode);
   const openSettings = useAppStore((s) => s.openSettings);
+  const openGlobalSearch = useAppStore((s) => s.openGlobalSearch);
+  const openExport = useAppStore((s) => s.openExport);
+  const openShortcuts = useAppStore((s) => s.openShortcuts);
+  const showTitlebarActions = useAppStore((s) => s.showTitlebarActions);
 
   const status = SCENE_STATUSES.find((s) => s.value === sceneMeta.status);
   const { available, isMaximized, isFullscreen, minimize, toggleMaximize, toggleFullscreen, close } =
@@ -137,7 +158,7 @@ export function Titlebar() {
 
   return (
     <div
-      className="flex items-center h-9 select-none"
+      className="solon-titlebar flex items-center h-9 select-none"
       style={{
         background: "var(--bg-panel-2)",
         borderBottom: "1px solid var(--border-subtle)",
@@ -240,13 +261,15 @@ export function Titlebar() {
         >
           <PanelLeft size={14} />
         </IconBtn>
-        <IconBtn
-          onClick={toggleInspector}
-          active={isInspectorOpen}
-          title="Inspector - Cena (Ctrl+Alt+I)"
-        >
-          <Info size={14} />
-        </IconBtn>
+        {showTitlebarActions && (
+          <IconBtn
+            onClick={toggleInspector}
+            active={isInspectorOpen}
+            title="Inspector - Cena (Ctrl+Alt+I)"
+          >
+            <Info size={14} />
+          </IconBtn>
+        )}
         <IconBtn
           onClick={toggleOutline}
           active={isOutlineOpen}
@@ -254,21 +277,44 @@ export function Titlebar() {
         >
           <ListTree size={14} />
         </IconBtn>
-        <div
-          className="w-px h-3.5 mx-1"
-          style={{ background: "var(--border-subtle)" }}
-        />
-        <IconBtn onClick={toggleFocusMode} active={focusMode} title="Modo Foco (F11)">
-          <Focus size={14} />
-        </IconBtn>
-        {available && (
-          <IconBtn
-            onClick={toggleFullscreen}
-            active={isFullscreen}
-            title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
-          >
-            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </IconBtn>
+        {showTitlebarActions && (
+          <>
+            <div
+              className="w-px h-3.5 mx-1"
+              style={{ background: "var(--border-subtle)" }}
+            />
+            <IconBtn
+              onClick={openGlobalSearch}
+              title="Buscar no projeto (Ctrl+Shift+F)"
+            >
+              <Search size={14} />
+            </IconBtn>
+            <IconBtn onClick={toggleFocusMode} active={focusMode} title="Modo foco">
+              <Focus size={14} />
+            </IconBtn>
+            <IconBtn
+              onClick={toggleReadingMode}
+              active={readingMode}
+              title="Modo leitura (Ctrl+Shift+R)"
+            >
+              <BookOpen size={14} />
+            </IconBtn>
+            <IconBtn onClick={openExport} title="Exportar PDF (Ctrl+Shift+E)">
+              <FileDown size={14} />
+            </IconBtn>
+            <IconBtn onClick={openShortcuts} title="Atalhos (Ctrl+/)">
+              <HelpCircle size={14} />
+            </IconBtn>
+            {available && (
+              <IconBtn
+                onClick={toggleFullscreen}
+                active={isFullscreen}
+                title={isFullscreen ? "Sair da tela cheia (F11)" : "Tela cheia (F11)"}
+              >
+                {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </IconBtn>
+            )}
+          </>
         )}
         <IconBtn onClick={openSettings} title="Preferências (Ctrl+,)">
           <SettingsIcon size={14} />

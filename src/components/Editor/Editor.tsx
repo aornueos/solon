@@ -49,6 +49,51 @@ import { EditorImageExtension } from "./EditorImageExtension";
 import { resolveEditorImageHtml, saveImageForEditor } from "../../lib/editorImages";
 import { loadSnippets } from "../../lib/snippets";
 
+const EDITOR_SCROLL_POSITIONS_KEY = "solon:editorScrollPositions";
+const MAX_EDITOR_SCROLL_POSITIONS = 200;
+
+function loadEditorScrollPositions(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(EDITOR_SCROLL_POSITIONS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const entries = Object.entries(parsed)
+      .filter((entry): entry is [string, number] => (
+        typeof entry[0] === "string" &&
+        typeof entry[1] === "number" &&
+        Number.isFinite(entry[1]) &&
+        entry[1] >= 0
+      ))
+      .slice(-MAX_EDITOR_SCROLL_POSITIONS);
+    return Object.fromEntries(entries);
+  } catch {
+    return {};
+  }
+}
+
+function rememberEditorScroll(path: string, scrollTop: number): void {
+  try {
+    const positions = loadEditorScrollPositions();
+    delete positions[path];
+    const next = {
+      ...positions,
+      [path]: Math.max(0, Math.round(scrollTop)),
+    };
+    const entries = Object.entries(next).slice(-MAX_EDITOR_SCROLL_POSITIONS);
+    localStorage.setItem(
+      EDITOR_SCROLL_POSITIONS_KEY,
+      JSON.stringify(Object.fromEntries(entries)),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function readEditorScroll(path: string): number {
+  return loadEditorScrollPositions()[path] ?? 0;
+}
+
 export function Editor() {
   // Seletores granulares: evita re-render do editor ao mudar sidebarWidth,
   // theme, viewport do canvas, etc. `fileBody` fica intencionalmente fora
@@ -99,7 +144,40 @@ export function Editor() {
   // (com {passive: false} pra poder preventDefault o scroll quando
   // Ctrl ta pressionado e a gente quer transformar em zoom).
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const visiblePathRef = useRef<string | null>(null);
+  const scrollSaveTimerRef = useRef<number | null>(null);
   const snippetsRef = useRef<Record<string, string>>({});
+
+  const saveVisibleScroll = () => {
+    const path = visiblePathRef.current;
+    const scroller = scrollRef.current;
+    if (!path || !scroller) return;
+    rememberEditorScroll(path, scroller.scrollTop);
+  };
+
+  const scheduleScrollMemory = () => {
+    const path = visiblePathRef.current;
+    const scroller = scrollRef.current;
+    if (!path || !scroller) return;
+    if (scrollSaveTimerRef.current != null) {
+      window.clearTimeout(scrollSaveTimerRef.current);
+    }
+    const top = scroller.scrollTop;
+    scrollSaveTimerRef.current = window.setTimeout(() => {
+      scrollSaveTimerRef.current = null;
+      rememberEditorScroll(path, top);
+    }, 120);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (scrollSaveTimerRef.current != null) {
+        window.clearTimeout(scrollSaveTimerRef.current);
+        scrollSaveTimerRef.current = null;
+      }
+      saveVisibleScroll();
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -255,10 +333,13 @@ export function Editor() {
   useEffect(() => {
     if (!editor) return;
     if (!activeFilePath) {
+      saveVisibleScroll();
+      visiblePathRef.current = null;
       lastLoadedPathRef.current = null;
       return;
     }
     if (lastLoadedPathRef.current === activeFilePath) return;
+    saveVisibleScroll();
     // CUIDADO: NAO chamar flushUpdateRef aqui. Quando este effect roda,
     // `activeFilePath` ja' mudou pro arquivo NOVO, mas o editor ainda
     // tem o conteudo do arquivo ANTIGO. Se a gente flushasse, o turndown
@@ -292,7 +373,12 @@ export function Editor() {
       const words = text.trim() ? text.trim().split(/\s+/).length : 0;
       setWordCount(words, text.length);
 
+      const restoreTop = readEditorScroll(activeFilePath);
       raf = requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = restoreTop;
+        }
+        visiblePathRef.current = activeFilePath;
         isLoadingRef.current = false;
       });
     });
@@ -451,31 +537,26 @@ export function Editor() {
     };
   }, [editor, typewriterMode]);
 
-  // Click em wikilinks (Ctrl/Cmd+click) abre o arquivo correspondente.
-  // Exigimos Ctrl/Cmd pra evitar que click normal — usado pra posicionar
-  // o caret dentro do texto da wikilink (editar o nome do destino) —
-  // dispare navegacao acidental. Mesma convencao de VSCode pra Go to
-  // Definition.
+  // Click em wikilinks abre a nota correspondente.
   useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom;
     const onClick = (e: MouseEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
       const target = e.target as HTMLElement | null;
-      const link = target?.closest("a.wikilink, a[data-wikilink='true']");
-      if (!link) return;
-      const name = (link.textContent ?? "").trim();
-      if (!name) return;
-      e.preventDefault();
-      e.stopPropagation();
-      // Busca recursiva por basename (sem ext) bate case-insensitive.
-      // Match exato preferido; se nao acha, toast.
-      const { fileTree, pushToast } = useAppStore.getState();
-      const found = findFileByName(fileTree, name);
-      if (found) {
-        void openFile(found.path, found.name, { tab: "replace" });
-      } else {
-        pushToast("info", `Nenhuma nota chamada "${name}" no projeto.`);
+      const directLink = target?.closest("a.wikilink, a[data-wikilink='true']");
+      if (directLink) {
+        const name = (directLink.textContent ?? "").trim();
+        if (!name) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const { fileTree, pushToast } = useAppStore.getState();
+        const found = findFileByName(fileTree, name);
+        if (found) {
+          void openFile(found.path, found.name, { tab: "replace" });
+        } else {
+          pushToast("info", `Nenhuma nota chamada "${name}" no projeto.`);
+        }
+        return;
       }
     };
     dom.addEventListener("click", onClick);
@@ -695,6 +776,7 @@ export function Editor() {
         data-paper={editorPaper === "default" ? undefined : editorPaper}
         className="flex-1 overflow-y-auto"
         onClick={focusEnd}
+        onScroll={scheduleScrollMemory}
         style={{
           // Quando ha papel custom, aplica bg/text via vars CSS settadas
           // em globals.css ([data-paper=...]). "default" deixa vazio →

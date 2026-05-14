@@ -8,12 +8,24 @@ import { useCanvasPersistence } from "./hooks/useCanvasPersistence";
 import { useSceneCardSync } from "./hooks/useSceneCardSync";
 import { checkForUpdate } from "./lib/updater";
 import { flushEditor } from "./lib/editorRef";
-import { requestedFileFromUrl } from "./lib/windows";
+import {
+  isTauriRuntime,
+  requestedFileFromUrl,
+  setAppFullscreen,
+  toggleAppFullscreen,
+} from "./lib/windows";
+import { EDITOR_PAPERS } from "./store/useAppStore";
 
-const isTauriRuntime = (): boolean =>
-  typeof window !== "undefined" &&
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).__TAURI_INTERNALS__ !== undefined;
+function cycleVisualTheme() {
+  const state = useAppStore.getState();
+  const currentIndex = EDITOR_PAPERS.findIndex(
+    (option) => option.value === state.editorPaper,
+  );
+  const next =
+    EDITOR_PAPERS[(currentIndex + 1) % EDITOR_PAPERS.length] ?? EDITOR_PAPERS[0];
+  state.setEditorPaper(next.value);
+  state.pushToast("info", `Tema visual: ${next.label}`, 1600);
+}
 
 export default function App() {
   // Seletores granulares: destructure direto de `useAppStore()` assinaria
@@ -23,7 +35,6 @@ export default function App() {
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
-  const toggleFocusMode = useAppStore((s) => s.toggleFocusMode);
   const setActiveView = useAppStore((s) => s.setActiveView);
   const setUpdateStatus = useAppStore((s) => s.setUpdateStatus);
   const openSettings = useAppStore((s) => s.openSettings);
@@ -186,6 +197,11 @@ export default function App() {
         openCommandPalette();
         return;
       }
+      if (ctrl && e.shiftKey && key === "l") {
+        e.preventDefault();
+        cycleVisualTheme();
+        return;
+      }
       if (ctrl && (e.key === "+" || e.key === "=")) {
         e.preventDefault();
         setAppZoom(useAppStore.getState().appZoom + 10);
@@ -234,39 +250,16 @@ export default function App() {
         e.preventDefault();
         setActiveView("canvas");
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === "3") {
+        e.preventDefault();
+        setActiveView("home");
+      }
       if (e.key === "F11") {
         e.preventDefault();
-        // F11 alterna tela cheia REAL do SO (esconde titlebar do Windows
-        // etc) — convencao classica. Antes F11 so' togglava `focusMode`
-        // (esconde sidebar/inspector dentro do app); fora do app nada
-        // mudava, e o user reportou "F11 nao funciona". Agora o F11
-        // pede setFullscreen do Tauri; se reading mode esta ligado,
-        // F11 sai dele primeiro (panic-key behavior). Focus mode
-        // continua acessivel via botao na titlebar/Command Palette.
-        if (useAppStore.getState().readingMode) {
-          toggleReadingMode();
-          return;
-        }
-        if (isTauriRuntime()) {
-          void (async () => {
-            try {
-              const { getCurrentWindow } = await import("@tauri-apps/api/window");
-              const win = getCurrentWindow();
-              const current = await win.isFullscreen();
-              await win.setFullscreen(!current);
-            } catch (err) {
-              console.error("F11 fullscreen failed:", err);
-              // Fallback: se a API de fullscreen falhar (permissao
-              // faltando, etc) cai pro toggleFocusMode antigo pra
-              // pelo menos algo acontecer.
-              toggleFocusMode();
-            }
-          })();
-        } else {
-          // Em dev/browser puro nao tem API Tauri — toggle focus mode
-          // como antes.
-          toggleFocusMode();
-        }
+        void toggleAppFullscreen().catch((err) => {
+          console.error("F11 fullscreen failed:", err);
+        });
+        return;
       }
       // Ctrl+, abre preferencias — convencao de macOS/VSCode/Obsidian.
       if ((e.ctrlKey || e.metaKey) && e.key === ",") {
@@ -317,15 +310,9 @@ export default function App() {
           isOutlineOpen: true,
           isInspectorOpen: true,
         });
+        void setAppFullscreen(false).catch(() => {});
         return;
       }
-      // F11 alterna focus mode normalmente, MAS se reading mode estiver
-      // ligado, F11 vira "sair do reading mode" — comportamento panic
-      // pra muscle memory de fullscreen toggle. Sem isso, o user que
-      // esquecer Ctrl+Shift+R nao acha o atalho.
-      // (F11 ja' eh tratado acima nesse mesmo handler — adicionamos a
-      // logica extra dentro do bloco F11 abaixo.)
-
       // Esc em reading mode sai do modo (mesmo padrao de presentation
       // mode em browsers/Keynote). Nao bloqueia outros usos do Esc
       // (dialogs, etc) — esses tem listeners proprios com stopPropagation.
@@ -407,7 +394,6 @@ export default function App() {
     toggleSidebar,
     toggleOutline,
     toggleInspector,
-    toggleFocusMode,
     setActiveView,
     openSettings,
     openCommandPalette,

@@ -17,10 +17,13 @@ import {
   Info,
   Plus,
   FileDown,
+  Palette,
+  Maximize2,
 } from "lucide-react";
-import { useAppStore, FileNode } from "../../store/useAppStore";
+import { EDITOR_PAPERS, useAppStore, FileNode } from "../../store/useAppStore";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
+import { toggleAppFullscreen } from "../../lib/windows";
 import { CanvasTool } from "../../types/canvas";
 
 type CommandItem = {
@@ -40,6 +43,17 @@ const TOOL_COMMANDS: { tool: CanvasTool; label: string; icon: React.ReactNode }[
   { tool: "eraser", label: "Canvas: borracha", icon: <Eraser size={15} /> },
 ];
 
+function cycleVisualTheme() {
+  const state = useAppStore.getState();
+  const currentIndex = EDITOR_PAPERS.findIndex(
+    (option) => option.value === state.editorPaper,
+  );
+  const next =
+    EDITOR_PAPERS[(currentIndex + 1) % EDITOR_PAPERS.length] ?? EDITOR_PAPERS[0];
+  state.setEditorPaper(next.value);
+  state.pushToast("info", `Tema visual: ${next.label}`, 1600);
+}
+
 export function CommandPalette() {
   const open = useAppStore((s) => s.showCommandPalette);
   const close = useAppStore((s) => s.closeCommandPalette);
@@ -56,10 +70,11 @@ export function CommandPalette() {
   const openLocalHistory = useAppStore((s) => s.openLocalHistory);
   const openExport = useAppStore((s) => s.openExport);
   const openShortcuts = useAppStore((s) => s.openShortcuts);
+  const openScratchpad = useAppStore((s) => s.openScratchpad);
   const setFileTree = useAppStore((s) => s.setFileTree);
   const setTool = useCanvasStore((s) => s.setTool);
   const addCard = useCanvasStore((s) => s.addCard);
-  const { openFile, openFolder } = useFileSystem();
+  const { openFile, openFolder, createUntitled } = useFileSystem();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -104,6 +119,30 @@ export function CommandPalette() {
   const baseCommands = useMemo<CommandItem[]>(
     () => [
       {
+        id: "new-note",
+        label: "Nova nota vazia",
+        hint: "Ctrl+T",
+        icon: <Plus size={15} />,
+        run: createUntitled,
+      },
+      {
+        id: "scratchpad",
+        label: "Abrir scratchpad",
+        hint: "Ctrl+Shift+N",
+        icon: <Pencil size={15} />,
+        run: openScratchpad,
+      },
+      {
+        id: "reopen-tab",
+        label: "Reabrir ultima aba fechada",
+        hint: "Ctrl+Shift+T",
+        icon: <FileText size={15} />,
+        run: async () => {
+          const tab = useAppStore.getState().reopenClosedTab();
+          if (tab) await openFile(tab.path, tab.name, { tab: "preserve" });
+        },
+      },
+      {
         id: "open-folder",
         label: "Abrir pasta",
         hint: "Trocar projeto",
@@ -113,7 +152,7 @@ export function CommandPalette() {
       {
         id: "home",
         label: "Ir para inicio",
-        hint: "Homepage",
+        hint: "Ctrl+3",
         icon: <Home size={15} />,
         run: () => setActiveView("home"),
       },
@@ -144,6 +183,20 @@ export function CommandPalette() {
         hint: "Ctrl+Shift+R",
         icon: <Focus size={15} />,
         run: toggleReadingMode,
+      },
+      {
+        id: "fullscreen",
+        label: "Tela cheia",
+        hint: "F11",
+        icon: <Maximize2 size={15} />,
+        run: () => void toggleAppFullscreen(),
+      },
+      {
+        id: "cycle-theme",
+        label: "Alternar tema visual",
+        hint: "Ctrl+Shift+L",
+        icon: <Palette size={15} />,
+        run: cycleVisualTheme,
       },
       {
         id: "typewriter",
@@ -235,12 +288,15 @@ export function CommandPalette() {
     [
       activeView,
       addCard,
+      createUntitled,
       openFolder,
       openGlobalSearch,
       openLocalHistory,
       openExport,
       openShortcuts,
+      openScratchpad,
       openSettings,
+      openFile,
       setActiveView,
       setTool,
       toggleFocusMode,

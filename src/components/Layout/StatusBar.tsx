@@ -22,7 +22,7 @@ export function StatusBar() {
 
   return (
     <div
-      className="flex items-center justify-between h-6 px-4 text-[0.68rem]"
+      className="solon-statusbar flex items-center justify-between h-6 px-4 text-[0.68rem]"
       role="status"
       aria-live="polite"
       style={{

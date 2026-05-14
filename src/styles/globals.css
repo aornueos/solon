@@ -256,9 +256,21 @@
     background-color: var(--bg-panel);
     color: var(--text-primary);
     font-family: "Inter", system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: subpixel-antialiased;
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
+  }
+
+  html[data-solon-fullscreen],
+  html[data-solon-fullscreen] body,
+  html[data-solon-fullscreen] #root {
+    background: var(--bg-app);
+  }
+
+  html[data-solon-fullscreen] .solon-titlebar,
+  html[data-solon-fullscreen] .solon-statusbar {
+    display: none !important;
   }
 
   button,
@@ -338,8 +350,7 @@ select:focus-visible {
    Wikilinks — `[[note]]` style Obsidian
 ───────────────────────────────────────── */
 /* Visual de link interno: cor accent + underline tracejado pra
-   diferenciar de link comum (que sai do app). Pointer cursor com
-   Ctrl pressionado (via :where(...) que respeita o body cursor). */
+   diferenciar de link comum (que sai do app). */
 .ProseMirror a.wikilink,
 .ProseMirror a[data-wikilink="true"] {
   color: var(--accent);
@@ -347,7 +358,7 @@ select:focus-visible {
   text-decoration-style: dashed;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
-  cursor: text; /* texto editavel; Ctrl+click ativa abertura */
+  cursor: pointer;
 }
 .ProseMirror a.wikilink:hover,
 .ProseMirror a[data-wikilink="true"]:hover {

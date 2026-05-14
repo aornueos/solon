@@ -13,6 +13,7 @@ import {
   Clipboard,
   Tag as TagIcon,
   X as XIcon,
+  Search,
 } from "lucide-react";
 import { useAppStore, FileNode } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
@@ -62,6 +63,7 @@ export function Sidebar() {
   const activeTagFilter = useAppStore((s) => s.activeTagFilter);
   const setActiveTagFilter = useAppStore((s) => s.setActiveTagFilter);
   const tagIndex = useAppStore((s) => s.tagIndex);
+  const openCommandPalette = useAppStore((s) => s.openCommandPalette);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const tagBtnRef = useRef<HTMLButtonElement | null>(null);
   const { openFolder, openFile, refresh, createFile, createFolder, renameNode, deleteNode, reorderItem, moveItem, duplicateFile } =
@@ -207,6 +209,12 @@ export function Sidebar() {
         <div className="flex items-center gap-0.5">
           {rootFolder && (
             <>
+              <HeaderBtn
+                onClick={openCommandPalette}
+                title="Buscar notas e pastas (Ctrl+K)"
+              >
+                <Search size={13} />
+              </HeaderBtn>
               <HeaderBtn
                 onClick={() => handleNewFile(rootFolder)}
                 title="Novo arquivo"

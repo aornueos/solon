@@ -8,15 +8,6 @@ import {
   type PrintSize,
 } from "../../lib/pdfExport";
 
-/**
- * Dialog de export pra PDF. Escolha entre:
- *  - Arquivo atual (so' a cena/capitulo ativo)
- *  - Projeto inteiro (concatena todos os .md/.txt na ordem do sidebar)
- *
- * Opcoes: tamanho de pagina (A5/A4/livro), familia de fonte (serif/sans),
- * incluir sumario. PDF e' gerado abrindo print dialog do WebView; user
- * escolhe destino "Save as PDF".
- */
 export function ExportDialog() {
   const open = useAppStore((s) => s.showExport);
   const close = useAppStore((s) => s.closeExport);
@@ -38,28 +29,38 @@ export function ExportDialog() {
   const canExportProject = fileTree.length > 0;
 
   const handleExport = async () => {
+    const filePath = activeFilePath;
+    const fileName = activeFileName;
+    if (scope === "file" && (!filePath || !fileName)) {
+      pushToast("error", "Abra um arquivo antes de exportar.");
+      return;
+    }
+    if (scope === "project" && !canExportProject) {
+      pushToast("error", "Abra uma pasta antes de exportar.");
+      return;
+    }
     setBusy(true);
     try {
+      let savedPath: string | null;
       if (scope === "file") {
-        if (!activeFilePath || !activeFileName) {
-          pushToast("error", "Abra um arquivo antes de exportar.");
-          return;
-        }
-        await exportFileToPdf(activeFilePath, activeFileName, {
+        savedPath = await exportFileToPdf(filePath!, fileName!, {
           size,
           font,
-          toc: false, // 1 arquivo so — TOC nao agrega
+          toc: false,
         });
       } else {
         const projectName =
           rootFolder?.split(/[\\/]/).filter(Boolean).pop() ?? "Projeto";
-        await exportFolderToPdf(fileTree, projectName, {
+        savedPath = await exportFolderToPdf(fileTree, projectName, {
           size,
           font,
           toc,
         });
       }
-      close();
+      if (savedPath) {
+        pushToast("success", "PDF exportado.");
+        close();
+      }
     } catch (err) {
       console.error("Erro ao exportar PDF:", err);
       pushToast(
@@ -110,14 +111,13 @@ export function ExportDialog() {
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          {/* Escopo */}
           <Section title="O que exportar">
             <Choice
               checked={scope === "file"}
               disabled={!canExportFile}
               label={
                 canExportFile
-                  ? `Arquivo atual — ${activeFileName?.replace(/\.(md|txt)$/i, "")}`
+                  ? `Arquivo atual - ${activeFileName?.replace(/\.(md|txt)$/i, "")}`
                   : "Arquivo atual (nenhum aberto)"
               }
               onSelect={() => setScope("file")}
@@ -134,54 +134,51 @@ export function ExportDialog() {
             />
           </Section>
 
-          {/* Tamanho */}
-          <Section title="Tamanho da página">
+          <Section title="Tamanho da pagina">
             <div className="flex gap-1.5">
               <SizeBtn
                 value="book"
                 current={size}
                 label="Livro"
-                hint="5,5×8,5 in"
+                hint="5,5 x 8,5 in"
                 onSelect={setSize}
               />
               <SizeBtn
                 value="a5"
                 current={size}
                 label="A5"
-                hint="148×210 mm"
+                hint="148 x 210 mm"
                 onSelect={setSize}
               />
               <SizeBtn
                 value="a4"
                 current={size}
                 label="A4"
-                hint="210×297 mm"
+                hint="210 x 297 mm"
                 onSelect={setSize}
               />
             </div>
           </Section>
 
-          {/* Fonte */}
           <Section title="Tipografia">
             <div className="flex gap-1.5">
               <SizeBtn
                 value="serif"
                 current={font}
                 label="Serifada"
-                hint="Lora"
+                hint="Times"
                 onSelect={setFont}
               />
               <SizeBtn
                 value="sans"
                 current={font}
                 label="Sem serifa"
-                hint="Inter"
+                hint="Helvetica"
                 onSelect={setFont}
               />
             </div>
           </Section>
 
-          {/* Sumário (so' faz sentido em projeto) */}
           {scope === "project" && (
             <label
               className="flex items-center gap-2 text-[0.82rem] cursor-pointer"
@@ -192,7 +189,7 @@ export function ExportDialog() {
                 checked={toc}
                 onChange={(e) => setToc(e.target.checked)}
               />
-              Incluir sumário antes do conteúdo
+              Incluir sumario antes do conteudo
             </label>
           )}
 
@@ -200,9 +197,8 @@ export function ExportDialog() {
             className="text-[0.7rem] italic leading-relaxed pt-1"
             style={{ color: "var(--text-muted)" }}
           >
-            Uma janela do navegador vai abrir com o documento formatado.
-            No diálogo de impressão, escolha <strong>"Microsoft Print to PDF"</strong>{" "}
-            (Windows) ou similar como destino, e salve.
+            O Solon vai gerar um PDF limpo e pedir onde salvar. Ele nao usa
+            print preview nem abre pop-up.
           </p>
         </div>
 
@@ -234,7 +230,7 @@ export function ExportDialog() {
             }}
           >
             <FileDown size={12} />
-            {busy ? "Gerando…" : "Exportar"}
+            {busy ? "Gerando..." : "Exportar"}
           </button>
         </div>
       </div>

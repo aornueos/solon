@@ -11,6 +11,8 @@ import {
   BookPlus,
   Search,
   Settings,
+  FileDown,
+  BookOpen,
 } from "lucide-react";
 import { useAppStore, ContextMenuItem } from "../../store/useAppStore";
 import { findWordAtCoords, replaceRange, getCurrentEditor } from "../../lib/editorRef";
@@ -344,6 +346,26 @@ function editorItems({
     },
     { kind: "separator" },
     {
+      label: "Buscar na nota",
+      icon: <Search size={12} />,
+      shortcut: "Ctrl+F",
+      onClick: () =>
+        document.dispatchEvent(new CustomEvent("solon:find-open")),
+    },
+    {
+      label: "Exportar PDF",
+      icon: <FileDown size={12} />,
+      shortcut: "Ctrl+Shift+E",
+      onClick: () => useAppStore.getState().openExport(),
+    },
+    {
+      label: "Modo leitura",
+      icon: <BookOpen size={12} />,
+      shortcut: "Ctrl+Shift+R",
+      onClick: () => useAppStore.getState().toggleReadingMode(),
+    },
+    { kind: "separator" },
+    {
       label: "Selecionar tudo",
       shortcut: "Ctrl+A",
       onClick: () => document.execCommand("selectAll"),
@@ -410,7 +432,7 @@ function genericItems({
     {
       label: "Buscar notas e pastas",
       icon: <Search size={12} />,
-      shortcut: "Ctrl+P",
+      shortcut: "Ctrl+K",
       onClick: () => useAppStore.getState().openCommandPalette(),
     },
     {
@@ -418,6 +440,18 @@ function genericItems({
       icon: <Search size={12} />,
       shortcut: "Ctrl+Shift+F",
       onClick: () => useAppStore.getState().openGlobalSearch(),
+    },
+    {
+      label: "Modo leitura",
+      icon: <BookOpen size={12} />,
+      shortcut: "Ctrl+Shift+R",
+      onClick: () => useAppStore.getState().toggleReadingMode(),
+    },
+    {
+      label: "Exportar PDF",
+      icon: <FileDown size={12} />,
+      shortcut: "Ctrl+Shift+E",
+      onClick: () => useAppStore.getState().openExport(),
     },
     {
       label: "Preferencias",

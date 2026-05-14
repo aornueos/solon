@@ -138,8 +138,13 @@ export function AppLayout() {
 
   return (
     <div
-      className="flex flex-col h-screen"
-      style={{ background: "var(--bg-panel)" }}
+      className="solon-app-shell flex flex-col"
+      style={{
+        background: "var(--bg-panel)",
+        height: "100dvh",
+        width: "100vw",
+        overflow: "hidden",
+      }}
     >
       {showTitlebar && <Titlebar />}
 
@@ -263,7 +268,7 @@ export function AppLayout() {
           type="button"
           onClick={toggleReadingMode}
           aria-label="Sair do modo leitura"
-          title="Sair do modo leitura (Esc, F11 ou Ctrl+Shift+R)"
+          title="Sair do modo leitura (Esc ou Ctrl+Shift+R)"
           className="fixed top-3 right-3 z-[90] flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-opacity text-[0.72rem]"
           style={{
             // Opacidade alta (0.85) — antes era 0.3, quase invisivel

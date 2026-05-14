@@ -1,7 +1,7 @@
 {
   "name": "solon",
   "private": true,
-  "version": "0.8.7",
+  "version": "0.8.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -54,6 +54,7 @@
     "dictionary-pt": "^4.0.0",
     "dompurify": "^3.2.3",
     "js-yaml": "^4.1.0",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.468.0",
     "marked": "^14.1.4",
     "react": "^18.3.1",
