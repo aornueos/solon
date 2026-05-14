@@ -1,6 +1,9 @@
 # Solon
 
-A desktop editor for creative writing — long-form fiction in plain Markdown, with a per-file canvas for storyboarding, native Brazilian Portuguese spellcheck, and a visual identity built around the way writers actually work.
+A writer-first Markdown workspace for fiction, story structure, and long-form creative writing.
+
+Solon is not a productivity dashboard, not a knowledge graph, and not a generic Markdown editor with a writing theme.
+It is a local-first desktop app built around the way fiction writers actually work: drafts, chapters, scenes, characters, storyboards, revisions, and the quiet terror of needing the file to still exist tomorrow.
 
 Built with **Tauri 2 + React + TipTap**. Notes live on your disk as plain `.md` files; you can open the same project in any other Markdown tool whenever you want.
 
@@ -8,14 +11,22 @@ Built with **Tauri 2 + React + TipTap**. Notes live on your disk as plain `.md` 
 
 ## Why Solon
 
-Most note apps optimize for knowledge management — networks, graphs, daily journals. Solon optimizes for **linear fiction**: scenes, chapters, characters. The features compose around that focus, and deliberately stop where the line between "writing a novel" and "managing a vault" begins.
+Most writing and note-taking apps fall into one of two traps.
+
+Some are beautiful Markdown editors, but stop at the page. They are clean, focused, and pleasant — until the project becomes a novel, with chapters, references, characters, structure, notes, and visual planning.
+
+Others are powerful knowledge-management systems, but they treat writing like a database: graphs, backlinks, dashboards, templates, plugins, daily notes, and an endless architecture around the actual text.
+
+Solon takes a narrower path.
+
+It is built for **linear fiction**: scenes, chapters, characters, frontmatter, storyboards, local files, and long-form writing projects. The features compose around that focus, and deliberately stop where writing a story becomes managing a vault.
 
 What that means in practice:
 
-- **No vendor lock-in.** Your project is a folder of Markdown files. Open in VSCode, sync over Dropbox, version with git — Solon never asks you to import.
-- **No productivity gamification.** No streaks, no pomodoros, no graphs of your week. The app shows up, opens your draft, and gets out of the way.
-- **Resilience by default.** Atomic file writes, crash-recovery drafts, local history snapshots, and Ed25519-signed auto-updates protect your work without asking.
-
+- **Your work stays yours.** A Solon project is just a folder of Markdown files. Open it in VSCode, sync it over Dropbox, version it with git, or leave Solon entirely without exporting your own writing back to yourself.
+- **The editor serves the draft.** No streaks, no pomodoros, no heatmaps, no productivity theater. Solon opens your project, protects your files, and gets out of the way.
+- **Structure without bloat.** Wikilinks, frontmatter, outline, inspector, backlinks, and per-file canvas exist to support fiction writing — not to turn your novel into a second operating system.
+- **Resilience by default.** Atomic file writes, crash-recovery drafts, local history snapshots, and signed auto-updates protect the work without making the writer think about infrastructure.
 ---
 
 ## Features
