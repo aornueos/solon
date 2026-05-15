@@ -83,14 +83,9 @@ export function ensureSpellchecker(): void {
   if (isReady) return;
   if (warmupPromise) return;
 
-  console.log("[spellcheck] warm-up iniciando…");
   warmupPromise = (async () => {
     try {
-      const start = performance.now();
-      const size = await invoke<number>("spell_size");
-      console.log(
-        `[spellcheck] backend ativo: ${size.toLocaleString("pt-BR")} palavras (${(performance.now() - start).toFixed(0)}ms)`,
-      );
+      await invoke<number>("spell_size");
 
       // Re-aplica dict pessoal
       for (const word of personalDict) {

@@ -1,7 +1,7 @@
 {
   "name": "solon",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.9.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,6 +15,7 @@
     "brand:icons": "node scripts/generate-brand-icon.cjs && node scripts/generate-icons.cjs",
     "icons": "node scripts/generate-icons.cjs",
     "release:prepare": "node scripts/release-prepare.cjs",
+    "release:qa": "node scripts/release-qa.cjs",
     "kill": "node scripts/kill-solon.cjs"
   },
   "dependencies": {

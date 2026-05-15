@@ -109,6 +109,8 @@ Latest installers are on the [Releases page](https://github.com/aornueos/solon/r
 
 Download `Solon_x.y.z_x64-setup.exe` or the MSI, then run it. The app updates from inside after installation.
 
+Solon uses Microsoft Edge WebView2 on Windows. The normal installer downloads and installs WebView2 automatically when it is missing, so users do not need to install it manually before installing Solon. An internet connection is required for that first-time bootstrap on machines where WebView2 was removed.
+
 > **SmartScreen warning**: Solon's installer is not yet signed with an Authenticode certificate. On first install you may see "Windows protected your PC". Click *More info → Run anyway*. The Ed25519 signed updater means later updates are still cryptographically verified.
 
 ### macOS and Linux

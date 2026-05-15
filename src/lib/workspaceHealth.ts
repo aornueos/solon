@@ -26,6 +26,8 @@ const isTauri = (): boolean =>
 const EXTERNAL_SRC_RE = /^(https?:|data:|blob:|mailto:|#)/i;
 const WIKILINK_RE = /\[\[([^\]\n|#]+)(?:[|#][^\]\n]+)?\]\]/g;
 const IMAGE_RE = /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+const LOCAL_ABSOLUTE_RE = /^(?:\/|[a-z]:\/)/i;
+const LARGE_NOTE_BYTES = 650 * 1024;
 
 function normalizeName(value: string): string {
   return value
@@ -55,6 +57,10 @@ function flattenNotes(nodes: FileNode[]): FileNode[] {
   return out;
 }
 
+function noteByteSize(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
 function lineForIndex(text: string, index: number): number {
   let line = 1;
   for (let i = 0; i < index; i += 1) {
@@ -63,8 +69,16 @@ function lineForIndex(text: string, index: number): number {
   return line;
 }
 
+function safeDecodeUri(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function resolveImagePath(rootFolder: string, notePath: string, src: string): string | null {
-  const clean = decodeURIComponent(src.trim()).replace(/\\/g, "/");
+  const clean = safeDecodeUri(src.trim()).replace(/\\/g, "/");
   if (!clean || EXTERNAL_SRC_RE.test(clean)) return null;
   let candidate: string | null = null;
   if (clean.startsWith(".solon/assets/")) {
@@ -90,10 +104,30 @@ export async function scanWorkspaceHealth(
   const notes = flattenNotes(fileTree).filter((node) =>
     isProjectNotePath(rootFolder, node.path),
   );
-  const noteNames = new Set(notes.map((node) => normalizeName(node.name)));
+  const noteNames = new Map<string, FileNode[]>();
+  for (const note of notes) {
+    const key = normalizeName(note.name);
+    const list = noteNames.get(key) ?? [];
+    list.push(note);
+    noteNames.set(key, list);
+  }
   const { readTextFile, exists } = await import("@tauri-apps/plugin-fs");
   const issues: WorkspaceHealthIssue[] = [];
   const assetChecks: Promise<void>[] = [];
+
+  for (const [key, duplicated] of noteNames) {
+    if (!key || duplicated.length < 2) continue;
+    duplicated.forEach((note) => {
+      issues.push({
+        id: `duplicate-note:${note.path}`,
+        severity: "warning",
+        title: "Nome de nota duplicado",
+        detail: "Wikilinks podem abrir a nota errada quando duas notas têm o mesmo nome.",
+        path: note.path,
+        name: note.name,
+      });
+    });
+  }
 
   const CHUNK = 16;
   for (let i = 0; i < notes.length; i += CHUNK) {
@@ -133,6 +167,28 @@ export async function scanWorkspaceHealth(
         });
       }
 
+      if (noteByteSize(raw) > LARGE_NOTE_BYTES) {
+        issues.push({
+          id: `large-note:${file.path}`,
+          severity: "info",
+          title: "Nota muito grande",
+          detail: "Arquivos muito longos podem deixar busca, histórico e renderização mais lentos.",
+          path: file.path,
+          name: file.name,
+        });
+      }
+
+      if (/<\s*(script|iframe|object|embed|form)\b/i.test(raw)) {
+        issues.push({
+          id: `unsafe-html:${file.path}`,
+          severity: "warning",
+          title: "HTML potencialmente inseguro",
+          detail: "A nota contém tags HTML que o editor sanitiza, mas vale revisar a origem.",
+          path: file.path,
+          name: file.name,
+        });
+      }
+
       if (/^---\r?\n/.test(raw) && !/^---\r?\n[\s\S]*?\r?\n---\r?\n?/.test(raw)) {
         issues.push({
           id: `frontmatter:${file.path}`,
@@ -161,8 +217,34 @@ export async function scanWorkspaceHealth(
 
       for (const match of body.matchAll(IMAGE_RE)) {
         const src = match[1].trim();
+        const cleanSrc = safeDecodeUri(src).replace(/\\/g, "/");
+        if (LOCAL_ABSOLUTE_RE.test(cleanSrc)) {
+          issues.push({
+            id: `asset-absolute:${file.path}:${match.index}:${src}`,
+            severity: "warning",
+            title: "Imagem com caminho absoluto",
+            detail: "Use imagens em .solon/assets para o projeto continuar portátil.",
+            path: file.path,
+            name: file.name,
+            line: lineForIndex(body, match.index ?? 0),
+          });
+          continue;
+        }
         const imagePath = resolveImagePath(rootFolder, file.path, src);
-        if (!imagePath) continue;
+        if (!imagePath) {
+          if (!EXTERNAL_SRC_RE.test(cleanSrc)) {
+            issues.push({
+              id: `asset-invalid:${file.path}:${match.index}:${src}`,
+              severity: "warning",
+              title: "Imagem local inválida",
+              detail: src,
+              path: file.path,
+              name: file.name,
+              line: lineForIndex(body, match.index ?? 0),
+            });
+          }
+          continue;
+        }
         assetChecks.push(
           exists(imagePath).then((ok) => {
             if (ok) return;

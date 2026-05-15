@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ExternalLink,
+  Archive,
   Loader2,
   Monitor,
   RotateCcw,
@@ -34,6 +35,8 @@ import {
   getSkippedVersion,
   RELEASES_URL,
 } from "../../lib/updater";
+import { createProjectBackup, restoreLatestProjectBackup } from "../../lib/projectBackup";
+import { useFileSystem } from "../../hooks/useFileSystem";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -80,10 +83,14 @@ export function SettingsDialog() {
   const setAutoExpandMovedFolders = useAppStore((s) => s.setAutoExpandMovedFolders);
   const restoreWorkspaceLayout = useAppStore((s) => s.restoreWorkspaceLayout);
   const setRestoreWorkspaceLayout = useAppStore((s) => s.setRestoreWorkspaceLayout);
+  const rootFolder = useAppStore((s) => s.rootFolder);
+  const fileTree = useAppStore((s) => s.fileTree);
   const openWorkspaceHealth = useAppStore((s) => s.openWorkspaceHealth);
+  const openConfirm = useAppStore((s) => s.openConfirm);
   const setUpdateStatus = useAppStore((s) => s.setUpdateStatus);
   const pushToast = useAppStore((s) => s.pushToast);
   const resetSettings = useAppStore((s) => s.resetSettings);
+  const { refresh } = useFileSystem();
 
   const [personalDictSize, setPersonalDictSize] = useState(0);
   const [personalDictWords, setPersonalDictWords] = useState<string[]>([]);
@@ -91,6 +98,9 @@ export function SettingsDialog() {
   const [lastUpdateCheck, setLastUpdateCheck] = useState<number | null>(null);
   const [skippedVersion, setSkippedVersion] = useState<string | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [creatingBackup, setCreatingBackup] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
+  const [backupMessage, setBackupMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!show) return;
@@ -172,6 +182,50 @@ export function SettingsDialog() {
     clearSkippedVersion();
     setSkippedVersion(null);
     pushToast("success", "Versão ignorada liberada.");
+  };
+
+  const onCreateBackup = async () => {
+    setCreatingBackup(true);
+    setBackupMessage(null);
+    try {
+      const result = await createProjectBackup(rootFolder, fileTree);
+      const failed = result.failedCount > 0 ? `, ${result.failedCount} falhou` : "";
+      setBackupMessage(`${result.fileCount} notas copiadas${failed}.`);
+      pushToast("success", "Backup do projeto criado.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Não foi possível criar backup.";
+      setBackupMessage(message);
+      pushToast("error", message);
+    } finally {
+      setCreatingBackup(false);
+    }
+  };
+
+  const onRestoreBackup = async () => {
+    const ok = await openConfirm({
+      title: "Restaurar último backup",
+      message:
+        "As notas existentes serão sobrescritas pelas cópias do backup mais recente. Arquivos criados depois do backup não serão apagados.",
+      confirmLabel: "Restaurar",
+      danger: true,
+    });
+    if (!ok) return;
+
+    setRestoringBackup(true);
+    setBackupMessage(null);
+    try {
+      const result = await restoreLatestProjectBackup(rootFolder);
+      const failed = result.failedCount > 0 ? `, ${result.failedCount} falhou` : "";
+      setBackupMessage(`${result.fileCount} notas restauradas${failed}.`);
+      await refresh();
+      pushToast("success", "Backup restaurado.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Não foi possível restaurar backup.";
+      setBackupMessage(message);
+      pushToast("error", message);
+    } finally {
+      setRestoringBackup(false);
+    }
   };
 
   const openReleaseChannel = async () => {
@@ -428,6 +482,39 @@ export function SettingsDialog() {
             </Section>
 
             <Section title="Projeto" description="Organização, histórico e verificações.">
+              <Row
+                label="Backup do projeto"
+                hint={backupMessage ?? "Copia notas para .solon/backups sem alterar seus arquivos."}
+                icon={<Archive size={12} />}
+              >
+                <ActionButton onClick={onCreateBackup} disabled={!rootFolder || creatingBackup}>
+                  {creatingBackup ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    "Criar"
+                  )}
+                </ActionButton>
+              </Row>
+
+              <Row
+                label="Restaurar último backup"
+                hint="Sobrescreve notas existentes com a cópia local mais recente."
+              >
+                <ActionButton onClick={onRestoreBackup} disabled={!rootFolder || restoringBackup}>
+                  {restoringBackup ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Restaurando...
+                    </>
+                  ) : (
+                    "Restaurar"
+                  )}
+                </ActionButton>
+              </Row>
+
               <Row
                 label="Saúde do projeto"
                 hint="Verifica links internos, imagens inline e notas vazias."

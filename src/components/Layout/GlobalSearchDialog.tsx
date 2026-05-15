@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FileText, FolderOpen, Search, X } from "lucide-react";
 import { FileNode, useAppStore } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
-import { parseDocument } from "../../lib/frontmatter";
+import { parseDocument, serializeDocument } from "../../lib/frontmatter";
 
 interface SearchResult {
   kind: "file" | "folder" | "content";
@@ -19,6 +19,9 @@ export function GlobalSearchDialog() {
   const open = useAppStore((s) => s.showGlobalSearch);
   const close = useAppStore((s) => s.closeGlobalSearch);
   const fileTree = useAppStore((s) => s.fileTree);
+  const activeFilePath = useAppStore((s) => s.activeFilePath);
+  const fileBody = useAppStore((s) => s.fileBody);
+  const sceneMeta = useAppStore((s) => s.sceneMeta);
   const setActiveView = useAppStore((s) => s.setActiveView);
   const setFileTree = useAppStore((s) => s.setFileTree);
   const { openFile } = useFileSystem();
@@ -26,6 +29,7 @@ export function GlobalSearchDialog() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const contentCacheRef = useRef<Map<string, string>>(new Map());
   const files = useMemo(() => flattenFiles(fileTree), [fileTree]);
   const folders = useMemo(() => flattenFolders(fileTree), [fileTree]);
 
@@ -38,6 +42,10 @@ export function GlobalSearchDialog() {
   }, [open]);
 
   useEffect(() => {
+    contentCacheRef.current.clear();
+  }, [fileTree]);
+
+  useEffect(() => {
     if (!open || query.trim().length < 1) {
       setResults([]);
       return;
@@ -45,7 +53,14 @@ export function GlobalSearchDialog() {
     let alive = true;
     const id = window.setTimeout(async () => {
       setSearching(true);
-      const found = await searchProject(files, folders, query);
+      const found = await searchProject(
+        files,
+        folders,
+        query,
+        contentCacheRef.current,
+        activeFilePath,
+        activeFilePath ? serializeDocument(sceneMeta, fileBody) : null,
+      );
       if (!alive) return;
       setResults(found);
       setSearching(false);
@@ -54,7 +69,7 @@ export function GlobalSearchDialog() {
       alive = false;
       window.clearTimeout(id);
     };
-  }, [files, folders, open, query]);
+  }, [activeFilePath, fileBody, files, folders, open, query, sceneMeta]);
 
   if (!open) return null;
 
@@ -207,6 +222,9 @@ async function searchProject(
   files: FileNode[],
   folders: FileNode[],
   query: string,
+  contentCache: Map<string, string>,
+  activeFilePath: string | null,
+  activeRaw: string | null,
 ): Promise<SearchResult[]> {
   const normalized = normalize(query);
   const results: SearchResult[] = [];
@@ -236,17 +254,20 @@ async function searchProject(
   }
   if (!isTauri() || normalized.length < 2) return results.slice(0, 80);
   const { readTextFile } = await import("@tauri-apps/plugin-fs");
-  // Paraleliza leitura em chunks. Antes era serie pura — projeto com
-  // 200 arquivos travava o dialog uns 8-12s. Chunk de 16 da' boa
-  // sobreposicao IPC sem saturar. Para cedo se atingiu 80 matches
-  // (cap visual do dialog).
   const CHUNK = 16;
   outer: for (let i = 0; i < files.length; i += CHUNK) {
     const slice = files.slice(i, i + CHUNK);
     const reads = await Promise.all(
       slice.map(async (file) => {
         try {
-          const raw = await readTextFile(file.path);
+          let raw =
+            file.path === activeFilePath && activeRaw !== null
+              ? activeRaw
+              : contentCache.get(file.path);
+          if (raw === undefined) {
+            raw = await readTextFile(file.path);
+            contentCache.set(file.path, raw);
+          }
           return { file, raw };
         } catch {
           return null;

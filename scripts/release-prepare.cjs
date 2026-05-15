@@ -82,6 +82,11 @@ if (!updater.pubkey || updater.pubkey.length < 40) {
   throw new Error("Updater pubkey ausente ou curta demais em src-tauri/tauri.conf.json.");
 }
 
+const webviewMode = tauri.bundle?.windows?.webviewInstallMode;
+if (webviewMode?.type !== "downloadBootstrapper") {
+  throw new Error("bundle.windows.webviewInstallMode precisa ficar em downloadBootstrapper.");
+}
+
 const releaseWorkflowPath = path.join(ROOT, ".github", "workflows", "release.yml");
 if (!fs.existsSync(releaseWorkflowPath)) {
   throw new Error("Workflow .github/workflows/release.yml nao existe.");

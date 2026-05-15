@@ -59,7 +59,15 @@
         { "path": "**/.git/**" },
         { "path": "**/.env" },
         { "path": "**/.env.*" },
+        { "path": "**/*.pem" },
+        { "path": "**/*.key" },
+        { "path": "**/id_rsa" },
+        { "path": "**/id_ed25519" },
         { "path": "**/.claude/**" },
+        { "path": "**/.cursor/**" },
+        { "path": "**/.windsurf/**" },
+        { "path": "$HOME/.npm/**" },
+        { "path": "$HOME/.pypirc" },
         { "path": "$HOME/AppData/Roaming/GitHub CLI/**" },
         { "path": "$HOME/AppData/Roaming/Code/User/globalStorage/github.*/*" }
       ]

@@ -20,12 +20,14 @@ import {
   Palette,
   Maximize2,
   ShieldCheck,
+  Archive,
 } from "lucide-react";
 import { EDITOR_PAPERS, useAppStore, FileNode } from "../../store/useAppStore";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { toggleAppFullscreen } from "../../lib/windows";
 import { CanvasTool } from "../../types/canvas";
+import { createProjectBackup, restoreLatestProjectBackup } from "../../lib/projectBackup";
 
 type CommandItem = {
   id: string;
@@ -59,6 +61,7 @@ export function CommandPalette() {
   const open = useAppStore((s) => s.showCommandPalette);
   const close = useAppStore((s) => s.closeCommandPalette);
   const fileTree = useAppStore((s) => s.fileTree);
+  const rootFolder = useAppStore((s) => s.rootFolder);
   const activeView = useAppStore((s) => s.activeView);
   const setActiveView = useAppStore((s) => s.setActiveView);
   const toggleFocusMode = useAppStore((s) => s.toggleFocusMode);
@@ -73,10 +76,12 @@ export function CommandPalette() {
   const openExport = useAppStore((s) => s.openExport);
   const openShortcuts = useAppStore((s) => s.openShortcuts);
   const openScratchpad = useAppStore((s) => s.openScratchpad);
+  const pushToast = useAppStore((s) => s.pushToast);
+  const openConfirm = useAppStore((s) => s.openConfirm);
   const setFileTree = useAppStore((s) => s.setFileTree);
   const setTool = useCanvasStore((s) => s.setTool);
   const addCard = useCanvasStore((s) => s.addCard);
-  const { openFile, openFolder, createUntitled } = useFileSystem();
+  const { openFile, openFolder, createUntitled, refresh } = useFileSystem();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -260,6 +265,51 @@ export function CommandPalette() {
         run: openWorkspaceHealth,
       },
       {
+        id: "project-backup",
+        label: "Criar backup do projeto",
+        hint: ".solon/backups",
+        icon: <Archive size={15} />,
+        run: async () => {
+          try {
+            const result = await createProjectBackup(rootFolder, fileTree);
+            const failed = result.failedCount > 0 ? `, ${result.failedCount} falhou` : "";
+            pushToast("success", `Backup criado: ${result.fileCount} notas${failed}.`);
+          } catch (err) {
+            pushToast(
+              "error",
+              err instanceof Error ? err.message : "Não foi possível criar backup.",
+            );
+          }
+        },
+      },
+      {
+        id: "project-restore-backup",
+        label: "Restaurar último backup",
+        hint: ".solon/backups",
+        icon: <Archive size={15} />,
+        run: async () => {
+          const ok = await openConfirm({
+            title: "Restaurar último backup",
+            message:
+              "As notas existentes serão sobrescritas pelas cópias do backup mais recente. Arquivos criados depois do backup não serão apagados.",
+            confirmLabel: "Restaurar",
+            danger: true,
+          });
+          if (!ok) return;
+          try {
+            const result = await restoreLatestProjectBackup(rootFolder);
+            const failed = result.failedCount > 0 ? `, ${result.failedCount} falhou` : "";
+            await refresh();
+            pushToast("success", `Backup restaurado: ${result.fileCount} notas${failed}.`);
+          } catch (err) {
+            pushToast(
+              "error",
+              err instanceof Error ? err.message : "Não foi possível restaurar backup.",
+            );
+          }
+        },
+      },
+      {
         id: "export-pdf",
         label: "Exportar para PDF",
         hint: "Ctrl+Shift+E",
@@ -307,6 +357,11 @@ export function CommandPalette() {
       openScratchpad,
       openSettings,
       openFile,
+      fileTree,
+      rootFolder,
+      pushToast,
+      openConfirm,
+      refresh,
       setActiveView,
       setTool,
       toggleFocusMode,
