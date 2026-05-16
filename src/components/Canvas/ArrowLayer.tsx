@@ -319,17 +319,7 @@ export const ArrowLayer = memo(function ArrowLayer({
  * abaixo (booleans), entao seleccionar UMA seta nao recomputa as outras
  * — em canvas com muitas setas, antes era O(N) `routeArrow` por toggle.
  */
-const ArrowNode = memo(function ArrowNode({
-  arrow: a,
-  from,
-  to,
-  zoom,
-  tool,
-  hitStroke,
-  handleR,
-  handleStroke,
-  onBendMouseDown,
-}: {
+type ArrowNodeProps = {
   arrow: ReturnType<typeof useCanvasStore.getState>["arrows"][number];
   from: Rect;
   to: Rect;
@@ -342,7 +332,44 @@ const ArrowNode = memo(function ArrowNode({
     e: React.MouseEvent,
     args: { id: string; origDx: number; origDy: number },
   ) => void;
-}) {
+};
+
+const sameRect = (a: Rect, b: Rect) =>
+  a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+
+// Comparador custom. Ao arrastar UM card, `updateCard` cria um novo array
+// `cards` → ArrowLayer re-renderiza → `rectById` reconstroi TODOS os Rect
+// como objetos novos. Com o memo default (shallow por referencia) TODA
+// seta re-renderizava e recomputava `routeArrow` por frame de drag —
+// exatamente o "lag ao mover coisas no canvas". Comparando from/to por
+// VALOR, setas que nao tocam o card movido tem rect identico e pulam o
+// render. Conservador: qualquer diferenca → re-renderiza (a seta cujo
+// endpoint realmente mexeu tem rect diferente, entao nunca fica stale).
+function arrowNodePropsEqual(prev: ArrowNodeProps, next: ArrowNodeProps): boolean {
+  return (
+    prev.arrow === next.arrow &&
+    prev.zoom === next.zoom &&
+    prev.tool === next.tool &&
+    prev.hitStroke === next.hitStroke &&
+    prev.handleR === next.handleR &&
+    prev.handleStroke === next.handleStroke &&
+    prev.onBendMouseDown === next.onBendMouseDown &&
+    sameRect(prev.from, next.from) &&
+    sameRect(prev.to, next.to)
+  );
+}
+
+const ArrowNode = memo(function ArrowNode({
+  arrow: a,
+  from,
+  to,
+  zoom,
+  tool,
+  hitStroke,
+  handleR,
+  handleStroke,
+  onBendMouseDown,
+}: ArrowNodeProps) {
   const isSel = useCanvasStore((s) => s.selectedId === a.id);
   // Grupo: seta capturada por marquee (ambos os cards endpoint dentro)
   // mas nao e primary. Sem esse visual, setas em multi-selecao ficavam
@@ -451,7 +478,7 @@ const ArrowNode = memo(function ArrowNode({
       )}
     </g>
   );
-});
+}, arrowNodePropsEqual);
 
 // ---------------- roteamento -----------------
 
