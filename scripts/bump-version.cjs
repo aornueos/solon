@@ -1,7 +1,9 @@
 /**
- * Bumpa versao em TODOS os 3 arquivos sincronizados:
+ * Bumpa a versao em todos os arquivos sincronizados:
  *   - package.json (lido em build-time pelo `__APP_VERSION__` via Vite)
+ *   - package-lock.json (entradas root + self)
  *   - src-tauri/Cargo.toml (versao do binario nativo)
+ *   - src-tauri/Cargo.lock (entrada do crate `solon`)
  *   - src-tauri/tauri.conf.json (versao reportada pelo updater)
  *
  * O updater compara a versao reportada (do Cargo/tauri.conf) com a
@@ -26,6 +28,7 @@ const ROOT = path.resolve(__dirname, "..");
 const PKG = path.join(ROOT, "package.json");
 const PKG_LOCK = path.join(ROOT, "package-lock.json");
 const CARGO = path.join(ROOT, "src-tauri", "Cargo.toml");
+const CARGO_LOCK = path.join(ROOT, "src-tauri", "Cargo.lock");
 const TAURI_CONF = path.join(ROOT, "src-tauri", "tauri.conf.json");
 
 // ─── parsing do argumento ───
@@ -78,6 +81,26 @@ if (!cargoMatch) {
 cargoText = cargoText.replace(/^version\s*=\s*"[^"]+"/m, `version = "${next}"`);
 fs.writeFileSync(CARGO, cargoText);
 console.log("  ✓ src-tauri/Cargo.toml");
+
+// ─── src-tauri/Cargo.lock ───
+// `cargo build` grava a versao do crate `solon` aqui. Como o version:set
+// nao tocava nessa entrada, o lock commitado ficava sempre uma versao
+// atras e TODO build local aparecia como Cargo.lock modificado (atrito
+// recorrente ao trocar de versao / atualizar checkout). Atualizamos so a
+// entrada do proprio crate — `name = "solon"` e' unico no lock, entao a
+// regex nao encosta em nenhuma dependencia.
+if (fs.existsSync(CARGO_LOCK)) {
+  const lockText = fs.readFileSync(CARGO_LOCK, "utf-8");
+  const re = /(name = "solon"\r?\nversion = ")[^"]+(")/;
+  if (re.test(lockText)) {
+    fs.writeFileSync(CARGO_LOCK, lockText.replace(re, `$1${next}$2`));
+    console.log("  ✓ src-tauri/Cargo.lock");
+  } else {
+    console.warn(
+      "  ! src-tauri/Cargo.lock: entrada do crate `solon` nao encontrada — pulando",
+    );
+  }
+}
 
 // ─── tauri.conf.json ───
 const tauriConf = JSON.parse(fs.readFileSync(TAURI_CONF, "utf-8"));
