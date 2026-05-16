@@ -72,7 +72,9 @@ export async function buildBacklinkIndex(tree: FileNode[]): Promise<BacklinkInde
             const re = new RegExp(WIKILINK_RE.source, "g");
             let m: RegExpExecArray | null;
             while ((m = re.exec(body))) {
-              matches.push(normalize(m[1]));
+              // Alias `[[target|exibido]]` → o backlink é pro target.
+              const rawTarget = m[1].split("|")[0];
+              matches.push(normalize(rawTarget));
             }
             return { file: f, targets: matches };
           } catch {

@@ -7,6 +7,13 @@ import {
   type PrintFont,
   type PrintSize,
 } from "../../lib/pdfExport";
+import {
+  exportFileToDocx,
+  exportFolderToDocx,
+  type DocxOptions,
+} from "../../lib/docxExport";
+
+type ExportFormat = "pdf" | "docx";
 
 export function ExportDialog() {
   const open = useAppStore((s) => s.showExport);
@@ -18,15 +25,30 @@ export function ExportDialog() {
   const pushToast = useAppStore((s) => s.pushToast);
 
   const [scope, setScope] = useState<"file" | "project">("file");
+  const [format, setFormat] = useState<ExportFormat>("pdf");
   const [size, setSize] = useState<PrintSize>("book");
   const [font, setFont] = useState<PrintFont>("serif");
   const [toc, setToc] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  // Folha de rosto Shunn — contato preenchido aqui (não persiste).
+  const [authorName, setAuthorName] = useState("");
+  const [address, setAddress] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [penName, setPenName] = useState("");
+  const [docTitle, setDocTitle] = useState("");
+
   if (!open) return null;
 
   const canExportFile = !!activeFilePath;
   const canExportProject = fileTree.length > 0;
+  const projectName =
+    rootFolder?.split(/[\\/]/).filter(Boolean).pop() ?? "Projeto";
+  const defaultTitle =
+    scope === "file"
+      ? activeFileName?.replace(/\.(md|txt)$/i, "") ?? ""
+      : projectName;
 
   const handleExport = async () => {
     const filePath = activeFilePath;
@@ -42,15 +64,27 @@ export function ExportDialog() {
     setBusy(true);
     try {
       let savedPath: string | null;
-      if (scope === "file") {
+      if (format === "docx") {
+        const opts: DocxOptions = {
+          authorName: authorName.trim(),
+          address: address.trim() || undefined,
+          email: email.trim() || undefined,
+          phone: phone.trim() || undefined,
+          penName: penName.trim() || undefined,
+          title: docTitle.trim() || undefined,
+          category: scope === "file" ? "short" : "novel",
+        };
+        savedPath =
+          scope === "file"
+            ? await exportFileToDocx(filePath!, fileName!, opts)
+            : await exportFolderToDocx(fileTree, projectName, opts);
+      } else if (scope === "file") {
         savedPath = await exportFileToPdf(filePath!, fileName!, {
           size,
           font,
           toc: false,
         });
       } else {
-        const projectName =
-          rootFolder?.split(/[\\/]/).filter(Boolean).pop() ?? "Projeto";
         savedPath = await exportFolderToPdf(fileTree, projectName, {
           size,
           font,
@@ -58,11 +92,11 @@ export function ExportDialog() {
         });
       }
       if (savedPath) {
-        pushToast("success", "PDF exportado.");
+        pushToast("success", format === "docx" ? "DOCX exportado." : "PDF exportado.");
         close();
       }
     } catch (err) {
-      console.error("Erro ao exportar PDF:", err);
+      console.error("Erro ao exportar:", err);
       pushToast(
         "error",
         `Falha ao exportar: ${err instanceof Error ? err.message : "erro desconhecido"}`,
@@ -83,8 +117,8 @@ export function ExportDialog() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Exportar para PDF"
-        className="w-full max-w-md rounded-lg shadow-xl overflow-hidden"
+        aria-label="Exportar"
+        className="w-full max-w-md rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
         style={{
           background: "var(--bg-panel)",
           border: "1px solid var(--border)",
@@ -93,12 +127,14 @@ export function ExportDialog() {
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div
-          className="flex items-center justify-between px-5 py-3.5"
+          className="flex items-center justify-between px-5 py-3.5 shrink-0"
           style={{ borderBottom: "1px solid var(--border-subtle)" }}
         >
           <div className="inline-flex items-center gap-2">
             <FileDown size={15} />
-            <h2 className="text-[1rem] font-medium">Exportar para PDF</h2>
+            <h2 className="text-[1rem] font-medium">
+              {format === "docx" ? "Exportar manuscrito (DOCX)" : "Exportar para PDF"}
+            </h2>
           </div>
           <button
             onClick={close}
@@ -110,7 +146,26 @@ export function ExportDialog() {
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4">
+        <div className="px-5 py-4 space-y-4 overflow-y-auto">
+          <Section title="Formato">
+            <div className="flex gap-1.5">
+              <SizeBtn
+                value="pdf"
+                current={format}
+                label="PDF"
+                hint="Leitura / impressão"
+                onSelect={setFormat}
+              />
+              <SizeBtn
+                value="docx"
+                current={format}
+                label="DOCX"
+                hint="Manuscrito Shunn"
+                onSelect={setFormat}
+              />
+            </div>
+          </Section>
+
           <Section title="O que exportar">
             <Choice
               checked={scope === "file"}
@@ -134,76 +189,94 @@ export function ExportDialog() {
             />
           </Section>
 
-          <Section title="Tamanho da pagina">
-            <div className="flex gap-1.5">
-              <SizeBtn
-                value="book"
-                current={size}
-                label="Livro"
-                hint="5,5 x 8,5 in"
-                onSelect={setSize}
-              />
-              <SizeBtn
-                value="a5"
-                current={size}
-                label="A5"
-                hint="148 x 210 mm"
-                onSelect={setSize}
-              />
-              <SizeBtn
-                value="a4"
-                current={size}
-                label="A4"
-                hint="210 x 297 mm"
-                onSelect={setSize}
-              />
-            </div>
-          </Section>
+          {format === "pdf" && (
+            <>
+              <Section title="Tamanho da pagina">
+                <div className="flex gap-1.5">
+                  <SizeBtn value="book" current={size} label="Livro" hint="5,5 x 8,5 in" onSelect={setSize} />
+                  <SizeBtn value="a5" current={size} label="A5" hint="148 x 210 mm" onSelect={setSize} />
+                  <SizeBtn value="a4" current={size} label="A4" hint="210 x 297 mm" onSelect={setSize} />
+                </div>
+              </Section>
 
-          <Section title="Tipografia">
-            <div className="flex gap-1.5">
-              <SizeBtn
-                value="serif"
-                current={font}
-                label="Serifada"
-                hint="Times"
-                onSelect={setFont}
-              />
-              <SizeBtn
-                value="sans"
-                current={font}
-                label="Sem serifa"
-                hint="Helvetica"
-                onSelect={setFont}
-              />
-            </div>
-          </Section>
+              <Section title="Tipografia">
+                <div className="flex gap-1.5">
+                  <SizeBtn value="serif" current={font} label="Serifada" hint="Times" onSelect={setFont} />
+                  <SizeBtn value="sans" current={font} label="Sem serifa" hint="Helvetica" onSelect={setFont} />
+                </div>
+              </Section>
 
-          {scope === "project" && (
-            <label
-              className="flex items-center gap-2 text-[0.82rem] cursor-pointer"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <input
-                type="checkbox"
-                checked={toc}
-                onChange={(e) => setToc(e.target.checked)}
-              />
-              Incluir sumario antes do conteudo
-            </label>
+              {scope === "project" && (
+                <label
+                  className="flex items-center gap-2 text-[0.82rem] cursor-pointer"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={toc}
+                    onChange={(e) => setToc(e.target.checked)}
+                  />
+                  Incluir sumario antes do conteudo
+                </label>
+              )}
+
+              <p
+                className="text-[0.7rem] italic leading-relaxed pt-1"
+                style={{ color: "var(--text-muted)" }}
+              >
+                O Solon vai gerar um PDF limpo e pedir onde salvar. Ele nao usa
+                print preview nem abre pop-up.
+              </p>
+            </>
           )}
 
-          <p
-            className="text-[0.7rem] italic leading-relaxed pt-1"
-            style={{ color: "var(--text-muted)" }}
-          >
-            O Solon vai gerar um PDF limpo e pedir onde salvar. Ele nao usa
-            print preview nem abre pop-up.
-          </p>
+          {format === "docx" && (
+            <Section title="Folha de rosto (formato Shunn)">
+              <Field
+                label="Título da obra"
+                value={docTitle}
+                placeholder={defaultTitle}
+                onChange={setDocTitle}
+              />
+              <Field
+                label="Nome legal"
+                value={authorName}
+                placeholder="Como assina contratos"
+                onChange={setAuthorName}
+              />
+              <Field
+                label="Endereço"
+                value={address}
+                placeholder="Rua, número, cidade, CEP"
+                onChange={setAddress}
+                multiline
+              />
+              <div className="flex gap-1.5">
+                <Field label="Email" value={email} placeholder="voce@email.com" onChange={setEmail} />
+                <Field label="Telefone" value={phone} placeholder="opcional" onChange={setPhone} />
+              </div>
+              <Field
+                label="Nome artístico (byline)"
+                value={penName}
+                placeholder={authorName.trim() || "igual ao nome legal"}
+                onChange={setPenName}
+              />
+              <p
+                className="text-[0.7rem] italic leading-relaxed pt-1"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {scope === "file"
+                  ? "Conto: corpo segue na primeira página, palavras à centena."
+                  : "Romance: cada arquivo vira um capítulo em página nova, palavras à milhar."}{" "}
+                Times New Roman 12, espaço duplo, margens de 1in, cabeçalho
+                corrido com número de página — o que agentes e revistas esperam.
+              </p>
+            </Section>
+          )}
         </div>
 
         <div
-          className="px-5 py-3 flex items-center justify-end gap-2"
+          className="px-5 py-3 flex items-center justify-end gap-2 shrink-0"
           style={{ borderTop: "1px solid var(--border-subtle)" }}
         >
           <button
@@ -255,6 +328,55 @@ function Section({
       </div>
       <div className="space-y-1.5">{children}</div>
     </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  placeholder,
+  onChange,
+  multiline,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (v: string) => void;
+  multiline?: boolean;
+}) {
+  const sharedStyle = {
+    background: "var(--bg-panel-2)",
+    border: "1px solid var(--border)",
+    color: "var(--text-primary)",
+  };
+  return (
+    <label className="block flex-1">
+      <span
+        className="block text-[0.7rem] mb-0.5"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        {label}
+      </span>
+      {multiline ? (
+        <textarea
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          rows={2}
+          className="w-full text-[0.82rem] px-2 py-1.5 rounded resize-none outline-none"
+          style={sharedStyle}
+        />
+      ) : (
+        <input
+          type="text"
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full text-[0.82rem] px-2 py-1.5 rounded outline-none"
+          style={sharedStyle}
+        />
+      )}
+    </label>
   );
 }
 

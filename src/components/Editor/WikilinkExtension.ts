@@ -1,70 +1,89 @@
-import { Mark, markInputRule } from "@tiptap/core";
+import { Mark, markInputRule, mergeAttributes, InputRule } from "@tiptap/core";
 
 /**
- * Wikilinks `[[name]]` estilo Obsidian — uma mark visual que aplica
- * estilo de link interno num trecho de texto. NAO carrega atributo
- * "target" separado do textContent: o conteudo da mark E' o target.
- * Isso garante que editar o texto da wikilink dentro do editor
- * naturalmente muda pra onde ela aponta — sem dessincronia.
+ * Wikilinks estilo Obsidian — uma mark visual de link interno.
  *
- * Trade-off vs node-based:
- *  - Pro: editavel inline, sem complicacoes de NodeView ou estado
- *    paralelo.
- *  - Con: nao da' pra ter "alias" tipo `[[Cap1|Capitulo Um]]` (Obsidian
- *    feature). Pode vir em 0.9.
+ * Duas formas:
+ *  - `[[nome]]`            → o texto visível É o target.
+ *  - `[[target|exibido]]`  → "exibido" é o texto visível; o target real
+ *                            viaja no atributo `target` (data-target no
+ *                            HTML). É o alias do Obsidian.
  *
- * Roundtrip com markdown e' feito em `markdownBridge.ts`:
- *  - Lendo: `[[name]]` -> `<a class="wikilink">name</a>` antes do TipTap.
- *  - Salvando: turndown rule captura `<a class="wikilink">` e emite
- *    `[[textContent]]`.
+ * Quando não há alias, `target` fica null e o alvo é o próprio
+ * textContent — então editar o texto inline naturalmente muda pra onde
+ * a wikilink aponta, sem estado paralelo. Com alias, editar o texto só
+ * muda o rótulo; o alvo persiste no atributo.
  *
- * Click e' tratado no Editor.tsx via delegate global (mais flexivel
- * que ProseMirror plugin pra esse caso).
+ * Roundtrip com markdown em `markdownBridge.ts`:
+ *  - Lendo: `[[t|d]]` → `<a class="wikilink" data-target="t">d</a>`.
+ *  - Salvando: turndown emite `[[t|d]]` (ou `[[d]]` sem alias).
+ * `data-target` está no ALLOWED_ATTR do sanitize — sem isso o alias
+ * seria engolido na carga e o link apontaria pro rótulo errado.
+ *
+ * Click é tratado no Editor.tsx (delegate global) lendo data-target ??
+ * textContent.
  */
 export const WikilinkExtension = Mark.create({
   name: "wikilink",
 
-  // Exclui mark de bold/italic/etc — wikilink eh uma "alavanca de
-  // navegacao", nao formatacao. Sobrepor formatacao confunde o user e
-  // complica turndown.
+  // Exclui formatação — wikilink é navegação, não estilo.
   excludes: "bold italic strike code",
 
-  parseHTML() {
-    return [
-      {
-        tag: 'a.wikilink',
+  addAttributes() {
+    return {
+      target: {
+        default: null as string | null,
+        parseHTML: (el) => el.getAttribute("data-target") || null,
+        renderHTML: (attrs) =>
+          attrs.target ? { "data-target": attrs.target } : {},
       },
-      {
-        tag: 'a[data-wikilink="true"]',
-      },
-    ];
+    };
   },
 
-  renderHTML() {
+  parseHTML() {
+    return [{ tag: "a.wikilink" }, { tag: 'a[data-wikilink="true"]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
     return [
       "a",
-      {
-        class: "wikilink",
-        "data-wikilink": "true",
-        // href fake — o click handler real intercepta e abre via store.
-        // Sem href, o cursor nao mostra pointer; com href="#" o browser
-        // tenta scrollar pro top. Solucao: pointer-events via CSS +
-        // role=link semantico.
-        href: "javascript:void(0)",
-        role: "link",
-      },
+      mergeAttributes(
+        {
+          class: "wikilink",
+          "data-wikilink": "true",
+          // href fake — click handler real intercepta. Sem href não há
+          // pointer; href="#" scrollaria pro topo.
+          href: "javascript:void(0)",
+          role: "link",
+        },
+        HTMLAttributes,
+      ),
       0,
     ];
   },
 
   addInputRules() {
     return [
-      // `[[texto]]` digitado vira mark automaticamente quando o user
-      // fecha o segundo `]`. Regex captura o que ta entre os colchetes.
-      // Funciona em digitacao ao vivo — assim o usuario nem precisa
-      // saber que "wikilinks existem".
+      // `[[target|exibido]]` digitado ao vivo: substitui tudo pelo texto
+      // "exibido" já com a mark carregando target. markInputRule não dá
+      // conta (ele só marca o grupo, não separa rótulo/alvo).
+      new InputRule({
+        find: /\[\[([^\]\n|]+)\|([^\]\n]+)\]\]$/,
+        handler: ({ state, range, match }) => {
+          const target = (match[1] || "").trim();
+          const display = (match[2] || "").trim();
+          if (!target || !display) return;
+          state.tr.replaceWith(
+            range.from,
+            range.to,
+            state.schema.text(display, [this.type.create({ target })]),
+          );
+        },
+      }),
+      // `[[nome]]` simples — comportamento antigo, sem alias (target null).
+      // Regex exclui `|` pra não colidir com a regra de alias acima.
       markInputRule({
-        find: /\[\[([^\]\n]+)\]\]$/,
+        find: /\[\[([^\]\n|]+)\]\]$/,
         type: this.type,
       }),
     ];

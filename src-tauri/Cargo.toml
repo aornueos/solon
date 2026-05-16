@@ -1,9 +1,10 @@
 [package]
 name = "solon"
-version = "0.9.8"
+version = "0.9.9"
 description = "Solon — Editor de Escrita Criativa"
 authors = ["Solon"]
 edition = "2021"
+license = "GPL-3.0-or-later"
 
 [lib]
 name = "solon_lib"

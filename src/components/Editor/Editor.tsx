@@ -660,7 +660,12 @@ export function Editor() {
       const target = e.target as HTMLElement | null;
       const directLink = target?.closest("a.wikilink, a[data-wikilink='true']");
       if (directLink) {
-        const name = (directLink.textContent ?? "").trim();
+        // Alias `[[target|exibido]]`: navega pro target real, não pro
+        // rótulo visível. Sem data-target, o texto É o alvo.
+        const explicitTarget = directLink
+          .getAttribute("data-target")
+          ?.trim();
+        const name = explicitTarget || (directLink.textContent ?? "").trim();
         if (!name) return;
         e.preventDefault();
         e.stopPropagation();

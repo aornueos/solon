@@ -247,7 +247,13 @@ turndown.addRule("wikilink", {
       el.getAttribute("data-wikilink") === "true"
     );
   },
-  replacement: (content) => `[[${content}]]`,
+  replacement: (content, node) => {
+    const target = (node as HTMLElement).getAttribute("data-target");
+    if (target && target.trim() && target.trim() !== content.trim()) {
+      return `[[${target.trim()}|${content}]]`;
+    }
+    return `[[${content}]]`;
+  },
 });
 
 // Headings com text-align: emite HTML literal (perde sintaxe `#` mas
@@ -272,8 +278,11 @@ for (const level of [1, 2, 3, 4, 5, 6] as const) {
  * que o schema do TipTap já aceita — qualquer coisa fora disso é ruído ou
  * vetor de XSS.
  */
-const ALLOWED_TAGS = [
-  "p", "br", "hr", "strong", "em", "s", "code", "pre",
+export const ALLOWED_TAGS = [
+  // `marked` emite <del> para ~~strike~~; o editor (TipTap Strike) parseia
+  // <s>/<del>/<strike>. Sem <del>/<strike> aqui o sanitize de produção
+  // engolia o tachado na carga — o texto sobrevivia, a formatação não.
+  "p", "br", "hr", "strong", "em", "s", "del", "strike", "code", "pre",
   "h1", "h2", "h3", "h4", "h5", "h6",
   "ul", "ol", "li",
   "blockquote",
@@ -300,7 +309,7 @@ const ALLOWED_TAGS = [
  *
  * `data-indent` carrega indent do IndentExtension sem precisar de style.
  */
-const ALLOWED_ATTR = [
+export const ALLOWED_ATTR = [
   "colspan",
   "rowspan",
   "colwidth",
@@ -314,6 +323,10 @@ const ALLOWED_ATTR = [
   // a wikilink toda — `class` e' o seletor real).
   "class",
   "data-wikilink",
+  // Alias `[[target|exibido]]`: o alvo real viaja aqui. Sem isso na
+  // allowlist o sanitize de produção engole o target e a wikilink
+  // passa a apontar pro rótulo (mesma classe de bug do <del>).
+  "data-target",
   "data-solon-src",
   "src",
   "alt",
@@ -405,14 +418,30 @@ function repairEscapedInlineMarks(markdown: string): string {
  * nome de arquivo curto. Edge cases (markdown que quer LITERAL `[[`)
  * podem usar escape `\[\[` que esta fora do escopo agora.
  */
+function escapeForHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function injectWikilinks(md: string): string {
-  return md.replace(/\[\[([^\]\n]+)\]\]/g, (_, target) => {
-    const safe = String(target)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-    return `<a class="wikilink" data-wikilink="true" role="link">${safe}</a>`;
+  return md.replace(/\[\[([^\]\n]+)\]\]/g, (_, inner) => {
+    // `[[target|exibido]]` → alias; `[[nome]]` → target = texto.
+    const pipe = String(inner).indexOf("|");
+    if (pipe !== -1) {
+      const target = String(inner).slice(0, pipe).trim();
+      const display = String(inner).slice(pipe + 1).trim();
+      if (target && display) {
+        return `<a class="wikilink" data-wikilink="true" data-target="${escapeForHtml(
+          target,
+        )}" role="link">${escapeForHtml(display)}</a>`;
+      }
+    }
+    return `<a class="wikilink" data-wikilink="true" role="link">${escapeForHtml(
+      String(inner),
+    )}</a>`;
   });
 }
 

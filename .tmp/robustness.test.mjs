@@ -23615,7 +23615,13 @@ turndown.addRule("wikilink", {
     const el = node;
     return el.classList.contains("wikilink") || el.getAttribute("data-wikilink") === "true";
   },
-  replacement: (content) => `[[${content}]]`
+  replacement: (content, node) => {
+    const target = node.getAttribute("data-target");
+    if (target && target.trim() && target.trim() !== content.trim()) {
+      return `[[${target.trim()}|${content}]]`;
+    }
+    return `[[${content}]]`;
+  }
 });
 for (const level of [1, 2, 3, 4, 5, 6]) {
   turndown.addRule(`heading${level}WithAlign`, {
@@ -23635,12 +23641,17 @@ for (const level of [1, 2, 3, 4, 5, 6]) {
   });
 }
 var ALLOWED_TAGS = [
+  // `marked` emite <del> para ~~strike~~; o editor (TipTap Strike) parseia
+  // <s>/<del>/<strike>. Sem <del>/<strike> aqui o sanitize de produção
+  // engolia o tachado na carga — o texto sobrevivia, a formatação não.
   "p",
   "br",
   "hr",
   "strong",
   "em",
   "s",
+  "del",
+  "strike",
   "code",
   "pre",
   "h1",
@@ -23682,6 +23693,10 @@ var ALLOWED_ATTR = [
   // a wikilink toda — `class` e' o seletor real).
   "class",
   "data-wikilink",
+  // Alias `[[target|exibido]]`: o alvo real viaja aqui. Sem isso na
+  // allowlist o sanitize de produção engole o target e a wikilink
+  // passa a apontar pro rótulo (mesma classe de bug do <del>).
+  "data-target",
   "data-solon-src",
   "src",
   "alt",
@@ -23742,10 +23757,24 @@ function repairEscapedInlineMarks(markdown) {
   }
   return next;
 }
+function escapeForHtml(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 function injectWikilinks(md) {
-  return md.replace(/\[\[([^\]\n]+)\]\]/g, (_, target) => {
-    const safe = String(target).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    return `<a class="wikilink" data-wikilink="true" role="link">${safe}</a>`;
+  return md.replace(/\[\[([^\]\n]+)\]\]/g, (_, inner) => {
+    const pipe = String(inner).indexOf("|");
+    if (pipe !== -1) {
+      const target = String(inner).slice(0, pipe).trim();
+      const display = String(inner).slice(pipe + 1).trim();
+      if (target && display) {
+        return `<a class="wikilink" data-wikilink="true" data-target="${escapeForHtml(
+          target
+        )}" role="link">${escapeForHtml(display)}</a>`;
+      }
+    }
+    return `<a class="wikilink" data-wikilink="true" role="link">${escapeForHtml(
+      String(inner)
+    )}</a>`;
   });
 }
 function markdownToHtml(md) {
@@ -23976,6 +24005,137 @@ describe("editor markdown bridge", () => {
       /<strong>Real<\/strong>/
     );
     assert.match(markdownToHtml("<p>*Sonho*</p>"), /<em>Sonho<\/em>/);
+  });
+});
+var save = (md) => htmlToMarkdown(markdownToHtml(md));
+var fixedPoint = (md) => {
+  const r1 = save(md);
+  const r2 = save(r1);
+  assert.equal(r2, r1, `roundtrip n\xE3o convergiu para ponto fixo:
+${JSON.stringify(r1)}
+!==
+${JSON.stringify(r2)}`);
+  return r1;
+};
+describe("markdown roundtrip \u2014 tachado (strike)", () => {
+  it("keeps every tag marked emits for strike inside the sanitize allowlist", () => {
+    assert.match(markdownToHtml("Isso ~~nao~~ foi."), /<del>nao<\/del>/);
+    assert.ok(ALLOWED_TAGS.includes("del"), "ALLOWED_TAGS precisa de <del> (output do marked)");
+    assert.ok(ALLOWED_TAGS.includes("s"), "ALLOWED_TAGS precisa de <s> (output do editor)");
+    assert.ok(ALLOWED_TAGS.includes("strike"), "ALLOWED_TAGS precisa de <strike> (legado)");
+  });
+  it("round-trips strike applied in the editor without dropping the mark", () => {
+    assert.match(htmlToMarkdown("<p>Isso <s>nao</s> foi.</p>"), /~nao~/);
+    assert.match(markdownToHtml("Isso ~~nao~~ foi."), /<del>nao<\/del>/);
+    assert.match(markdownToHtml("Isso ~nao~ foi."), /<del>nao<\/del>/);
+    const r = fixedPoint("Ele ~~hesitou~~ e ~~recuou~~.");
+    assert.match(r, /~hesitou~/);
+    assert.match(r, /~recuou~/);
+  });
+});
+describe("markdown roundtrip \u2014 construtos de fic\xE7\xE3o", () => {
+  it("preserves accented pt-BR prose with no loss", () => {
+    const src = "A can\xE7\xE3o da \xF3rf\xE3 \xE3\xE9\xED\xF5\xFB \xE7edilha p\xF4s \xE0 prova o cora\xE7\xE3o.";
+    assert.equal(fixedPoint(src), src);
+  });
+  it("preserves em-dash dialogue verbatim (di\xE1logo \xE9 o caso mais comum)", () => {
+    const src = "\u2014 Voc\xEA vai? \u2014 perguntou ela.\n\n\u2014 N\xE3o sei \u2014 respondeu ele.";
+    assert.equal(fixedPoint(src), src);
+  });
+  it("keeps a scene break (---) as a scene break, not a heading", () => {
+    const r = fixedPoint("Fim da cena.\n\n---\n\nNova cena come\xE7a.");
+    assert.match(r, /Fim da cena\.\n\n---\n\nNova cena começa\./);
+  });
+  it("round-trips wikilinks", () => {
+    const src = "Veja [[Elara]] e tamb\xE9m [[capitulo-02]] no enredo.";
+    assert.equal(fixedPoint(src), src);
+  });
+  it("keeps headings h1\u2013h6 across save/load", () => {
+    const src = "# A\n\n## B\n\n### C\n\n#### D\n\n##### E\n\n###### F";
+    assert.equal(fixedPoint(src), src);
+  });
+  it("reaches a stable fixed point for blockquotes", () => {
+    const r = fixedPoint("> Toda a vida \xE9 sonho.\n>\n> E os sonhos, sonhos s\xE3o.");
+    assert.match(r, /^>/);
+    assert.match(r, /sonhos são\./);
+  });
+  it("treats markdown inside fenced code as inert and stable", () => {
+    const fence = "```js\nconst a = b * c; // ~~nao~~ vira *nada*\n```";
+    const html3 = markdownToHtml(fence);
+    assert.match(html3, /<pre>|<code>/);
+    assert.match(html3, /b \* c/);
+    assert.doesNotMatch(html3, /<del>|<em>/);
+    fixedPoint(fence);
+  });
+  it("converges nested bold/italic to a stable fixed point", () => {
+    const r = fixedPoint("Ela era **muito _forte_ mesmo** naquela manh\xE3.");
+    assert.match(r, /\*\*muito \*forte\* mesmo\*\*/);
+  });
+});
+describe("markdown roundtrip \u2014 pipeline real (frontmatter + bridge)", () => {
+  const raw = [
+    "---",
+    "pov: Lina",
+    "status: draft",
+    "tags: [ato-1, a\xE7\xE3o]",
+    "---",
+    "# Cap\xEDtulo 1",
+    "",
+    "\u2014 Voc\xEA vem? \u2014 perguntou ela, **s\xE9ria**.",
+    "",
+    "Ele ~~hesitou~~ e respondeu \u2014 com um *fio* de voz.",
+    "",
+    "> Toda vida \xE9 sonho.",
+    "",
+    "---",
+    "",
+    "Nova cena. Veja [[Elara]]."
+  ].join("\n");
+  const cycle = (input) => {
+    const { meta, body } = parseDocument(input);
+    return serializeDocument(meta, htmlToMarkdown(markdownToHtml(body)));
+  };
+  it("survives a full save/load cycle and is idempotent on the next", () => {
+    const c1 = cycle(raw);
+    const c2 = cycle(c1);
+    assert.equal(c2, c1, "documento n\xE3o convergiu \u2014 corrup\xE7\xE3o acumularia a cada save");
+  });
+  it("does not lose content through the real pipeline", () => {
+    const c1 = cycle(raw);
+    assert.match(c1, /pov: Lina/);
+    assert.match(c1, /- ação/);
+    assert.match(c1, /^# Capítulo 1/m);
+    assert.match(c1, /— Você vem\? — perguntou ela, \*\*séria\*\*\./);
+    assert.match(c1, /~hesitou~/);
+    assert.match(c1, /\*fio\*/);
+    assert.match(c1, /^> Toda vida é sonho\./m);
+    assert.match(c1, /\[\[Elara\]\]/);
+  });
+});
+describe("markdown roundtrip \u2014 wikilinks com alias", () => {
+  it("keeps data-target inside the sanitize attribute allowlist", () => {
+    assert.ok(
+      ALLOWED_ATTR.includes("data-target"),
+      "ALLOWED_ATTR precisa de data-target (alvo do alias sobrevive ao sanitize)"
+    );
+  });
+  it("renders [[target|exibido]] with target in data-target and label as text", () => {
+    const html3 = markdownToHtml("Veja [[capitulo-01|Cap\xEDtulo Um]] aqui.");
+    assert.match(html3, /data-target="capitulo-01"/);
+    assert.match(html3, />Capítulo Um<\/a>/);
+  });
+  it("round-trips an aliased wikilink to [[target|label]] and is stable", () => {
+    const r = fixedPoint("Veja [[capitulo-01|Cap\xEDtulo Um]] e siga.");
+    assert.match(r, /\[\[capitulo-01\|Capítulo Um\]\]/);
+  });
+  it("keeps plain [[name]] without inventing an alias (no regression)", () => {
+    const html3 = markdownToHtml("Veja [[Elara]].");
+    assert.doesNotMatch(html3, /data-target/);
+    assert.equal(fixedPoint("Veja [[Elara]] e [[capitulo-02]]."), "Veja [[Elara]] e [[capitulo-02]].");
+  });
+  it("handles accents on both sides of the alias", () => {
+    const r = fixedPoint("Olhe [[\xF3rf\xE3-arken|A \xD3rf\xE3 de Arken]] agora.");
+    assert.match(r, /\[\[órfã-arken\|A Órfã de Arken\]\]/);
   });
 });
 /*! Bundled license information:

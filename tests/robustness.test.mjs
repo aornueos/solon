@@ -17,6 +17,8 @@ import {
   isSafeEntryName,
 } from "../src/lib/pathSecurity.ts";
 import {
+  ALLOWED_ATTR,
+  ALLOWED_TAGS,
   htmlToMarkdown,
   markdownToHtml,
 } from "../src/components/Editor/markdownBridge.ts";
@@ -245,5 +247,169 @@ describe("editor markdown bridge", () => {
       /<strong>Real<\/strong>/,
     );
     assert.match(markdownToHtml("<p>*Sonho*</p>"), /<em>Sonho<\/em>/);
+  });
+});
+
+// Roundtrip de ficção: o corpus abaixo é o que um escritor de verdade salva.
+// A propriedade central que protege contra corrupção lenta ao longo de meses
+// de saves é o PONTO FIXO: depois de uma normalização inicial, o documento
+// não pode mais mudar a cada ciclo save→load.
+const save = (md) => htmlToMarkdown(markdownToHtml(md));
+const fixedPoint = (md) => {
+  const r1 = save(md);
+  const r2 = save(r1);
+  assert.equal(r2, r1, `roundtrip não convergiu para ponto fixo:\n${JSON.stringify(r1)}\n!==\n${JSON.stringify(r2)}`);
+  return r1;
+};
+
+describe("markdown roundtrip — tachado (strike)", () => {
+  // Regressão estrutural: `marked` emite <del> para ~~x~~. Em produção o
+  // DOMPurify roda de verdade e remove qualquer tag fora de ALLOWED_TAGS.
+  // Se <del>/<s> saírem da allowlist o tachado some na carga sem erro.
+  // O ambiente de teste não tem DOM (sanitize é no-op), então este invariante
+  // só é defensável checando a allowlist diretamente.
+  it("keeps every tag marked emits for strike inside the sanitize allowlist", () => {
+    assert.match(markdownToHtml("Isso ~~nao~~ foi."), /<del>nao<\/del>/);
+    assert.ok(ALLOWED_TAGS.includes("del"), "ALLOWED_TAGS precisa de <del> (output do marked)");
+    assert.ok(ALLOWED_TAGS.includes("s"), "ALLOWED_TAGS precisa de <s> (output do editor)");
+    assert.ok(ALLOWED_TAGS.includes("strike"), "ALLOWED_TAGS precisa de <strike> (legado)");
+  });
+
+  it("round-trips strike applied in the editor without dropping the mark", () => {
+    assert.match(htmlToMarkdown("<p>Isso <s>nao</s> foi.</p>"), /~nao~/);
+    assert.match(markdownToHtml("Isso ~~nao~~ foi."), /<del>nao<\/del>/);
+    assert.match(markdownToHtml("Isso ~nao~ foi."), /<del>nao<\/del>/);
+    const r = fixedPoint("Ele ~~hesitou~~ e ~~recuou~~.");
+    assert.match(r, /~hesitou~/);
+    assert.match(r, /~recuou~/);
+  });
+});
+
+describe("markdown roundtrip — construtos de ficção", () => {
+  it("preserves accented pt-BR prose with no loss", () => {
+    const src = "A canção da órfã ãéíõû çedilha pôs à prova o coração.";
+    assert.equal(fixedPoint(src), src);
+  });
+
+  it("preserves em-dash dialogue verbatim (diálogo é o caso mais comum)", () => {
+    const src = "— Você vai? — perguntou ela.\n\n— Não sei — respondeu ele.";
+    assert.equal(fixedPoint(src), src);
+  });
+
+  it("keeps a scene break (---) as a scene break, not a heading", () => {
+    const r = fixedPoint("Fim da cena.\n\n---\n\nNova cena começa.");
+    assert.match(r, /Fim da cena\.\n\n---\n\nNova cena começa\./);
+  });
+
+  it("round-trips wikilinks", () => {
+    const src = "Veja [[Elara]] e também [[capitulo-02]] no enredo.";
+    assert.equal(fixedPoint(src), src);
+  });
+
+  it("keeps headings h1–h6 across save/load", () => {
+    const src = "# A\n\n## B\n\n### C\n\n#### D\n\n##### E\n\n###### F";
+    assert.equal(fixedPoint(src), src);
+  });
+
+  it("reaches a stable fixed point for blockquotes", () => {
+    const r = fixedPoint("> Toda a vida é sonho.\n>\n> E os sonhos, sonhos são.");
+    assert.match(r, /^>/);
+    assert.match(r, /sonhos são\./);
+  });
+
+  it("treats markdown inside fenced code as inert and stable", () => {
+    const fence = "```js\nconst a = b * c; // ~~nao~~ vira *nada*\n```";
+    const html = markdownToHtml(fence);
+    assert.match(html, /<pre>|<code>/);
+    assert.match(html, /b \* c/);
+    assert.doesNotMatch(html, /<del>|<em>/);
+    fixedPoint(fence);
+  });
+
+  it("converges nested bold/italic to a stable fixed point", () => {
+    const r = fixedPoint("Ela era **muito _forte_ mesmo** naquela manhã.");
+    assert.match(r, /\*\*muito \*forte\* mesmo\*\*/);
+  });
+});
+
+describe("markdown roundtrip — pipeline real (frontmatter + bridge)", () => {
+  // O caminho de produção: parseDocument separa o YAML, só o BODY passa pelo
+  // bridge, serializeDocument remonta. Este é o teste que mais se parece com
+  // o que o disco realmente vê a cada save.
+  const raw = [
+    "---",
+    "pov: Lina",
+    "status: draft",
+    "tags: [ato-1, ação]",
+    "---",
+    "# Capítulo 1",
+    "",
+    "— Você vem? — perguntou ela, **séria**.",
+    "",
+    "Ele ~~hesitou~~ e respondeu — com um *fio* de voz.",
+    "",
+    "> Toda vida é sonho.",
+    "",
+    "---",
+    "",
+    "Nova cena. Veja [[Elara]].",
+  ].join("\n");
+
+  const cycle = (input) => {
+    const { meta, body } = parseDocument(input);
+    return serializeDocument(meta, htmlToMarkdown(markdownToHtml(body)));
+  };
+
+  it("survives a full save/load cycle and is idempotent on the next", () => {
+    const c1 = cycle(raw);
+    const c2 = cycle(c1);
+    assert.equal(c2, c1, "documento não convergiu — corrupção acumularia a cada save");
+  });
+
+  it("does not lose content through the real pipeline", () => {
+    const c1 = cycle(raw);
+    assert.match(c1, /pov: Lina/);
+    assert.match(c1, /- ação/);
+    assert.match(c1, /^# Capítulo 1/m);
+    assert.match(c1, /— Você vem\? — perguntou ela, \*\*séria\*\*\./);
+    assert.match(c1, /~hesitou~/);
+    assert.match(c1, /\*fio\*/);
+    assert.match(c1, /^> Toda vida é sonho\./m);
+    assert.match(c1, /\[\[Elara\]\]/);
+  });
+});
+
+describe("markdown roundtrip — wikilinks com alias", () => {
+  // Mesma classe de bug do <del>: o alvo viaja em data-target e o
+  // ambiente de teste não tem DOMPurify. Sem data-target na allowlist
+  // o sanitize de produção engoliria o alvo e o link apontaria pro
+  // rótulo. Este guard estrutural tranca o invariante no CI.
+  it("keeps data-target inside the sanitize attribute allowlist", () => {
+    assert.ok(
+      ALLOWED_ATTR.includes("data-target"),
+      "ALLOWED_ATTR precisa de data-target (alvo do alias sobrevive ao sanitize)",
+    );
+  });
+
+  it("renders [[target|exibido]] with target in data-target and label as text", () => {
+    const html = markdownToHtml("Veja [[capitulo-01|Capítulo Um]] aqui.");
+    assert.match(html, /data-target="capitulo-01"/);
+    assert.match(html, />Capítulo Um<\/a>/);
+  });
+
+  it("round-trips an aliased wikilink to [[target|label]] and is stable", () => {
+    const r = fixedPoint("Veja [[capitulo-01|Capítulo Um]] e siga.");
+    assert.match(r, /\[\[capitulo-01\|Capítulo Um\]\]/);
+  });
+
+  it("keeps plain [[name]] without inventing an alias (no regression)", () => {
+    const html = markdownToHtml("Veja [[Elara]].");
+    assert.doesNotMatch(html, /data-target/);
+    assert.equal(fixedPoint("Veja [[Elara]] e [[capitulo-02]]."), "Veja [[Elara]] e [[capitulo-02]].");
+  });
+
+  it("handles accents on both sides of the alias", () => {
+    const r = fixedPoint("Olhe [[órfã-arken|A Órfã de Arken]] agora.");
+    assert.match(r, /\[\[órfã-arken\|A Órfã de Arken\]\]/);
   });
 });

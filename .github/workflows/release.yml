@@ -1,6 +1,6 @@
 # Solon — workflow de release.
 #
-# Trigger: push de tag `v*` (ex: `v0.6.0`). A action builda os 3 OS,
+# Trigger: push de tag `v*` (ex: `v0.6.0`). A action builda o Windows,
 # assina os bundles com a chave Ed25519 do updater, sobe os instaladores
 # como assets do GitHub Release, e gera o `latest.json` que o plugin
 # updater le pra detectar nova versao.
@@ -42,34 +42,47 @@ on:
       - 'v*'
 
 jobs:
+  # Gate de roundtrip. Se os testes de robustez falharem, NENHUM instalador
+  # e' publicado — `release` tem `needs: test`. Roda uma vez (Linux, rapido,
+  # sem Rust) e bloqueia os 3 OS de uma vez. E' aqui que uma regressao de
+  # roundtrip de markdown (bold/strike/acentos sumindo no save/load) para
+  # de virar release tagueado.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Roundtrip + robustness tests
+        run: npm run test:robustness
+
   release:
+    needs: test
     permissions:
       # Necessario pra a tauri-action criar o release e fazer upload dos
       # bundles + latest.json.
       contents: write
     strategy:
-      # Uma falha num OS nao mata os outros — release fica incompleto
-      # mas pelo menos o que buildou tem o `.json` correto pra updater.
+      # Windows-only por enquanto (1.0). macOS/Linux saem do CI ate' terem
+      # build testado de verdade — publicar binario nao testado e' pior
+      # que nao publicar. Matrix de 1 item: pra re-expandir depois, basta
+      # voltar os OS aqui + a step "Install Linux dependencies".
       fail-fast: false
       matrix:
-        platform: [windows-latest, macos-latest, ubuntu-22.04]
+        platform: [windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      # Deps de sistema do Linux pra webview/gtk. Sem isso o build em
-      # ubuntu falha com "webkit2gtk not found".
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-3-dev \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -143,8 +156,6 @@ jobs:
 
             **Instalacao:**
             - Windows: `.msi` ou `.nsis.zip` abaixo
-            - macOS: `.dmg` (Apple Silicon e Intel separados)
-            - Linux: `.AppImage`
 
             Apps ja instalados detectam essa versao automaticamente no
             proximo boot e oferecem update via banner.

@@ -33,7 +33,7 @@ What that means in practice:
 
 * **TipTap based Markdown editor** with full roundtrip support for bold, italic, strike, headings, lists, blockquotes, tables, horizontal rules, inline code, code blocks, text alignment, highlights, and smart dashes.
 * **Native Brazilian Portuguese spellcheck** running in a Rust backend, with Levenshtein distance, ranking aware of accents, suggestions in roughly 5 to 15 ms against a 312k word dictionary, and a persisted personal dictionary.
-* **Wikilinks** with `[[note]]` syntax, autocomplete while typing `[[`, `Ctrl/Cmd+click` navigation, and a backlinks panel in the Inspector showing every note that links to the current one.
+* **Wikilinks** with `[[note]]` syntax and aliased `[[note|display name]]` form, autocomplete while typing `[[`, `Ctrl/Cmd+click` navigation, and a backlinks panel in the Inspector showing every note that links to the current one.
 * **Typewriter mode** keeps the caret vertically centered while the page scrolls underneath.
 * **Reading mode** hides every chrome element for focused editing. Toggle with `Ctrl+Shift+R`. Exit with `Esc`, `F11`, or `Ctrl+Shift+Esc`.
 * **Focus mode** collapses sidebar, outline, and inspector while keeping tabs and toolbar available.
@@ -88,10 +88,9 @@ What that means in practice:
 
 ### Export
 
-* **PDF export** supports a single file or the whole project as a book.
-* **Book, A4, and A5 page sizes** are available.
-* **Serif or sans typography**, optional table of contents, cover, page breaks per section, and hyphenated justification are supported.
-* Export uses the browser print dialog, so the file can be saved through "Microsoft Print to PDF" or an equivalent system printer. No bundled converter, no dependency bloat.
+* **PDF export** supports a single file or the whole project as a book, with Book, A4, and A5 page sizes, serif or sans typography, and an optional table of contents for project exports.
+* **DOCX export** in **Shunn manuscript format** — the "Proper Manuscript Format" agents and magazines expect: Times New Roman 12pt, double spaced, one-inch margins, first-line indent, a contact title page with approximate word count, centered scene breaks, and a running `Surname / TITLE / page` header. A single file exports as a short story; a project exports as a novel with one chapter per file.
+* Both run locally and ask where to save. No system print dialog, no pop-up.
 
 ### Updates
 
@@ -241,10 +240,8 @@ User preferences live in `localStorage` and follow the `solon:*` key prefix.
 Likely to come:
 
 * macOS and Linux release builds.
-* DOCX export with Shunn manuscript format for submission.
 * Authenticode signature for the Windows installer.
 * Collapsible headings inside the editor.
-* Aliased wikilinks with `[[file|display name]]`.
 
 Deliberately out of scope:
 
@@ -269,4 +266,6 @@ This is a personal project. Issues and pull requests are welcome, but they are t
 
 ## License
 
-To be defined. Until then, source is available for personal use and study.
+Solon is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License** as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+Solon is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [GNU General Public License](LICENSE) for more details.
