@@ -365,6 +365,38 @@ select:focus-visible {
   text-decoration-style: solid;
 }
 
+/* Headings colapsáveis (CollapsibleHeadingsExtension). O estado de fold
+   vive no plugin — aqui é só o visual. */
+.ProseMirror .solon-collapsed-hidden {
+  display: none;
+}
+.solon-fold-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.7em;
+  line-height: 1;
+  padding: 0 0.35em 0 0;
+  margin-left: -1.05em;
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+  user-select: none;
+}
+.ProseMirror h1:hover .solon-fold-toggle,
+.ProseMirror h2:hover .solon-fold-toggle,
+.ProseMirror h3:hover .solon-fold-toggle,
+.ProseMirror h4:hover .solon-fold-toggle,
+.ProseMirror h5:hover .solon-fold-toggle,
+.ProseMirror h6:hover .solon-fold-toggle,
+.solon-fold-toggle.is-collapsed {
+  opacity: 1;
+}
+.solon-fold-toggle.is-collapsed {
+  transform: rotate(-90deg);
+  color: var(--accent);
+}
+
 /* ─────────────────────────────────────────
    Editor — "papel" customizado (paper variants)
 ───────────────────────────────────────── */

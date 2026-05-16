@@ -29,6 +29,7 @@ import { ListExitExtension } from "./ListExitExtension";
 import { SmartDashesExtension } from "./SmartDashesExtension";
 import { HeadingNavExtension } from "./HeadingNavExtension";
 import { WikilinkExtension } from "./WikilinkExtension";
+import { CollapsibleHeadingsExtension } from "./CollapsibleHeadingsExtension";
 import {
   EDITOR_INDENT_SIZES,
   EDITOR_FONT_FAMILIES,
@@ -322,6 +323,7 @@ export function Editor() {
       // `true` consome o evento. HeadingNav so' age se cursor esta em
       // heading; senao retorna false e o Indent assume.
       HeadingNavExtension,
+      CollapsibleHeadingsExtension,
       IndentExtension,
       ListExitExtension,
       SmartDashesExtension,

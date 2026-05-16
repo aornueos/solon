@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { useAppStore } from "../../store/useAppStore";
 import { startDrag } from "../../lib/drag";
@@ -135,7 +135,11 @@ export const ArrowLayer = memo(function ArrowLayer({
     origDy: number;
   } | null>(null);
 
-  const onBendMouseDown = (
+  // useCallback: sem isso, `onBendMouseDown` ganha identidade nova a cada
+  // render do ArrowLayer (ex.: trocar tool, linking, arrastar UM card que
+  // muda `cards`) e quebra o memo de TODOS os ArrowNode. setArrowBend e'
+  // ref estavel de store, entao o callback fica estavel de fato.
+  const onBendMouseDown = useCallback((
     e: React.MouseEvent,
     args: { id: string; origDx: number; origDy: number },
   ) => {
@@ -201,7 +205,7 @@ export const ArrowLayer = memo(function ArrowLayer({
         );
       },
     });
-  };
+  }, [setArrowBend]);
 
   // Larguras em world coords: dividimos por zoom pra manter o traço com
   // espessura visual constante, independente de pan/zoom. Sem isso, em

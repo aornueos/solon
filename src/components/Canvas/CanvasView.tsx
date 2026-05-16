@@ -78,6 +78,8 @@ export function CanvasView() {
   const panning = useRef<{ startX: number; startY: number } | null>(null);
   const panFrame = useRef<number | null>(null);
   const pendingPan = useRef({ dx: 0, dy: 0 });
+  const zoomFrame = useRef<number | null>(null);
+  const pendingZoom = useRef({ x: 0, y: 0, delta: 0 });
 
   // Stroke em progresso (live) — estado local pra não re-render a store a
   // cada pixel. Commitamos no `mouseup`.
@@ -116,11 +118,32 @@ export function CanvasView() {
     });
   };
 
+  // Zoom coalescido em rAF — espelha schedulePanBy. O wheel (trackpad
+  // pinch / mouse notch) dispara dezenas de eventos/seg; sem isso cada
+  // um fazia um `zoomAt` → re-render do CanvasView + todo StrokeNode +
+  // ArrowLayer. `zoomAt` e' exponencial em delta, entao somar os deltas
+  // e aplicar 1x/frame da' o MESMO zoom (exp(-(d1+d2)k)=exp(-d1k)exp(-d2k)).
+  const scheduleZoom = (clientX: number, clientY: number, deltaY: number) => {
+    pendingZoom.current.x = clientX;
+    pendingZoom.current.y = clientY;
+    pendingZoom.current.delta += deltaY;
+    if (zoomFrame.current != null) return;
+    zoomFrame.current = requestAnimationFrame(() => {
+      zoomFrame.current = null;
+      const { x, y, delta } = pendingZoom.current;
+      pendingZoom.current = { x: 0, y: 0, delta: 0 };
+      if (delta) zoomAt(x, y, delta);
+    });
+  };
+
   useEffect(() => {
     return () => {
       if (panFrame.current != null) cancelAnimationFrame(panFrame.current);
       panFrame.current = null;
       pendingPan.current = { dx: 0, dy: 0 };
+      if (zoomFrame.current != null) cancelAnimationFrame(zoomFrame.current);
+      zoomFrame.current = null;
+      pendingZoom.current = { x: 0, y: 0, delta: 0 };
     };
   }, []);
 
@@ -147,7 +170,7 @@ export function CanvasView() {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) > 30) {
-        zoomAt(e.clientX, e.clientY, e.deltaY);
+        scheduleZoom(e.clientX, e.clientY, e.deltaY);
       } else {
         schedulePanBy(-e.deltaX, -e.deltaY);
       }
