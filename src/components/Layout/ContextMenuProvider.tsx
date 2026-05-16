@@ -354,7 +354,7 @@ function editorItems({
         document.dispatchEvent(new CustomEvent("solon:find-open")),
     },
     {
-      label: "Exportar PDF",
+      label: "Exportar…",
       icon: <FileDown size={12} />,
       shortcut: "Ctrl+Shift+E",
       onClick: () => useAppStore.getState().openExport(),
@@ -454,7 +454,7 @@ function genericItems({
       onClick: () => useAppStore.getState().toggleReadingMode(),
     },
     {
-      label: "Exportar PDF",
+      label: "Exportar…",
       icon: <FileDown size={12} />,
       shortcut: "Ctrl+Shift+E",
       onClick: () => useAppStore.getState().openExport(),

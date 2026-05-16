@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileDown, X } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import {
@@ -23,6 +23,7 @@ export function ExportDialog() {
   const fileTree = useAppStore((s) => s.fileTree);
   const rootFolder = useAppStore((s) => s.rootFolder);
   const pushToast = useAppStore((s) => s.pushToast);
+  const exportInitialFormat = useAppStore((s) => s.exportInitialFormat);
 
   const [scope, setScope] = useState<"file" | "project">("file");
   const [format, setFormat] = useState<ExportFormat>("pdf");
@@ -38,6 +39,12 @@ export function ExportDialog() {
   const [phone, setPhone] = useState("");
   const [penName, setPenName] = useState("");
   const [docTitle, setDocTitle] = useState("");
+
+  // Ao abrir, respeita o formato pedido pelo comando (ex.: "Exportar
+  // manuscrito (DOCX)" abre o dialog já em DOCX).
+  useEffect(() => {
+    if (open) setFormat(exportInitialFormat);
+  }, [open, exportInitialFormat]);
 
   if (!open) return null;
 

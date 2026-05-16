@@ -276,8 +276,10 @@ interface AppState {
   showCommandPalette: boolean;
   /** Cheatsheet de atalhos (Ctrl+/). */
   showShortcuts: boolean;
-  /** Dialog de export (PDF). */
+  /** Dialog de export (PDF/DOCX). */
   showExport: boolean;
+  /** Formato pré-selecionado quando o dialog de export abre. */
+  exportInitialFormat: "pdf" | "docx";
   /** Tag ativa de filtro na Sidebar. Quando settada, a Sidebar exibe
    *  apenas arquivos cujo frontmatter inclui essa tag (lista flat,
    *  fora da arvore de pastas). null = sem filtro. */
@@ -452,7 +454,7 @@ interface AppState {
   setBacklinkIndex: (
     index: Map<string, { path: string; name: string }[]> | null,
   ) => void;
-  openExport: () => void;
+  openExport: (initialFormat?: "pdf" | "docx") => void;
   closeExport: () => void;
   /** Reset de todas as preferencias pro default. */
   resetSettings: () => void;
@@ -937,6 +939,7 @@ export const useAppStore = create<AppState>((set) => ({
   showCommandPalette: false,
   showShortcuts: false,
   showExport: false,
+  exportInitialFormat: "pdf",
   activeTagFilter: null,
   tagIndex: null,
   backlinkIndex: null,
@@ -1377,7 +1380,8 @@ export const useAppStore = create<AppState>((set) => ({
   setActiveTagFilter: (tag) => set({ activeTagFilter: tag }),
   setTagIndex: (idx) => set({ tagIndex: idx }),
   setBacklinkIndex: (idx) => set({ backlinkIndex: idx }),
-  openExport: () => set({ showExport: true }),
+  openExport: (initialFormat: "pdf" | "docx" = "pdf") =>
+    set({ showExport: true, exportInitialFormat: initialFormat }),
   closeExport: () => set({ showExport: false }),
   resetSettings: () => {
     // Apaga todas as chaves de pref do localStorage e reseta o state pros

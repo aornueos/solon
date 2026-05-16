@@ -299,7 +299,7 @@ export function Titlebar() {
             >
               <BookOpen size={14} />
             </IconBtn>
-            <IconBtn onClick={openExport} title="Exportar PDF (Ctrl+Shift+E)">
+            <IconBtn onClick={() => openExport()} title="Exportar (Ctrl+Shift+E)">
               <FileDown size={14} />
             </IconBtn>
             <IconBtn onClick={openShortcuts} title="Atalhos (Ctrl+/)">

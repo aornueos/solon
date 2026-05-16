@@ -275,8 +275,8 @@ export default function App() {
         e.preventDefault();
         openShortcuts();
       }
-      // Ctrl+Shift+E abre dialog de export pra PDF — convencao herdada
-      // de editores de texto que tem "Export" no menu Arquivo.
+      // Ctrl+Shift+E abre o dialog de export (PDF/DOCX) — convencao
+      // herdada de editores de texto que tem "Export" no menu Arquivo.
       if (
         (e.ctrlKey || e.metaKey) &&
         e.shiftKey &&

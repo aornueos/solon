@@ -311,10 +311,17 @@ export function CommandPalette() {
       },
       {
         id: "export-pdf",
-        label: "Exportar para PDF",
+        label: "Exportar… (PDF)",
         hint: "Ctrl+Shift+E",
         icon: <FileDown size={15} />,
-        run: openExport,
+        run: () => openExport("pdf"),
+      },
+      {
+        id: "export-docx",
+        label: "Exportar manuscrito (DOCX)",
+        hint: "Shunn",
+        icon: <FileDown size={15} />,
+        run: () => openExport("docx"),
       },
       {
         id: "shortcuts",
