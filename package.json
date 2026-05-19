@@ -1,7 +1,7 @@
 {
   "name": "solon",
   "private": true,
-  "version": "0.9.12",
+  "version": "0.9.13",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
@@ -17,6 +17,7 @@
     "icons": "node scripts/generate-icons.cjs",
     "release:prepare": "node scripts/release-prepare.cjs",
     "release:qa": "node scripts/release-qa.cjs",
+    "doctor": "node scripts/doctor.cjs",
     "kill": "node scripts/kill-solon.cjs"
   },
   "dependencies": {

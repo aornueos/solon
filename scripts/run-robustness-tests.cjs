@@ -17,7 +17,10 @@ esbuild.buildSync({
   format: "esm",
   target: "node20",
   packages: "bundle",
-  external: ["@tauri-apps/*"],
+  // `docx` so' e' dynamic-import dentro de funcoes de export; os testes
+  // exercitam apenas os helpers puros. External evita bundlar a lib
+  // inteira (jszip etc.) no bundle de teste.
+  external: ["@tauri-apps/*", "docx"],
   logLevel: "silent",
 });
 

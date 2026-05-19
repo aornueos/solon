@@ -184,7 +184,7 @@ function segmentsText(segments: InlineSegment[]): string {
   return segments.map((s) => s.text).join("");
 }
 
-function countWords(text: string): number {
+export function countWords(text: string): number {
   const cleaned = text
     .replace(/[#*_~`>|-]/g, " ")
     .replace(/\s+/g, " ")
@@ -193,13 +193,13 @@ function countWords(text: string): number {
   return cleaned.split(" ").length;
 }
 
-function roundWordCount(words: number, category: ShunnCategory): number {
+export function roundWordCount(words: number, category: ShunnCategory): number {
   const step = category === "novel" ? 1000 : 100;
   return Math.max(step, Math.round(words / step) * step);
 }
 
 /** Slug curto pro cabeçalho corrido (Shunn: "Sobrenome / PALAVRA / pág"). */
-function headerKeyword(title: string): string {
+export function headerKeyword(title: string): string {
   const word = title
     .replace(/[^\p{L}\p{N} ]/gu, "")
     .trim()
@@ -208,7 +208,7 @@ function headerKeyword(title: string): string {
   return (word || title.split(/\s+/)[0] || "Manuscrito").toUpperCase();
 }
 
-function surnameOf(name: string): string {
+export function surnameOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return parts.length ? parts[parts.length - 1] : "Autor";
 }

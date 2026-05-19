@@ -22,6 +22,12 @@ import {
   htmlToMarkdown,
   markdownToHtml,
 } from "../src/components/Editor/markdownBridge.ts";
+import {
+  countWords,
+  headerKeyword,
+  roundWordCount,
+  surnameOf,
+} from "../src/lib/docxExport.ts";
 import { isSafeAssetSrc } from "../src/lib/canvasImages.ts";
 
 describe("frontmatter", () => {
@@ -411,5 +417,51 @@ describe("markdown roundtrip — wikilinks com alias", () => {
   it("handles accents on both sides of the alias", () => {
     const r = fixedPoint("Olhe [[órfã-arken|A Órfã de Arken]] agora.");
     assert.match(r, /\[\[órfã-arken\|A Órfã de Arken\]\]/);
+  });
+});
+
+// DOCX / formato Shunn — helpers puros. A folha de rosto Shunn vive ou
+// morre nesses números (contagem "Cerca de N palavras", cabeçalho
+// corrido). Travados no CI no mesmo padrão do roundtrip.
+describe("docx Shunn — contagem de palavras", () => {
+  it("rounds short stories to the nearest 100, never below one step", () => {
+    assert.equal(roundWordCount(0, "short"), 100);
+    assert.equal(roundWordCount(3500, "short"), 3500);
+    assert.equal(roundWordCount(3540, "short"), 3500);
+    assert.equal(roundWordCount(3560, "short"), 3600);
+  });
+
+  it("rounds novels to the nearest 1000, never below one step", () => {
+    assert.equal(roundWordCount(50, "novel"), 1000);
+    assert.equal(roundWordCount(82000, "novel"), 82000);
+    assert.equal(roundWordCount(82490, "novel"), 82000);
+    assert.equal(roundWordCount(82500, "novel"), 83000);
+  });
+
+  it("counts words ignoring markdown punctuation", () => {
+    assert.equal(countWords(""), 0);
+    assert.equal(countWords("a b c"), 3);
+    assert.equal(countWords("uma frase **simples** aqui"), 4);
+    assert.equal(countWords("# Capítulo 1"), 2);
+    assert.equal(countWords("> citação `code` _enf_"), 3);
+  });
+});
+
+describe("docx Shunn — cabeçalho corrido", () => {
+  it("derives a keyword: first word longer than 3 chars, uppercased", () => {
+    assert.equal(headerKeyword("O Portal de Arken"), "PORTAL");
+    assert.equal(headerKeyword("Canção Órfã"), "CANÇÃO");
+  });
+
+  it("falls back to the first word, then to a default", () => {
+    assert.equal(headerKeyword("Sol"), "SOL");
+    assert.equal(headerKeyword(""), "MANUSCRITO");
+  });
+
+  it("takes the surname as the last name token", () => {
+    assert.equal(surnameOf("Lua Arpessoal"), "Arpessoal");
+    assert.equal(surnameOf("Ana Maria de Souza"), "Souza");
+    assert.equal(surnameOf("  Clarice  "), "Clarice");
+    assert.equal(surnameOf(""), "Autor");
   });
 });
