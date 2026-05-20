@@ -31,28 +31,30 @@ const TOOL_META: Record<
 };
 
 export function CanvasToolbar() {
-  const {
-    viewport,
-    setViewport,
-    addCard,
-    cards,
-    texts,
-    images,
-    zoomAt,
-    tool,
-    setTool,
-    drawColor,
-    setDrawColor,
-    drawWidth,
-    setDrawWidth,
-    selectedId,
-    selectedIds,
-    duplicateSelected,
-    bringSelectionToFront,
-    sendSelectionToBack,
-    removeSelected,
-  } = useCanvasStore();
-  const selectionCount = selectedIds.size || (selectedId ? 1 : 0);
+  // Seletores granulares. Antes assinava `useCanvasStore()` cru — a
+  // toolbar re-renderizava a CADA mutação da store (pan/zoom/drag de
+  // card/stroke/edição). Agora só re-renderiza no que de fato é exibido:
+  // tool, draw*, zoom (não viewport inteiro), selectionCount (derivado).
+  const tool = useCanvasStore((s) => s.tool);
+  const drawColor = useCanvasStore((s) => s.drawColor);
+  const drawWidth = useCanvasStore((s) => s.drawWidth);
+  const zoom = useCanvasStore((s) => s.viewport.zoom);
+  // Derivado: muda só quando a contagem efetiva muda (não no shuffle
+  // interno do Set selectedIds nem em mudanças de outros campos).
+  const selectionCount = useCanvasStore(
+    (s) => s.selectedIds.size || (s.selectedId ? 1 : 0),
+  );
+  // Actions têm ref estável em Zustand — subscrever é grátis em renders.
+  const setViewport = useCanvasStore((s) => s.setViewport);
+  const setTool = useCanvasStore((s) => s.setTool);
+  const setDrawColor = useCanvasStore((s) => s.setDrawColor);
+  const setDrawWidth = useCanvasStore((s) => s.setDrawWidth);
+  const addCard = useCanvasStore((s) => s.addCard);
+  const zoomAt = useCanvasStore((s) => s.zoomAt);
+  const duplicateSelected = useCanvasStore((s) => s.duplicateSelected);
+  const bringSelectionToFront = useCanvasStore((s) => s.bringSelectionToFront);
+  const sendSelectionToBack = useCanvasStore((s) => s.sendSelectionToBack);
+  const removeSelected = useCanvasStore((s) => s.removeSelected);
 
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -67,6 +69,10 @@ export function CanvasToolbar() {
   };
 
   const fitAll = () => {
+    // cards/texts/images são usados SÓ aqui — leio do snapshot no clique
+    // em vez de assinar (essas arrays mudam toda hora; subscrever forçaria
+    // re-render da toolbar a cada drag/edição sem necessidade).
+    const { cards, texts, images } = useCanvasStore.getState();
     const boxes: { x: number; y: number; w: number; h: number }[] = [
       ...cards,
       ...images,
@@ -220,7 +226,7 @@ export function CanvasToolbar() {
         className="text-[0.68rem] tabular-nums w-10 text-center"
         style={{ color: "var(--text-muted)" }}
       >
-        {Math.round(viewport.zoom * 100)}%
+        {Math.round(zoom * 100)}%
       </span>
       <Btn title="Zoom in (+)" onClick={() => zoomStep(-1)}>
         <ZoomIn size={14} />

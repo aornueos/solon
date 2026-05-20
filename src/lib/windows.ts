@@ -35,7 +35,7 @@ export async function openTabInNewWindow(
   const url = `index.html?${query.toString()}`;
 
   if (!isTauriRuntime()) {
-    window.open(`${window.location.origin}/?${query.toString()}`, "_blank", "noopener");
+    window.open(`${window.location.origin}/?${query.toString()}`, "_blank", "noopener,noreferrer");
     return;
   }
 
