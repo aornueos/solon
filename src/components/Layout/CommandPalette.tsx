@@ -22,7 +22,12 @@ import {
   ShieldCheck,
   Archive,
 } from "lucide-react";
-import { EDITOR_PAPERS, useAppStore, FileNode } from "../../store/useAppStore";
+import {
+  EDITOR_PAGE_LAYOUTS,
+  EDITOR_PAPERS,
+  useAppStore,
+  FileNode,
+} from "../../store/useAppStore";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { toggleAppFullscreen } from "../../lib/windows";
@@ -55,6 +60,16 @@ function cycleVisualTheme() {
     EDITOR_PAPERS[(currentIndex + 1) % EDITOR_PAPERS.length] ?? EDITOR_PAPERS[0];
   state.setEditorPaper(next.value);
   state.pushToast("info", `Tema visual: ${next.label}`, 1600);
+}
+
+function toggleA4ContinuousPage() {
+  const state = useAppStore.getState();
+  const next =
+    state.editorPageLayout === "a4-continuous" ? "fluid" : "a4-continuous";
+  state.setEditorPageLayout(next);
+  const label =
+    EDITOR_PAGE_LAYOUTS.find((option) => option.value === next)?.label ?? next;
+  state.pushToast("info", `Modo de página: ${label}`, 1600);
 }
 
 export function CommandPalette() {
@@ -165,10 +180,23 @@ export function CommandPalette() {
       },
       {
         id: "editor",
-        label: "Ir para editor",
+        label: "Ir para livre",
         hint: "Ctrl+1",
         icon: <FileText size={15} />,
-        run: () => setActiveView("editor"),
+        run: () => {
+          useAppStore.getState().setEditorPageLayout("fluid");
+          setActiveView("editor");
+        },
+      },
+      {
+        id: "page-editor",
+        label: "Ir para página",
+        hint: "A4 contínua",
+        icon: <FileText size={15} />,
+        run: () => {
+          useAppStore.getState().setEditorPageLayout("a4-continuous");
+          setActiveView("editor");
+        },
       },
       {
         id: "canvas",
@@ -214,6 +242,13 @@ export function CommandPalette() {
           const s = useAppStore.getState();
           s.setTypewriterMode(!s.typewriterMode);
         },
+      },
+      {
+        id: "a4-continuous-page",
+        label: "Alternar folha A4 contínua",
+        hint: "Livre / Página",
+        icon: <FileText size={15} />,
+        run: toggleA4ContinuousPage,
       },
       {
         id: "sidebar",

@@ -493,22 +493,33 @@ select:focus-visible {
    Editor ProseMirror
 ───────────────────────────────────────── */
 
+.solon-editor-a4-page {
+  box-sizing: border-box;
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  box-shadow: var(--shadow-md);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
 .ProseMirror {
   outline: none;
   user-select: text;
   -webkit-user-select: text;
   cursor: text;
   font-family: var(--editor-font-family, "Lora", Georgia, serif) !important;
-  /* `--editor-zoom` e settado pelo wrapper do EditorContent (Editor.tsx).
-     Default 1 mantem comportamento atual quando settings inativas. Multi-
-     plicador aplicado em todos os font-sizes abaixo via calc(). */
-  font-size: calc(1.0625rem * var(--editor-zoom, 1)) !important;
+  /* `--editor-text-scale` vem dos presets Pequeno/Medio/Grande; `--editor-zoom`
+     escala a visualizacao. Mantidos separados para A4 poder dar zoom sem
+     virar controle de tamanho tipografico livre. */
+  font-size: calc(1.0625rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1)) !important;
   /* 1.5 e' o sweet spot pra leitura em tela (estilo Scrivener default).
      Antes era 1.85 — confortavel pra olho, mas dava percepcao de
      "duplo espacamento" tipo Word. Com 1.5 o paragrafo respira sem
      parecer lista. */
   line-height: var(--editor-line-height, 1.5);
-  color: var(--text-primary);
+  color: var(--editor-paper-text, var(--text-primary));
   caret-color: var(--accent);
 }
 
@@ -520,7 +531,7 @@ select:focus-visible {
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: var(--text-placeholder);
+  color: var(--editor-paper-text-placeholder, var(--text-placeholder));
   pointer-events: none;
   height: 0;
   font-style: italic;
@@ -528,12 +539,12 @@ select:focus-visible {
 
 .ProseMirror h1 {
   font-family: var(--editor-font-family, "Lora", Georgia, serif) !important;
-  font-size: calc(2rem * var(--editor-zoom, 1)) !important;
+  font-size: calc(2rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1)) !important;
   font-weight: 700 !important;
   line-height: 1.15;
   margin-top: 3rem;
   margin-bottom: 1.25rem;
-  color: var(--text-primary) !important;
+  color: var(--editor-paper-text, var(--text-primary)) !important;
   letter-spacing: -0.03em;
   padding-bottom: 0.6rem;
   border-bottom: 2px solid var(--heading-rule);
@@ -543,12 +554,12 @@ select:focus-visible {
 
 .ProseMirror h2 {
   font-family: var(--editor-font-family, "Lora", Georgia, serif) !important;
-  font-size: calc(1.35rem * var(--editor-zoom, 1)) !important;
+  font-size: calc(1.35rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1)) !important;
   font-weight: 600 !important;
   line-height: 1.3;
   margin-top: 2.5rem;
   margin-bottom: 0.75rem;
-  color: var(--text-primary) !important;
+  color: var(--editor-paper-text, var(--text-primary)) !important;
   letter-spacing: -0.01em;
   padding-left: 0.75rem;
   border-left: 3px solid var(--heading-rule);
@@ -556,7 +567,7 @@ select:focus-visible {
 
 .ProseMirror h3 {
   font-family: var(--editor-font-family, "Inter", sans-serif) !important;
-  font-size: calc(0.72rem * var(--editor-zoom, 1)) !important;
+  font-size: calc(0.72rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1)) !important;
   font-weight: 700 !important;
   line-height: 1.4;
   margin-top: 2.5rem;
@@ -568,11 +579,11 @@ select:focus-visible {
 
 .ProseMirror h4 {
   font-family: var(--editor-font-family, "Inter", sans-serif) !important;
-  font-size: calc(0.7rem * var(--editor-zoom, 1)) !important;
+  font-size: calc(0.7rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1)) !important;
   font-weight: 600 !important;
   margin-top: 1.75rem;
   margin-bottom: 0.4rem;
-  color: var(--text-muted) !important;
+  color: var(--editor-paper-text-muted, var(--text-muted)) !important;
   text-transform: uppercase;
   letter-spacing: 0.14em;
 }
@@ -580,11 +591,11 @@ select:focus-visible {
 .ProseMirror h5,
 .ProseMirror h6 {
   font-family: var(--editor-font-family, "Inter", sans-serif) !important;
-  font-size: calc(0.68rem * var(--editor-zoom, 1)) !important;
+  font-size: calc(0.68rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1)) !important;
   font-weight: 500 !important;
   margin-top: 1.25rem;
   margin-bottom: 0.3rem;
-  color: var(--text-placeholder) !important;
+  color: var(--editor-paper-text-placeholder, var(--text-placeholder)) !important;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -639,7 +650,7 @@ select:focus-visible {
   border-left: 3px solid var(--accent);
   padding-left: 1.25rem;
   margin: 1.5rem 0;
-  color: var(--text-secondary) !important;
+  color: var(--editor-paper-text-muted, var(--text-secondary)) !important;
   font-style: italic;
 }
 
@@ -677,7 +688,7 @@ select:focus-visible {
   opacity: 0.7;
 }
 
-.ProseMirror strong { font-weight: 700; color: var(--text-primary); }
+.ProseMirror strong { font-weight: 700; color: var(--editor-paper-text, var(--text-primary)); }
 .ProseMirror em { font-style: italic; }
 
 .ProseMirror img.solon-editor-image,
@@ -725,7 +736,7 @@ select:focus-visible {
   background: var(--bg-code);
   padding: 0.1em 0.35em;
   border-radius: 3px;
-  color: var(--text-primary);
+  color: var(--editor-paper-text, var(--text-primary));
 }
 .ProseMirror pre {
   background: var(--bg-inverse);
@@ -735,7 +746,7 @@ select:focus-visible {
   overflow-x: auto;
   margin: 1rem 0;
   font-family: "JetBrains Mono", monospace;
-  font-size: calc(0.875rem * var(--editor-zoom, 1));
+  font-size: calc(0.875rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1));
   line-height: 1.6;
 }
 
@@ -771,7 +782,7 @@ select:focus-visible {
   table-layout: fixed;
   overflow: hidden;
   font-family: "Inter", sans-serif;
-  font-size: calc(0.92rem * var(--editor-zoom, 1));
+  font-size: calc(0.92rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1));
 }
 .ProseMirror table td,
 .ProseMirror table th {
@@ -785,7 +796,7 @@ select:focus-visible {
 .ProseMirror table th {
   background: var(--bg-panel-2);
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--editor-paper-text, var(--text-primary));
   text-align: left;
 }
 .ProseMirror table tr:nth-child(even) td {

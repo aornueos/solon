@@ -8,7 +8,7 @@ import { UpdateBanner } from "./UpdateBanner";
 /**
  * Landing minima — pagina de transicao, NAO um dashboard. Funcao unica:
  * dar contexto rapido (qual projeto, quanto ja foi escrito) e empurrar
- * pro editor com 1 clique.
+ * pra escrita com 1 clique.
  *
  * Layout: vertical centralizado, max-w-md. Hierarquia clara:
  *   1. Solon (marca pequena, masthead)
@@ -20,7 +20,7 @@ import { UpdateBanner } from "./UpdateBanner";
  * Estados:
  *   - sem rootFolder: empty state com CTA "Abrir pasta"
  *   - com rootFolder + activeFilePath: "Continuar lendo X"
- *   - com rootFolder, sem activeFilePath: "Ir para o editor"
+ *   - com rootFolder, sem activeFilePath: "Ir para livre"
  */
 export function HomePage() {
   const rootFolder = useAppStore((s) => s.rootFolder);
@@ -29,6 +29,7 @@ export function HomePage() {
   const projectStats = useAppStore((s) => s.projectStats);
   const setProjectStats = useAppStore((s) => s.setProjectStats);
   const setActiveView = useAppStore((s) => s.setActiveView);
+  const setEditorPageLayout = useAppStore((s) => s.setEditorPageLayout);
   const openPrompt = useAppStore((s) => s.openPrompt);
   const pushToast = useAppStore((s) => s.pushToast);
   const recentFiles = useAppStore((s) => s.recentFiles);
@@ -113,7 +114,10 @@ export function HomePage() {
     // novas a cada `refresh()`, entao essa dep cobre create/delete/rename.
   }, [allFiles, setProjectStats]);
 
-  const goEditor = () => setActiveView("editor");
+  const openFreeEditor = () => {
+    setEditorPageLayout("fluid");
+    setActiveView("editor");
+  };
 
   const onNewFile = async () => {
     if (!rootFolder) {
@@ -122,13 +126,13 @@ export function HomePage() {
     }
     const name = await openPrompt({
       title: "Nova nota",
-      message: "Vira o título da cena/capítulo no editor.",
+      message: "Vira o título da cena/capítulo na escrita.",
       placeholder: "Ex: minha-cena",
       confirmLabel: "Criar",
     });
     if (!name) return;
     await createFile(rootFolder, name);
-    if (useAppStore.getState().activeFilePath) setActiveView("editor");
+    if (useAppStore.getState().activeFilePath) openFreeEditor();
   };
 
   return (
@@ -147,7 +151,7 @@ export function HomePage() {
                 rootFolder={rootFolder}
                 stats={projectStats}
                 continueLabel={continueLabel}
-                onContinue={goEditor}
+                onContinue={openFreeEditor}
                 onNewFile={onNewFile}
                 onOpenFolder={openFolder}
               />
@@ -157,7 +161,7 @@ export function HomePage() {
                   rootFolder={rootFolder}
                   onOpen={(path, name) => {
                     void openFile(path, name, { tab: "replace" });
-                    setActiveView("editor");
+                    openFreeEditor();
                   }}
                 />
               )}
@@ -233,7 +237,7 @@ function ProjectHero({
       </div>
 
       {/* CTA primario. Quando ha arquivo aberto: "Continuar lendo X".
-          Quando nao ha (mas tem pasta): "Ir para o editor" — usuario
+          Quando nao ha (mas tem pasta): "Ir para livre" — usuario
           escolhe arquivo no explorador la dentro. */}
       <button
         onClick={onContinue}
@@ -252,7 +256,7 @@ function ProjectHero({
               </span>
             </>
           ) : (
-            "Ir para o editor"
+            "Ir para livre"
           )}
         </span>
         <ArrowRight

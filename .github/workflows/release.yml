@@ -149,10 +149,14 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Solon ${{ github.ref_name }}'
-          # Body do release. Pode trocar pra `body-path: CHANGELOG.md` se
-          # quiser que cada release puxe direto do changelog.
+          # Body do release. Mantido inline porque este repo ainda nao tem
+          # CHANGELOG.md versionado.
           releaseBody: |
-            Veja as notas completas no `CHANGELOG.md`.
+            **Destaques da 0.9.20:**
+            - Novo modo Página com folha A4 contínua.
+            - Modo Livre separado de Página na navegação principal.
+            - Presets de tamanho do texto: Pequeno, Médio e Grande.
+            - Ajustes de zoom, largura, tipografia e contraste dos papéis.
 
             **Instalacao:**
             - Windows: `.msi` ou `.nsis.zip` abaixo

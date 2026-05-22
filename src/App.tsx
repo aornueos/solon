@@ -36,6 +36,7 @@ export default function App() {
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
   const setActiveView = useAppStore((s) => s.setActiveView);
+  const setEditorPageLayout = useAppStore((s) => s.setEditorPageLayout);
   const setUpdateStatus = useAppStore((s) => s.setUpdateStatus);
   const openSettings = useAppStore((s) => s.openSettings);
   const openCommandPalette = useAppStore((s) => s.openCommandPalette);
@@ -244,6 +245,7 @@ export default function App() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "1") {
         e.preventDefault();
+        setEditorPageLayout("fluid");
         setActiveView("editor");
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "2") {
@@ -395,6 +397,7 @@ export default function App() {
     toggleOutline,
     toggleInspector,
     setActiveView,
+    setEditorPageLayout,
     openSettings,
     openCommandPalette,
     openGlobalSearch,

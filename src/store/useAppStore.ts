@@ -34,6 +34,8 @@ export interface Toast {
 
 export type EditorFontFamily = "serif" | "sans" | "mono";
 export type EditorToolbarMode = "fixed" | "hover";
+export type EditorPageLayout = "fluid" | "a4-continuous";
+export type EditorTextSize = "small" | "medium" | "large";
 
 /** Variantes de "papel" do editor — vide doc no AppState.editorPaper. */
 export type EditorPaper = "default" | "creme" | "sepia" | "gray" | "midnight" | "tokyo";
@@ -261,8 +263,9 @@ interface AppState {
   projectStats: { wordCount: number; fileCount: number } | null;
 
   // ─── Preferencias do usuario (persistidas em localStorage) ───
-  /** Zoom do texto do editor — 75..200, default 100. Multiplicador
-   *  aplicado via CSS var `--editor-zoom` no .ProseMirror. */
+  /** Zoom da area de escrita — 75..200, default 100. No layout A4,
+   *  escala a pagina; no layout livre, escala a coluna como visualizacao.
+   *  Tamanho tipografico semantico vive em `editorTextSize`. */
   editorZoom: number;
   appZoom: number;
   /** Liga/desliga auto-save (so afeta o debounce; Ctrl+S sempre salva). */
@@ -301,6 +304,13 @@ interface AppState {
    *  da linha — escritor pode preferir mais estreito (560-680, classico
    *  livro) ou mais ar (820-1000). Default 680 e' o sweet spot pt-BR. */
   editorMaxWidth: number;
+  /** Layout visual da superficie de escrita. "fluid" preserva a coluna
+   *  historica; "a4-continuous" desenha uma folha A4 continua sem paginar
+   *  nem alterar o documento ProseMirror. */
+  editorPageLayout: EditorPageLayout;
+  /** Preset tipografico do corpo do editor. Afeta paragrafos e headings
+   *  juntos para preservar hierarquia visual previsivel. */
+  editorTextSize: EditorTextSize;
   /** Espacamento vertical do texto do editor. Mantem o layout editorial,
    *  mas deixa o escritor escolher entre denso e confortavel. */
   editorLineHeight: "compact" | "normal" | "relaxed";
@@ -421,6 +431,8 @@ interface AppState {
   setAutoSaveEnabled: (v: boolean) => void;
   setAutoCheckUpdates: (v: boolean) => void;
   setEditorMaxWidth: (w: number) => void;
+  setEditorPageLayout: (v: EditorPageLayout) => void;
+  setEditorTextSize: (v: EditorTextSize) => void;
   setEditorLineHeight: (v: "compact" | "normal" | "relaxed") => void;
   setEditorParagraphSpacing: (v: "tight" | "normal" | "airy") => void;
   setEditorIndentSize: (v: "small" | "normal" | "large") => void;
@@ -624,6 +636,8 @@ const DEFAULT_AUTO_SAVE = true;
 const DEFAULT_AUTO_CHECK_UPDATES = true;
 const DEFAULT_SPELLCHECK = true;
 const DEFAULT_EDITOR_MAX_WIDTH = 680;
+const DEFAULT_EDITOR_PAGE_LAYOUT: EditorPageLayout = "fluid";
+const DEFAULT_EDITOR_TEXT_SIZE: EditorTextSize = "medium";
 const DEFAULT_EDITOR_LINE_HEIGHT: "compact" | "normal" | "relaxed" = "normal";
 const DEFAULT_EDITOR_PARAGRAPH_SPACING: "tight" | "normal" | "airy" = "normal";
 const DEFAULT_EDITOR_INDENT_SIZE: "small" | "normal" | "large" = "normal";
@@ -652,6 +666,8 @@ const AUTO_SAVE_KEY = "solon:autoSave";
 const AUTO_CHECK_UPDATES_KEY = "solon:autoCheckUpdates";
 const SPELLCHECK_KEY = "solon:spellcheck";
 const EDITOR_MAX_WIDTH_KEY = "solon:editorMaxWidth";
+const EDITOR_PAGE_LAYOUT_KEY = "solon:editorPageLayout";
+const EDITOR_TEXT_SIZE_KEY = "solon:editorTextSize";
 const EDITOR_LINE_HEIGHT_KEY = "solon:editorLineHeight";
 const EDITOR_PARAGRAPH_SPACING_KEY = "solon:editorParagraphSpacing";
 const EDITOR_INDENT_SIZE_KEY = "solon:editorIndentSize";
@@ -677,6 +693,23 @@ const START_VIEW_KEY = "solon:startView";
 
 /** Larguras suportadas pra coluna do editor (em px). */
 export const EDITOR_MAX_WIDTHS = [560, 680, 820, 1000] as const;
+export const EDITOR_PAGE_LAYOUTS = [
+  {
+    value: "fluid" as const,
+    label: "Livre",
+    hint: "Coluna ajustável",
+  },
+  {
+    value: "a4-continuous" as const,
+    label: "A4 contínua",
+    hint: "Folha A4 contínua",
+  },
+] as const;
+export const EDITOR_TEXT_SIZES = [
+  { value: "small" as const, label: "Pequeno", shortLabel: "A-", css: 0.92 },
+  { value: "medium" as const, label: "Médio", shortLabel: "A", css: 1 },
+  { value: "large" as const, label: "Grande", shortLabel: "A+", css: 1.12 },
+] as const;
 export const EDITOR_LINE_HEIGHTS = [
   { value: "compact", label: "Compacto", css: 1.38 },
   { value: "normal", label: "Normal", css: 1.5 },
@@ -784,6 +817,22 @@ function loadEditorPaper(): EditorPaper {
     ) return v;
   } catch {}
   return DEFAULT_EDITOR_PAPER;
+}
+
+function loadEditorPageLayout(): EditorPageLayout {
+  try {
+    const v = localStorage.getItem(EDITOR_PAGE_LAYOUT_KEY);
+    if (v === "fluid" || v === "a4-continuous") return v;
+  } catch {}
+  return DEFAULT_EDITOR_PAGE_LAYOUT;
+}
+
+function loadEditorTextSize(): EditorTextSize {
+  try {
+    const v = localStorage.getItem(EDITOR_TEXT_SIZE_KEY);
+    if (v === "small" || v === "medium" || v === "large") return v;
+  } catch {}
+  return DEFAULT_EDITOR_TEXT_SIZE;
 }
 
 function loadEditorToolbarMode(): EditorToolbarMode {
@@ -946,6 +995,8 @@ export const useAppStore = create<AppState>((set) => ({
   activeContextMenu: null,
   spellcheckEnabled: loadBoolPref(SPELLCHECK_KEY, DEFAULT_SPELLCHECK),
   editorMaxWidth: loadEditorMaxWidth(),
+  editorPageLayout: loadEditorPageLayout(),
+  editorTextSize: loadEditorTextSize(),
   editorLineHeight: loadEditorLineHeight(),
   editorParagraphSpacing: loadEditorParagraphSpacing(),
   editorIndentSize: loadEditorIndentSize(),
@@ -1394,6 +1445,8 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.removeItem(AUTO_CHECK_UPDATES_KEY);
       localStorage.removeItem(SPELLCHECK_KEY);
       localStorage.removeItem(EDITOR_MAX_WIDTH_KEY);
+      localStorage.removeItem(EDITOR_PAGE_LAYOUT_KEY);
+      localStorage.removeItem(EDITOR_TEXT_SIZE_KEY);
       localStorage.removeItem(EDITOR_LINE_HEIGHT_KEY);
       localStorage.removeItem(EDITOR_PARAGRAPH_SPACING_KEY);
       localStorage.removeItem(EDITOR_INDENT_SIZE_KEY);
@@ -1426,6 +1479,8 @@ export const useAppStore = create<AppState>((set) => ({
       autoCheckUpdates: DEFAULT_AUTO_CHECK_UPDATES,
       spellcheckEnabled: DEFAULT_SPELLCHECK,
       editorMaxWidth: DEFAULT_EDITOR_MAX_WIDTH,
+      editorPageLayout: DEFAULT_EDITOR_PAGE_LAYOUT,
+      editorTextSize: DEFAULT_EDITOR_TEXT_SIZE,
       editorLineHeight: DEFAULT_EDITOR_LINE_HEIGHT,
       editorParagraphSpacing: DEFAULT_EDITOR_PARAGRAPH_SPACING,
       editorIndentSize: DEFAULT_EDITOR_INDENT_SIZE,
@@ -1491,6 +1546,26 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ editorMaxWidth: w });
+  },
+
+  setEditorPageLayout: (v) => {
+    if (!EDITOR_PAGE_LAYOUTS.some((option) => option.value === v)) return;
+    try {
+      localStorage.setItem(EDITOR_PAGE_LAYOUT_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ editorPageLayout: v });
+  },
+
+  setEditorTextSize: (v) => {
+    if (!EDITOR_TEXT_SIZES.some((option) => option.value === v)) return;
+    try {
+      localStorage.setItem(EDITOR_TEXT_SIZE_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ editorTextSize: v });
   },
 
   setEditorLineHeight: (v) => {

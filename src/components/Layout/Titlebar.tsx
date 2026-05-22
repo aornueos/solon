@@ -133,6 +133,8 @@ export function Titlebar() {
   const focusMode = useAppStore((s) => s.focusMode);
   const activeView = useAppStore((s) => s.activeView);
   const setActiveView = useAppStore((s) => s.setActiveView);
+  const editorPageLayout = useAppStore((s) => s.editorPageLayout);
+  const setEditorPageLayout = useAppStore((s) => s.setEditorPageLayout);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
@@ -154,6 +156,16 @@ export function Titlebar() {
     if ((e.target as HTMLElement).closest("button")) return;
     e.preventDefault();
     toggleMaximize();
+  };
+
+  const openFluidEditor = () => {
+    setEditorPageLayout("fluid");
+    setActiveView("editor");
+  };
+
+  const openPageEditor = () => {
+    setEditorPageLayout("a4-continuous");
+    setActiveView("editor");
   };
 
   return (
@@ -187,14 +199,14 @@ export function Titlebar() {
         {activeFileName && (
           <>
             <span style={{ color: "var(--border)" }}>/</span>
-            {/* Clicavel: leva pro editor com o arquivo aberto. Util
+            {/* Clicavel: leva para a escrita com o arquivo aberto. Util
                 quando o user esta no canvas/home e quer voltar pro
                 texto sem ter que achar o item no sidebar. */}
             <button
               onClick={() => setActiveView("editor")}
               onMouseDown={(e) => e.stopPropagation()}
-              title="Ir para o editor"
-              aria-label="Ir para o editor"
+              title="Ir para escrita"
+              aria-label="Ir para escrita"
               className="text-[0.78rem] truncate max-w-[240px] transition-opacity hover:opacity-70"
               style={{
                 color: "var(--text-secondary)",
@@ -229,18 +241,26 @@ export function Titlebar() {
       {/* Espaço arrastável */}
       <div className="flex-1" data-tauri-drag-region />
 
-      {/* Toggle de visão (Editor ↔ Canvas) */}
+      {/* Toggle de visão (Livre / Página / Canvas) */}
       <div
         className="flex items-center gap-0 rounded-md p-0.5 mr-2"
         style={{ background: "var(--bg-hover)" }}
       >
         <ViewTab
-          onClick={() => setActiveView("editor")}
-          active={activeView === "editor"}
-          title="Editor (Ctrl+1)"
+          onClick={openFluidEditor}
+          active={activeView === "editor" && editorPageLayout === "fluid"}
+          title="Livre (Ctrl+1)"
         >
           <FileText size={12} />
-          <span className="text-[0.7rem]">Editor</span>
+          <span className="text-[0.7rem]">Livre</span>
+        </ViewTab>
+        <ViewTab
+          onClick={openPageEditor}
+          active={activeView === "editor" && editorPageLayout === "a4-continuous"}
+          title="Página A4 contínua"
+        >
+          <BookOpen size={12} />
+          <span className="text-[0.7rem]">Página</span>
         </ViewTab>
         <ViewTab
           onClick={() => setActiveView("canvas")}

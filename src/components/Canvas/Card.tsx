@@ -322,7 +322,7 @@ export const Card = memo(function Card({ card }: Props) {
           ? "cursor-cell"
           : "cursor-grab active:cursor-grabbing",
       )}
-      title={isScene ? "Duplo clique para abrir a cena no editor" : undefined}
+      title={isScene ? "Duplo clique para abrir a cena na escrita" : undefined}
     >
       {/* Conteúdo */}
       <div className="w-full h-full p-2.5 overflow-hidden flex flex-col">
@@ -419,7 +419,7 @@ export const Card = memo(function Card({ card }: Props) {
         )}
         {isScene && (
           <ActionBtn
-            title="Abrir no editor"
+            title="Abrir na escrita"
             onClick={(e) => {
               e.stopPropagation();
               openInEditor();

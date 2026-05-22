@@ -20,7 +20,7 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "Ctrl + Shift + F", label: "Buscar no projeto" },
       { keys: "Ctrl + F", label: "Buscar na nota" },
       { keys: "Ctrl + Alt + H", label: "Histórico local" },
-      { keys: "Ctrl + 1", label: "Ir para editor" },
+      { keys: "Ctrl + 1", label: "Ir para livre" },
       { keys: "Ctrl + 2", label: "Ir para canvas" },
       { keys: "Ctrl + 3", label: "Ir para início" },
     ],
@@ -38,12 +38,12 @@ const GROUPS: ShortcutGroup[] = [
     ],
   },
   {
-    title: "Editor",
+    title: "Escrita",
     items: [
       { keys: "Ctrl + S", label: "Salvar" },
       { keys: "Ctrl + Z / Ctrl + Y", label: "Desfazer / Refazer" },
       { keys: "Ctrl + B / I / Shift+S", label: "Negrito / Itálico / Tachado" },
-      { keys: "Ctrl + Scroll", label: "Zoom do texto" },
+      { keys: "Ctrl + Scroll", label: "Zoom da área de escrita" },
       { keys: "Tab (heading)", label: "Demote heading" },
       { keys: "Shift + Tab (heading)", label: "Promote heading" },
       { keys: "Tab (parágrafo)", label: "Indentar primeira linha" },

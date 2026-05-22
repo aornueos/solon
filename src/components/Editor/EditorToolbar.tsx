@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { useAppStore } from "../../store/useAppStore";
+import { EDITOR_TEXT_SIZES, useAppStore } from "../../store/useAppStore";
 
 interface Props {
   editor: Editor;
@@ -51,6 +51,8 @@ export function EditorToolbar({ editor }: Props) {
   const [tableMenu, setTableMenu] = useState(false);
   const typewriterMode = useAppStore((s) => s.typewriterMode);
   const setTypewriterMode = useAppStore((s) => s.setTypewriterMode);
+  const editorTextSize = useAppStore((s) => s.editorTextSize);
+  const setEditorTextSize = useAppStore((s) => s.setEditorTextSize);
   const toolbarMode = useAppStore((s) => s.editorToolbarMode);
   const setToolbarMode = useAppStore((s) => s.setEditorToolbarMode);
   const openContextMenu = useAppStore((s) => s.openContextMenu);
@@ -210,6 +212,8 @@ export function EditorToolbar({ editor }: Props) {
         <Keyboard size={15} />
       </ToolBtn>
       <Divider />
+      <TextSizeControls value={editorTextSize} onChange={setEditorTextSize} />
+      <Divider />
       <ToolGroup editor={editor} tools={historyTools} />
       <Divider />
       <ToolGroup editor={editor} tools={headingTools} />
@@ -242,6 +246,31 @@ export function EditorToolbar({ editor }: Props) {
         )}
       </div>
     </div>
+  );
+}
+
+function TextSizeControls({
+  value,
+  onChange,
+}: {
+  value: (typeof EDITOR_TEXT_SIZES)[number]["value"];
+  onChange: (value: (typeof EDITOR_TEXT_SIZES)[number]["value"]) => void;
+}) {
+  return (
+    <>
+      {EDITOR_TEXT_SIZES.map((option) => (
+        <ToolBtn
+          key={option.value}
+          title={`Texto ${option.label.toLowerCase()}`}
+          active={value === option.value}
+          onClick={() => onChange(option.value)}
+        >
+          <span className="block min-w-[18px] text-center text-[0.68rem] font-semibold leading-none">
+            {option.shortLabel}
+          </span>
+        </ToolBtn>
+      ))}
+    </>
   );
 }
 

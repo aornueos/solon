@@ -35,6 +35,7 @@ import {
   EDITOR_FONT_FAMILIES,
   EDITOR_LINE_HEIGHTS,
   EDITOR_PARAGRAPH_SPACING,
+  EDITOR_TEXT_SIZES,
   useAppStore,
 } from "../../store/useAppStore";
 import { EditorToolbar } from "./EditorToolbar";
@@ -54,6 +55,10 @@ const EDITOR_SCROLL_POSITIONS_KEY = "solon:editorScrollPositions";
 const EDITOR_SELECTIONS_KEY = "solon:editorSelections";
 const MAX_EDITOR_SCROLL_POSITIONS = 200;
 const MAX_EDITOR_SELECTIONS = 200;
+const A4_PAGE_WIDTH_PX = 794;
+const A4_PAGE_HEIGHT_PX = 1123;
+const A4_PAGE_MARGIN_X_PX = 96;
+const A4_PAGE_MARGIN_Y_PX = 96;
 
 interface EditorSelectionMemory {
   from: number;
@@ -171,6 +176,8 @@ export function Editor() {
   const editorZoom = useAppStore((s) => s.editorZoom);
   const setEditorZoom = useAppStore((s) => s.setEditorZoom);
   const editorMaxWidth = useAppStore((s) => s.editorMaxWidth);
+  const editorPageLayout = useAppStore((s) => s.editorPageLayout);
+  const editorTextSize = useAppStore((s) => s.editorTextSize);
   const editorLineHeight = useAppStore((s) => s.editorLineHeight);
   const editorParagraphSpacing = useAppStore((s) => s.editorParagraphSpacing);
   const editorIndentSize = useAppStore((s) => s.editorIndentSize);
@@ -702,8 +709,9 @@ export function Editor() {
     return () => window.clearTimeout(t);
   }, [spellcheckEnabled]);
 
-  // Ctrl+Scroll = zoom do texto. So' afeta o editor (escopo do listener),
-  // nao a UI ao redor. Acumulador de deltaY pra suavizar trackpads que
+  // Ctrl+Scroll = zoom da area de escrita. No modo A4, isso aumenta ou
+  // diminui a pagina inteira; tamanho tipografico semantico fica nos
+  // presets Pequeno/Medio/Grande da toolbar. Acumulador suaviza trackpads que
   // disparam dezenas de events com delta pequeno por gesto — sem
   // acumulador, um swipe casual saltaria de 100% pra 200%. Cada 50px
   // acumulados = 1 step de 5%, semelhante a 1 notch de mouse fisico.
@@ -721,8 +729,8 @@ export function Editor() {
       e.preventDefault();
       accumulator += e.deltaY;
       if (Math.abs(accumulator) < STEP_THRESHOLD) return;
-      // deltaY < 0 = scroll pra cima = zoom in (texto maior).
-      // deltaY > 0 = scroll pra baixo = zoom out (texto menor).
+      // deltaY < 0 = scroll pra cima = zoom in.
+      // deltaY > 0 = scroll pra baixo = zoom out.
       const direction = accumulator < 0 ? 1 : -1;
       const current = useAppStore.getState().editorZoom;
       setEditorZoom(current + direction * STEP_SIZE);
@@ -761,6 +769,35 @@ export function Editor() {
     return () => document.removeEventListener("solon:scroll-to", handler);
   }, [editor]);
 
+  const editorScale = editorZoom / 100;
+  const isA4Continuous = editorPageLayout === "a4-continuous";
+  const editorSurfaceBackground = isA4Continuous
+    ? "var(--bg-app)"
+    : editorPaper === "default"
+      ? "var(--bg-app)"
+      : "var(--editor-paper-bg)";
+  const editorSurfaceColor =
+    editorPaper === "default" ? "var(--text-primary)" : "var(--editor-paper-text)";
+  const editorPageBackground =
+    editorPaper === "default" ? "var(--bg-panel)" : "var(--editor-paper-bg)";
+  const editorPageColor =
+    editorPaper === "default" ? "var(--text-primary)" : "var(--editor-paper-text)";
+  const a4PageWidth = Math.round(A4_PAGE_WIDTH_PX * editorScale);
+  const a4PageHeight = Math.round(A4_PAGE_HEIGHT_PX * editorScale);
+  const a4PageMarginX = Math.round(A4_PAGE_MARGIN_X_PX * editorScale);
+  const a4PageMarginY = Math.round(A4_PAGE_MARGIN_Y_PX * editorScale);
+  const a4Padding = `${a4PageMarginY}px ${a4PageMarginX}px`;
+  const a4TypewriterPadding = `max(${a4PageMarginY}px, min(30vh, 220px))`;
+  const a4BaseStyle: React.CSSProperties = {
+    width: `${a4PageWidth}px`,
+    minHeight: `${a4PageHeight}px`,
+    padding: a4Padding,
+    paddingTop: typewriterMode ? a4TypewriterPadding : `${a4PageMarginY}px`,
+    paddingBottom: typewriterMode ? a4TypewriterPadding : `${a4PageMarginY}px`,
+    background: editorPageBackground,
+    color: editorPageColor,
+  };
+
   // Sem arquivo ativo: renderiza o MESMO frame visual do editor (toolbar
   // simulada + container max-w-680px com padding identico) e so um
   // paragrafo placeholder dentro. NAO e uma "tela cheia centralizada com
@@ -785,17 +822,23 @@ export function Editor() {
         )}
         <div
           data-paper={editorPaper === "default" ? undefined : editorPaper}
-          className="flex-1 overflow-y-auto"
+          className={
+            isA4Continuous
+              ? "flex-1 overflow-auto py-8 px-6"
+              : "flex-1 overflow-y-auto"
+          }
           style={{
-            background:
-              editorPaper === "default"
-                ? "var(--bg-app)"
-                : "var(--editor-paper-bg)",
+            background: editorSurfaceBackground,
+            color: editorSurfaceColor,
           }}
         >
           <div
-            className="mx-auto px-8 py-12"
-            style={{ maxWidth: editorMaxWidth }}
+            className={
+              isA4Continuous
+                ? "solon-editor-a4-page mx-auto"
+                : "mx-auto px-8 py-12"
+            }
+            style={isA4Continuous ? a4BaseStyle : { maxWidth: editorMaxWidth }}
           >
             <p
               className="font-serif italic text-[1.05rem]"
@@ -856,10 +899,9 @@ export function Editor() {
     }
   };
 
-  // Zoom do editor: aplicado como CSS var no container do EditorContent.
-  // Os seletores em globals.css multiplicam font-size por essa var, entao
-  // o usuario pode aumentar/diminuir o tamanho do texto sem afetar a UI
-  // (sidebar, titlebar, statusbar continuam fixos).
+  // Zoom e presets tipograficos: zoom escala a area de escrita; tamanho
+  // do texto muda a hierarquia editorial (paragrafos + headings) sem
+  // depender de porcentagem livre.
   const lineHeightValue =
     EDITOR_LINE_HEIGHTS.find((option) => option.value === editorLineHeight)
       ?.css ?? 1.5;
@@ -873,13 +915,32 @@ export function Editor() {
   const editorFontFamilyValue =
     EDITOR_FONT_FAMILIES.find((option) => option.value === editorFontFamily)
       ?.css ?? EDITOR_FONT_FAMILIES[0].css;
+  const editorTextScale =
+    EDITOR_TEXT_SIZES.find((option) => option.value === editorTextSize)?.css ?? 1;
   const editorVars = {
     ["--editor-zoom" as string]: String(editorZoom / 100),
+    ["--editor-text-scale" as string]: String(editorTextScale),
     ["--editor-line-height" as string]: String(lineHeightValue),
     ["--editor-paragraph-spacing" as string]: paragraphSpacingValue,
     ["--editor-indent-size" as string]: indentSizeValue,
     ["--editor-font-family" as string]: editorFontFamilyValue,
   };
+  const editorScrollerClassName = isA4Continuous
+    ? "flex-1 overflow-auto py-8 px-6"
+    : "flex-1 overflow-y-auto";
+  const editorBodyClassName = isA4Continuous
+    ? "solon-editor-a4-page mx-auto cursor-text"
+    : "mx-auto px-8 cursor-text";
+  const fluidEditorBodyStyle: React.CSSProperties = {
+    ...editorVars,
+    maxWidth: Math.round(editorMaxWidth * editorScale),
+    paddingTop: typewriterMode ? "min(30vh, 220px)" : "3rem",
+    paddingBottom: typewriterMode ? "min(30vh, 220px)" : "3rem",
+    minHeight: "100%",
+  };
+  const editorBodyStyle: React.CSSProperties = isA4Continuous
+    ? { ...editorVars, ...a4BaseStyle }
+    : fluidEditorBodyStyle;
 
   return (
     <div className="relative flex flex-col h-full">
@@ -896,38 +957,20 @@ export function Editor() {
       <div
         ref={scrollRef}
         data-paper={editorPaper === "default" ? undefined : editorPaper}
-        className="flex-1 overflow-y-auto"
+        className={editorScrollerClassName}
         onClick={focusEnd}
         onScroll={scheduleScrollMemory}
         style={{
           // Quando ha papel custom, aplica bg/text via vars CSS settadas
           // em globals.css ([data-paper=...]). "default" deixa vazio →
           // fallback pro --bg-app/--text-primary do tema.
-          background:
-            editorPaper === "default"
-              ? "var(--bg-app)"
-              : "var(--editor-paper-bg)",
-          color:
-            editorPaper === "default"
-              ? "var(--text-primary)"
-              : "var(--editor-paper-text)",
+          background: editorSurfaceBackground,
+          color: editorSurfaceColor,
         }}
       >
         <div
-          className="mx-auto px-8 cursor-text"
-          style={{
-            ...editorVars,
-            maxWidth: Math.round(editorMaxWidth * (editorZoom / 100)),
-            // Typewriter mode adiciona padding pra que o caret possa
-            // centralizar mesmo em docs curtos. Antes era 40vh — muito
-            // agressivo: em docs com poucas linhas, o conteudo aparecia
-            // empurrado pro centro/fundo e podia parecer "tela vazia".
-            // 30vh dá folga sem virar pagina em branco. min(30vh, 220px)
-            // limita em monitores muito altos (4K vertical).
-            paddingTop: typewriterMode ? "min(30vh, 220px)" : "3rem",
-            paddingBottom: typewriterMode ? "min(30vh, 220px)" : "3rem",
-            minHeight: "100%",
-          } as React.CSSProperties}
+          className={editorBodyClassName}
+          style={editorBodyStyle}
         >
           <EditorContent editor={editor} />
         </div>

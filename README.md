@@ -126,7 +126,7 @@ Building from source works on both. A release matrix for multiple operating syst
 | Global search                      | `Ctrl+Shift+F`                     |
 | Find in note                       | `Ctrl+F`                           |
 | Local history                      | `Ctrl+Alt+H`                       |
-| Editor, Canvas, Home               | `Ctrl+1` / `Ctrl+2`                |
+| Livre, Canvas, Home                | `Ctrl+1` / `Ctrl+2`                |
 | New empty note                     | `Ctrl+T`                           |
 | Scratchpad                         | `Ctrl+Shift+N`                     |
 | Close tab                          | `Ctrl+W`                           |

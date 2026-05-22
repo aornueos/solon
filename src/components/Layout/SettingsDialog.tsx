@@ -18,8 +18,10 @@ import {
   EDITOR_INDENT_SIZES,
   EDITOR_LINE_HEIGHTS,
   EDITOR_MAX_WIDTHS,
+  EDITOR_PAGE_LAYOUTS,
   EDITOR_PAPERS,
   EDITOR_PARAGRAPH_SPACING,
+  EDITOR_TEXT_SIZES,
   useAppStore,
 } from "../../store/useAppStore";
 import {
@@ -49,6 +51,10 @@ export function SettingsDialog() {
   const setAppZoom = useAppStore((s) => s.setAppZoom);
   const editorMaxWidth = useAppStore((s) => s.editorMaxWidth);
   const setEditorMaxWidth = useAppStore((s) => s.setEditorMaxWidth);
+  const editorPageLayout = useAppStore((s) => s.editorPageLayout);
+  const setEditorPageLayout = useAppStore((s) => s.setEditorPageLayout);
+  const editorTextSize = useAppStore((s) => s.editorTextSize);
+  const setEditorTextSize = useAppStore((s) => s.setEditorTextSize);
   const editorLineHeight = useAppStore((s) => s.editorLineHeight);
   const setEditorLineHeight = useAppStore((s) => s.setEditorLineHeight);
   const editorParagraphSpacing = useAppStore((s) => s.editorParagraphSpacing);
@@ -306,7 +312,7 @@ export function SettingsDialog() {
               />
 
               <RangeRow
-                label="Zoom do texto"
+                label="Zoom da página"
                 icon={<Type size={12} />}
                 value={editorZoom}
                 suffix="%"
@@ -317,7 +323,28 @@ export function SettingsDialog() {
                 onReset={() => setEditorZoom(100)}
               />
 
-              <Row label="Largura do editor" hint={`${editorMaxWidth}px`}>
+            </Section>
+
+            <Section title="Escrita" description="Ritmo do texto e tipografia padrão.">
+              <Row label="Tamanho do texto" hint={getTextSizeLabel(editorTextSize)}>
+                <SelectControl
+                  value={editorTextSize}
+                  options={EDITOR_TEXT_SIZES.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  onChange={setEditorTextSize}
+                />
+              </Row>
+
+              <Row
+                label="Largura no modo livre"
+                hint={
+                  editorPageLayout === "a4-continuous"
+                    ? "Usada no modo livre"
+                    : `${editorMaxWidth}px`
+                }
+              >
                 <SelectControl
                   value={String(editorMaxWidth)}
                   options={EDITOR_MAX_WIDTHS.map((w) => ({
@@ -327,9 +354,7 @@ export function SettingsDialog() {
                   onChange={(v) => setEditorMaxWidth(parseInt(v, 10))}
                 />
               </Row>
-            </Section>
 
-            <Section title="Escrita" description="Ritmo do texto e tipografia padrão.">
               <Row label="Fonte padrão">
                 <SelectControl
                   value={editorFontFamily}
@@ -378,7 +403,18 @@ export function SettingsDialog() {
               </Row>
             </Section>
 
-            <Section title="Editor" description="Salvamento, ortografia e ferramentas.">
+            <Section title="Fluxo" description="Página, salvamento e ferramentas.">
+              <Row label="Página" hint={pageLayoutHint(editorPageLayout)}>
+                <SelectControl
+                  value={editorPageLayout}
+                  options={EDITOR_PAGE_LAYOUTS.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  onChange={setEditorPageLayout}
+                />
+              </Row>
+
               <Row label="Auto-save" hint="Ctrl+S continua disponível a qualquer momento." icon={<Save size={12} />}>
                 <Toggle
                   checked={autoSaveEnabled}
@@ -403,7 +439,7 @@ export function SettingsDialog() {
                 />
               </Row>
 
-              <Row label="Toolbar do editor">
+              <Row label="Toolbar da escrita">
                 <SelectControl
                   value={editorToolbarMode}
                   options={[
@@ -430,7 +466,7 @@ export function SettingsDialog() {
                   value={startView}
                   options={[
                     { value: "home", label: "Início" },
-                    { value: "editor", label: "Editor" },
+                    { value: "editor", label: "Livre" },
                     { value: "canvas", label: "Canvas" },
                   ]}
                   onChange={(v) => setStartView(v as "home" | "editor" | "canvas")}
@@ -906,6 +942,14 @@ function ActionButton({
 
 function themeHint(value: string): string | undefined {
   return EDITOR_PAPERS.find((option) => option.value === value)?.hint;
+}
+
+function pageLayoutHint(value: string): string | undefined {
+  return EDITOR_PAGE_LAYOUTS.find((option) => option.value === value)?.hint;
+}
+
+function getTextSizeLabel(value: string): string {
+  return EDITOR_TEXT_SIZES.find((option) => option.value === value)?.label ?? "Médio";
 }
 
 function formatDateTime(timestamp: number): string {
