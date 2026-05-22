@@ -82,6 +82,10 @@ if (!updater.pubkey || updater.pubkey.length < 40) {
   throw new Error("Updater pubkey ausente ou curta demais em src-tauri/tauri.conf.json.");
 }
 
+if (tauri.bundle?.createUpdaterArtifacts !== true) {
+  throw new Error("bundle.createUpdaterArtifacts precisa ficar true para gerar .sig/latest.json.");
+}
+
 const webviewMode = tauri.bundle?.windows?.webviewInstallMode;
 if (webviewMode?.type !== "downloadBootstrapper") {
   throw new Error("bundle.windows.webviewInstallMode precisa ficar em downloadBootstrapper.");

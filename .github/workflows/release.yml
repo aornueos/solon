@@ -159,7 +159,7 @@ jobs:
             - Ajustes de zoom, largura, tipografia e contraste dos papéis.
 
             **Instalacao:**
-            - Windows: `.msi` ou `.nsis.zip` abaixo
+            - Windows: `.msi` ou `setup.exe` abaixo
 
             Apps ja instalados detectam essa versao automaticamente no
             proximo boot e oferecem update via banner.

@@ -30,6 +30,10 @@ const tag = `v${pkg.version}`;
 
 assert(pkg.version === tauri.version, "package.json e tauri.conf.json estão desalinhados.");
 assert(cargoToml.includes(`version = "${pkg.version}"`), "Cargo.toml está desalinhado.");
+assert(
+  tauri.bundle?.createUpdaterArtifacts === true,
+  "bundle.createUpdaterArtifacts precisa estar true para gerar .sig/latest.json.",
+);
 assert(tauri.bundle?.windows?.webviewInstallMode?.type === "downloadBootstrapper", "WebView2 precisa usar downloadBootstrapper.");
 assert(tauri.plugins?.updater?.active === true, "Updater precisa estar ativo.");
 assert(tauri.plugins?.updater?.pubkey?.length > 40, "Updater pubkey ausente ou curta demais.");
