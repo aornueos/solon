@@ -80,7 +80,7 @@ What that means in practice:
 
 ### Look and Feel
 
-* **Six themes**: light, creme, sepia, gray, midnight, and Tokyo.
+* **Seven themes**: light, creme, sepia, gray, midnight, Tokyo, and Noir (true-black, OLED-friendly).
 * **Editorial typography** uses Lora by default, with Inter and Courier as alternates.
 * **Reading preferences** include line height, paragraph spacing, indent size, max column width, and zoom.
 * **Theme aware dropdowns** make native `<select>` popups follow the active theme through `color-scheme`.

@@ -71,6 +71,7 @@ export function CanvasView() {
   const canvasDefaultTextSize = useAppStore((s) => s.canvasDefaultTextSize);
   const canvasDefaultDrawWidth = useAppStore((s) => s.canvasDefaultDrawWidth);
   const canvasDefaultColor = useAppStore((s) => s.canvasDefaultColor);
+  const canvasDblClickCreates = useAppStore((s) => s.canvasDblClickCreates);
   const pushToast = useAppStore((s) => s.pushToast);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -776,7 +777,21 @@ export function CanvasView() {
   const onBgDoubleClick = (e: React.MouseEvent) => {
     if (tool !== "select") return;
     const { x, y } = screenToWorld(e.clientX, e.clientY);
-    addCard({ x: snap(x - 110), y: snap(y - 60) });
+    if (canvasDblClickCreates === "card") {
+      addCard({ x: snap(x - 110), y: snap(y - 60) });
+      return;
+    }
+    // Padrão a partir do 0.9.21: duplo clique cria texto solto pronto pra
+    // editar inline. Mais leve que card pra anotações no canvas. O card
+    // segue acessível por "N" / botão da toolbar / Ajustes → Canvas.
+    const id = addText({
+      x: snap(x),
+      y: snap(y),
+      text: "",
+      size: canvasDefaultTextSize || DEFAULT_TEXT_SIZE,
+      color: drawColor,
+    });
+    setJustCreatedTextId(id);
   };
 
   const bgCursor =

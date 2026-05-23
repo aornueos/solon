@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  CANVAS_DBLCLICK_ACTIONS,
   EDITOR_FONT_FAMILIES,
   EDITOR_INDENT_SIZES,
   EDITOR_LINE_HEIGHTS,
@@ -89,6 +90,8 @@ export function SettingsDialog() {
   const setAutoExpandMovedFolders = useAppStore((s) => s.setAutoExpandMovedFolders);
   const restoreWorkspaceLayout = useAppStore((s) => s.restoreWorkspaceLayout);
   const setRestoreWorkspaceLayout = useAppStore((s) => s.setRestoreWorkspaceLayout);
+  const canvasDblClickCreates = useAppStore((s) => s.canvasDblClickCreates);
+  const setCanvasDblClickCreates = useAppStore((s) => s.setCanvasDblClickCreates);
   const rootFolder = useAppStore((s) => s.rootFolder);
   const fileTree = useAppStore((s) => s.fileTree);
   const openWorkspaceHealth = useAppStore((s) => s.openWorkspaceHealth);
@@ -513,6 +516,26 @@ export function SettingsDialog() {
                   checked={showStatusPath}
                   onChange={setShowStatusPath}
                   label={showStatusPath ? "Ativado" : "Desativado"}
+                />
+              </Row>
+            </Section>
+
+            <Section title="Canvas" description="Comportamento do quadro de planejamento visual.">
+              <Row
+                label="Duplo clique no fundo"
+                hint={
+                  CANVAS_DBLCLICK_ACTIONS.find(
+                    (option) => option.value === canvasDblClickCreates,
+                  )?.hint
+                }
+              >
+                <SelectControl
+                  value={canvasDblClickCreates}
+                  options={CANVAS_DBLCLICK_ACTIONS.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  onChange={setCanvasDblClickCreates}
                 />
               </Row>
             </Section>

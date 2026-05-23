@@ -38,7 +38,7 @@ export type EditorPageLayout = "fluid" | "a4-continuous";
 export type EditorTextSize = "small" | "medium" | "large";
 
 /** Variantes de "papel" do editor — vide doc no AppState.editorPaper. */
-export type EditorPaper = "default" | "creme" | "sepia" | "gray" | "midnight" | "tokyo";
+export type EditorPaper = "default" | "creme" | "sepia" | "gray" | "midnight" | "tokyo" | "noir";
 
 /**
  * Dialog modal ativo — usado em vez de `window.prompt/confirm` (que
@@ -343,6 +343,10 @@ interface AppState {
   canvasDefaultTextSize: number;
   canvasDefaultDrawWidth: number;
   canvasDefaultColor: string;
+  /** Ação ao dar duplo clique no fundo do canvas. Padrão: "text"
+   *  (mais leve, vira inline edit). "card" preserva o comportamento
+   *  anterior ao 0.9.21. */
+  canvasDblClickCreates: CanvasDblClickAction;
   /** Snapshots locais antes de sobrescrever notas. */
   localHistoryEnabled: boolean;
   /** Comportamentos de conveniencia. */
@@ -450,6 +454,7 @@ interface AppState {
   setCanvasDefaultTextSize: (v: number) => void;
   setCanvasDefaultDrawWidth: (v: number) => void;
   setCanvasDefaultColor: (v: string) => void;
+  setCanvasDblClickCreates: (v: CanvasDblClickAction) => void;
   setLocalHistoryEnabled: (v: boolean) => void;
   setOpenLastFileOnStartup: (v: boolean) => void;
   setAutoExpandMovedFolders: (v: boolean) => void;
@@ -655,6 +660,7 @@ const DEFAULT_CANVAS_TOOL: CanvasTool = "select";
 const DEFAULT_CANVAS_TEXT_SIZE = 24;
 const DEFAULT_CANVAS_DRAW_WIDTH = 2;
 const DEFAULT_CANVAS_COLOR = "";
+const DEFAULT_CANVAS_DBLCLICK_ACTION: CanvasDblClickAction = "text";
 const DEFAULT_LOCAL_HISTORY_ENABLED = true;
 const DEFAULT_OPEN_LAST_FILE_ON_STARTUP = true;
 const DEFAULT_AUTO_EXPAND_MOVED_FOLDERS = true;
@@ -685,6 +691,7 @@ const CANVAS_DEFAULT_TOOL_KEY = "solon:canvasDefaultTool";
 const CANVAS_DEFAULT_TEXT_SIZE_KEY = "solon:canvasDefaultTextSize";
 const CANVAS_DEFAULT_DRAW_WIDTH_KEY = "solon:canvasDefaultDrawWidth";
 const CANVAS_DEFAULT_COLOR_KEY = "solon:canvasDefaultColor";
+const CANVAS_DBLCLICK_ACTION_KEY = "solon:canvasDblClickAction";
 const LOCAL_HISTORY_ENABLED_KEY = "solon:localHistoryEnabled";
 const OPEN_LAST_FILE_ON_STARTUP_KEY = "solon:openLastFileOnStartup";
 const AUTO_EXPAND_MOVED_FOLDERS_KEY = "solon:autoExpandMovedFolders";
@@ -763,6 +770,7 @@ export const EDITOR_PAPERS = [
   { value: "gray" as const, label: "Cinza", hint: "Neutro frio" },
   { value: "midnight" as const, label: "Noite", hint: "Azul-tinta escuro" },
   { value: "tokyo" as const, label: "Tokyo", hint: "Escuro neon suave" },
+  { value: "noir" as const, label: "Noir", hint: "Preto OLED, âmbar quente" },
 ];
 
 export const CANVAS_GRID_SIZES = [16, 24, 32, 48] as const;
@@ -774,6 +782,16 @@ export const CANVAS_DEFAULT_TOOLS: CanvasTool[] = [
   "draw",
   "text",
   "eraser",
+];
+
+export type CanvasDblClickAction = "text" | "card";
+export const CANVAS_DBLCLICK_ACTIONS: {
+  value: CanvasDblClickAction;
+  label: string;
+  hint?: string;
+}[] = [
+  { value: "text", label: "Texto solto", hint: "Edita inline; leve para anotações." },
+  { value: "card", label: "Card", hint: "Comportamento clássico do canvas." },
 ];
 
 function loadEditorLineHeight(): EditorLineHeight {
@@ -864,6 +882,16 @@ function loadCanvasTool(): CanvasTool {
     if (v && CANVAS_DEFAULT_TOOLS.includes(v)) return v;
   } catch {}
   return DEFAULT_CANVAS_TOOL;
+}
+
+function loadCanvasDblClickAction(): CanvasDblClickAction {
+  try {
+    const v = localStorage.getItem(CANVAS_DBLCLICK_ACTION_KEY);
+    if (v === "text" || v === "card") return v;
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_CANVAS_DBLCLICK_ACTION;
 }
 
 function loadStringPref(key: string, fallback: string): string {
@@ -1029,6 +1057,7 @@ export const useAppStore = create<AppState>((set) => ({
     DEFAULT_CANVAS_DRAW_WIDTH,
   ),
   canvasDefaultColor: loadStringPref(CANVAS_DEFAULT_COLOR_KEY, DEFAULT_CANVAS_COLOR),
+  canvasDblClickCreates: loadCanvasDblClickAction(),
   localHistoryEnabled: loadBoolPref(
     LOCAL_HISTORY_ENABLED_KEY,
     DEFAULT_LOCAL_HISTORY_ENABLED,
@@ -1464,6 +1493,7 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.removeItem(CANVAS_DEFAULT_TEXT_SIZE_KEY);
       localStorage.removeItem(CANVAS_DEFAULT_DRAW_WIDTH_KEY);
       localStorage.removeItem(CANVAS_DEFAULT_COLOR_KEY);
+      localStorage.removeItem(CANVAS_DBLCLICK_ACTION_KEY);
       localStorage.removeItem(LOCAL_HISTORY_ENABLED_KEY);
       localStorage.removeItem(OPEN_LAST_FILE_ON_STARTUP_KEY);
       localStorage.removeItem(AUTO_EXPAND_MOVED_FOLDERS_KEY);
@@ -1498,6 +1528,7 @@ export const useAppStore = create<AppState>((set) => ({
       canvasDefaultTextSize: DEFAULT_CANVAS_TEXT_SIZE,
       canvasDefaultDrawWidth: DEFAULT_CANVAS_DRAW_WIDTH,
       canvasDefaultColor: DEFAULT_CANVAS_COLOR,
+      canvasDblClickCreates: DEFAULT_CANVAS_DBLCLICK_ACTION,
       localHistoryEnabled: DEFAULT_LOCAL_HISTORY_ENABLED,
       openLastFileOnStartup: DEFAULT_OPEN_LAST_FILE_ON_STARTUP,
       autoExpandMovedFolders: DEFAULT_AUTO_EXPAND_MOVED_FOLDERS,
@@ -1729,6 +1760,16 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ canvasDefaultColor: v });
+  },
+
+  setCanvasDblClickCreates: (v) => {
+    if (v !== "text" && v !== "card") return;
+    try {
+      localStorage.setItem(CANVAS_DBLCLICK_ACTION_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ canvasDblClickCreates: v });
   },
 
   setLocalHistoryEnabled: (v) => {

@@ -19,7 +19,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useAppStore } from "../../store/useAppStore";
+import { EDITOR_PAPERS, useAppStore, type EditorPaper } from "../../store/useAppStore";
 import { SCENE_STATUSES } from "../../types/scene";
 import { toggleAppFullscreen } from "../../lib/windows";
 import clsx from "clsx";
@@ -135,6 +135,8 @@ export function Titlebar() {
   const setActiveView = useAppStore((s) => s.setActiveView);
   const editorPageLayout = useAppStore((s) => s.editorPageLayout);
   const setEditorPageLayout = useAppStore((s) => s.setEditorPageLayout);
+  const editorPaper = useAppStore((s) => s.editorPaper);
+  const setEditorPaper = useAppStore((s) => s.setEditorPaper);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
@@ -334,6 +336,27 @@ export function Titlebar() {
                 {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
               </IconBtn>
             )}
+            {/* Troca rápida de tema — antes só via Ajustes. O select nativo
+                respeita color-scheme (definido por [data-paper] em globals.css),
+                então o popup do SO sai claro/escuro coerente com o tema. */}
+            <select
+              aria-label="Tema visual"
+              title="Tema visual"
+              value={editorPaper}
+              onChange={(e) => setEditorPaper(e.target.value as EditorPaper)}
+              className="h-6 ml-0.5 px-1.5 text-[0.7rem] rounded transition-colors outline-none"
+              style={{
+                background: "transparent",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              {EDITOR_PAPERS.map((paper) => (
+                <option key={paper.value} value={paper.value}>
+                  {paper.label}
+                </option>
+              ))}
+            </select>
           </>
         )}
         <IconBtn onClick={openSettings} title="Preferências (Ctrl+,)">
