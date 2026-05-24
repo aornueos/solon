@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   PanelLeft,
   Focus,
@@ -17,6 +17,7 @@ import {
   FileDown,
   BookOpen,
   HelpCircle,
+  ChevronDown,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EDITOR_PAPERS, useAppStore, type EditorPaper } from "../../store/useAppStore";
@@ -119,6 +120,132 @@ function useWindowControls() {
   };
 
   return { available, isMaximized, isFullscreen, minimize, toggleMaximize, toggleFullscreen, close };
+}
+
+/**
+ * Dropdown custom de tema. <select> nativo só aceita `color-scheme`
+ * (light/dark) para o popup do SO — não dá pra forçar a paleta exata
+ * do tema atual. No Noir o popup nativo saía cinza-OS, destoando do
+ * preto puro do app. Este popover usa as CSS vars como o resto da UI:
+ * o popup vira `--bg-panel` com border `--border` e shadow temática,
+ * item ativo ganha o `--accent` do tema corrente. Coerência total.
+ */
+function ThemePicker({
+  value,
+  onChange,
+}: {
+  value: EditorPaper;
+  onChange: (v: EditorPaper) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const current = EDITOR_PAPERS.find((paper) => paper.value === value);
+
+  // Click fora fecha o popover.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  // Esc fecha — capture pra não competir com handlers do editor.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [open]);
+
+  return (
+    <div
+      ref={rootRef}
+      className="relative"
+      // titlebar é zona de drag (data-tauri-drag-region) — sem este stop,
+      // mousedown no botão viraria drag da janela em vez de abrir.
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        aria-label="Tema visual"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        title="Tema visual"
+        onClick={() => setOpen((o) => !o)}
+        className="h-6 ml-0.5 px-1.5 text-[0.7rem] rounded inline-flex items-center gap-1 transition-colors outline-none"
+        style={{
+          background: open ? "var(--bg-hover)" : "transparent",
+          color: open ? "var(--text-primary)" : "var(--text-secondary)",
+          border: "1px solid var(--border-subtle)",
+        }}
+      >
+        <span>{current?.label ?? "Tema"}</span>
+        <ChevronDown size={10} style={{ opacity: 0.65 }} />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label="Temas"
+          className="absolute right-0 mt-1 rounded-md overflow-hidden z-[60]"
+          style={{
+            top: "100%",
+            minWidth: 168,
+            background: "var(--bg-panel)",
+            border: "1px solid var(--border)",
+            boxShadow: "var(--shadow-md)",
+            color: "var(--text-primary)",
+          }}
+        >
+          {EDITOR_PAPERS.map((paper) => {
+            const active = paper.value === value;
+            return (
+              <button
+                key={paper.value}
+                role="option"
+                aria-selected={active}
+                type="button"
+                onClick={() => {
+                  onChange(paper.value);
+                  setOpen(false);
+                }}
+                className="block w-full px-2.5 py-1.5 text-left text-[0.72rem] transition-colors"
+                style={{
+                  background: active ? "var(--accent-soft)" : "transparent",
+                  color: active ? "var(--accent)" : "var(--text-secondary)",
+                  fontWeight: active ? 600 : 400,
+                  borderLeft: active
+                    ? "2px solid var(--accent)"
+                    : "2px solid transparent",
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.background =
+                      "var(--bg-hover)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.background =
+                      "transparent";
+                  }
+                }}
+              >
+                {paper.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function Titlebar() {
@@ -336,27 +463,11 @@ export function Titlebar() {
                 {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
               </IconBtn>
             )}
-            {/* Troca rápida de tema — antes só via Ajustes. O select nativo
-                respeita color-scheme (definido por [data-paper] em globals.css),
-                então o popup do SO sai claro/escuro coerente com o tema. */}
-            <select
-              aria-label="Tema visual"
-              title="Tema visual"
-              value={editorPaper}
-              onChange={(e) => setEditorPaper(e.target.value as EditorPaper)}
-              className="h-6 ml-0.5 px-1.5 text-[0.7rem] rounded transition-colors outline-none"
-              style={{
-                background: "transparent",
-                color: "var(--text-secondary)",
-                border: "1px solid var(--border-subtle)",
-              }}
-            >
-              {EDITOR_PAPERS.map((paper) => (
-                <option key={paper.value} value={paper.value}>
-                  {paper.label}
-                </option>
-              ))}
-            </select>
+            {/* Troca rápida de tema. Antes era um <select> nativo, mas o
+                popup é desenhado pelo Chromium (só aceita color-scheme,
+                não cores custom) e destoava do tema — gritante no Noir.
+                Popover custom usa as mesmas CSS vars que o resto da app. */}
+            <ThemePicker value={editorPaper} onChange={setEditorPaper} />
           </>
         )}
         <IconBtn onClick={openSettings} title="Preferências (Ctrl+,)">
