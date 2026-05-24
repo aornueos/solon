@@ -770,7 +770,7 @@ export const EDITOR_PAPERS = [
   { value: "gray" as const, label: "Cinza", hint: "Neutro frio" },
   { value: "midnight" as const, label: "Noite", hint: "Azul-tinta escuro" },
   { value: "tokyo" as const, label: "Tokyo", hint: "Escuro neon suave" },
-  { value: "noir" as const, label: "Noir", hint: "Preto OLED, âmbar quente" },
+  { value: "noir" as const, label: "Noir", hint: "Folha cinza sobre laterais pretas" },
 ];
 
 export const CANVAS_GRID_SIZES = [16, 24, 32, 48] as const;

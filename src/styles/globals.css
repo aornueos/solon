@@ -233,41 +233,47 @@
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.55);
 }
 
-/* Noir — preto OLED de verdade (distinto de midnight/tokyo, que são
-   azuis-noite). bg-app puro #000 economiza energia em OLED e dá
-   contraste máximo pra leitura noturna. Accent âmbar quente mantém a
-   identidade literária do projeto (combina com light/creme/sepia)
-   contrastando com os outros temas escuros, que são frios. */
+/* Noir — monocromático. Chrome (sidebar/titlebar/etc.) em preto puro
+   #000 sobre o desk #000 (OLED-friendly); a folha do editor é cinza
+   claramente destacado (--editor-paper-bg #1f1f1f) pra parecer um
+   documento flutuando sobre as laterais. Accent BRANCO (#ffffff) em
+   vez do âmbar inicial — substitui o "dourado" em wikilinks, ring de
+   seleção, folder ativa, marquee, find. Distinção das outras paper
+   variants escuras (midnight/tokyo): aqui não tem azul/indigo — só
+   preto, cinza e branco. */
 [data-paper="noir"] {
   --bg-app: #000000;
-  --bg-panel: #0e0e0e;
-  --bg-panel-2: #161616;
-  --bg-hover: #1f1f1f;
-  --bg-active: #2a2a2a;
-  --bg-selected: #2d251a;
+  --bg-panel: #000000;
+  --bg-panel-2: #0c0c0c;
+  --bg-hover: #181818;
+  --bg-active: #232323;
+  --bg-selected: #1f1f1f;
   --bg-inverse: #ededed;
-  --bg-code: #141414;
+  --bg-code: #161616;
   --text-primary: #ededed;
-  --text-secondary: #c0bcb5;
+  --text-secondary: #bdb9b3;
   --text-muted: #888481;
   --text-placeholder: #555250;
   --text-inverse: #000000;
-  --border: #262626;
-  --border-subtle: #1a1a1a;
-  --border-strong: #3a3a3a;
-  --accent: #d4a960;
-  --accent-2: #e6c180;
-  --accent-soft: rgba(212, 169, 96, 0.18);
-  --danger: #e05656;
+  --border: #1f1f1f;
+  --border-subtle: #141414;
+  --border-strong: #333333;
+  /* Accent branco. Slight 6% acima de --text-primary (#ffffff vs
+     #ededed) pra que elementos accent ainda "pulem" sobre o corpo de
+     texto sem virar uma cor diferente. */
+  --accent: #ffffff;
+  --accent-2: #c0bcb5;
+  --accent-soft: rgba(255, 255, 255, 0.14);
+  --danger: #e07a7a;
   --success: #9bbf6e;
-  --text-selection-bg: rgba(212, 169, 96, 0.26);
-  --heading-rule: #d4a960;
-  --folder-color: #b9904e;
-  --folder-color-open: #d4a960;
+  --text-selection-bg: rgba(255, 255, 255, 0.22);
+  --heading-rule: #c0bcb5;
+  --folder-color: #888481;
+  --folder-color-open: #ffffff;
   --dot-grid: #1a1a1a;
-  --marquee-fill: rgba(212, 169, 96, 0.10);
-  --marquee-stroke: rgba(212, 169, 96, 0.72);
-  --selection-ring: rgba(212, 169, 96, 0.65);
+  --marquee-fill: rgba(255, 255, 255, 0.06);
+  --marquee-stroke: rgba(255, 255, 255, 0.65);
+  --selection-ring: rgba(255, 255, 255, 0.55);
   --canvas-text-auto: #ededed;
   --canvas-text-placeholder: rgba(237, 237, 237, 0.36);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.55);
@@ -478,6 +484,17 @@ select:focus-visible {
   --editor-paper-text: #c0caf5;
   --editor-paper-text-muted: #7aa2f7;
   --editor-paper-text-placeholder: #565f89;
+}
+/* Noir: a folha do editor (--editor-paper-bg) é cinza neutro, em
+   contraste com as laterais pretas (--bg-panel #000). Cria a sensação
+   de "documento sobre uma mesa preta", consistente em fluid mode e
+   sheet/A4 (ambos consomem --editor-paper-bg quando paper variant é
+   ativo). */
+[data-paper="noir"] {
+  --editor-paper-bg: #1f1f1f;
+  --editor-paper-text: #ededed;
+  --editor-paper-text-muted: #aaa6a0;
+  --editor-paper-text-placeholder: #5d5a55;
 }
 
 /* ─────────────────────────────────────────
