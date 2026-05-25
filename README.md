@@ -50,7 +50,7 @@ What that means in practice:
 * **Sidebar** supports drag and drop reorder, file movement, and manual ordering per folder.
 * **Tag filter** filters the sidebar by frontmatter tag.
 * **Recents** appear on the home page.
-* **Quick scratchpad** with `Ctrl+Shift+N` captures fragments without committing to a filename.
+* **Quick scratchpad** with `Ctrl+T` (or `Ctrl+Shift+N`) captures fragments without committing to a filename — no auto-created files.
 * **Duplicate file** is available from the context menu.
 
 ### Storyboard
@@ -80,7 +80,7 @@ What that means in practice:
 
 ### Look and Feel
 
-* **Seven themes**: light, creme, sepia, gray, midnight, Tokyo, and Noir (true-black, OLED-friendly).
+* **Twenty-two themes** covering light, warm, cool, and dark moods — including Roseglow, Custard, Petal, Mermaid, Pumpkin spice, Cotton candy, Marble (lights), and Leatherbound, Wasteland, Cinema vérité, Wicked fog, Orchid noir, Aura, Afterglow, Radioactive, Tokyo, Midnight, Noir (darks). Each one tunes the editor surface, chrome, selection, wikilinks, and accents to a coherent palette.
 * **Editorial typography** uses Lora by default, with Inter and Courier as alternates.
 * **Reading preferences** include line height, paragraph spacing, indent size, max column width, and zoom.
 * **Theme aware dropdowns** make native `<select>` popups follow the active theme through `color-scheme`.
@@ -127,8 +127,7 @@ Building from source works on both. A release matrix for multiple operating syst
 | Find in note                       | `Ctrl+F`                           |
 | Local history                      | `Ctrl+Alt+H`                       |
 | Livre, Canvas, Home                | `Ctrl+1` / `Ctrl+2`                |
-| New empty note                     | `Ctrl+T`                           |
-| Scratchpad                         | `Ctrl+Shift+N`                     |
+| Scratchpad                         | `Ctrl+T` / `Ctrl+Shift+N`          |
 | Close tab                          | `Ctrl+W`                           |
 | Next or previous tab               | `Ctrl+Tab` / `Ctrl+Shift+Tab`      |
 | Reopen closed tab                  | `Ctrl+Shift+T`                     |

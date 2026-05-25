@@ -328,12 +328,13 @@ export default function App() {
           toggleReadingMode();
         }
       }
-      // Ctrl+T cria nova nota "Sem titulo" na raiz do projeto e abre
-      // como aba ativa. Convencao classica de browsers/editores. Sem
-      // pasta aberta, mostra toast (createUntitled cuida).
+      // Ctrl+T abre a scratchpad — janela de buffer transiente, sem
+      // criar arquivo no disco. Antes criava "Sem titulo.md" automaticamente,
+      // o que poluia o projeto. createUntitled segue acessivel pelo command
+      // palette ("Nova nota vazia") pra quem quiser de fato.
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "t") {
         e.preventDefault();
-        void createUntitled();
+        openScratchpad();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "n") {

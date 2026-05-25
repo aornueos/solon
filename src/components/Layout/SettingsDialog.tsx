@@ -90,6 +90,8 @@ export function SettingsDialog() {
   const setAutoExpandMovedFolders = useAppStore((s) => s.setAutoExpandMovedFolders);
   const restoreWorkspaceLayout = useAppStore((s) => s.restoreWorkspaceLayout);
   const setRestoreWorkspaceLayout = useAppStore((s) => s.setRestoreWorkspaceLayout);
+  const outlineSide = useAppStore((s) => s.outlineSide);
+  const setOutlineSide = useAppStore((s) => s.setOutlineSide);
   const canvasDblClickCreates = useAppStore((s) => s.canvasDblClickCreates);
   const setCanvasDblClickCreates = useAppStore((s) => s.setCanvasDblClickCreates);
   const rootFolder = useAppStore((s) => s.rootFolder);
@@ -500,6 +502,24 @@ export function SettingsDialog() {
                   checked={showTitlebarActions}
                   onChange={setShowTitlebarActions}
                   label={showTitlebarActions ? "Ativado" : "Desativado"}
+                />
+              </Row>
+
+              <Row
+                label="Lado do Índice"
+                hint={
+                  outlineSide === "left"
+                    ? "Embaixo da Sidebar (esquerda)"
+                    : "Junto do Inspector (direita)"
+                }
+              >
+                <SelectControl
+                  value={outlineSide}
+                  options={[
+                    { value: "right", label: "Direita" },
+                    { value: "left", label: "Esquerda" },
+                  ]}
+                  onChange={setOutlineSide}
                 />
               </Row>
 

@@ -143,7 +143,9 @@ export function CommandPalette() {
       {
         id: "new-note",
         label: "Nova nota vazia",
-        hint: "Ctrl+T",
+        // Sem atalho: Ctrl+T agora abre a scratchpad (buffer transiente,
+        // sem criar arquivo). createUntitled ainda existe aqui pra quem
+        // quiser de fato uma "Sem título.md" criada no disco.
         icon: <Plus size={15} />,
         run: createUntitled,
       },

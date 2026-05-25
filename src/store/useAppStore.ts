@@ -34,11 +34,34 @@ export interface Toast {
 
 export type EditorFontFamily = "serif" | "sans" | "mono";
 export type EditorToolbarMode = "fixed" | "hover";
+export type OutlineSide = "left" | "right";
 export type EditorPageLayout = "fluid" | "a4-continuous";
 export type EditorTextSize = "small" | "medium" | "large";
 
 /** Variantes de "papel" do editor — vide doc no AppState.editorPaper. */
-export type EditorPaper = "default" | "creme" | "sepia" | "gray" | "midnight" | "tokyo" | "noir";
+export type EditorPaper =
+  | "default"
+  | "creme"
+  | "sepia"
+  | "gray"
+  | "midnight"
+  | "tokyo"
+  | "noir"
+  | "roseglow"
+  | "custard"
+  | "petal"
+  | "mermaid"
+  | "pumpkin-spice"
+  | "cotton-candy"
+  | "marble"
+  | "leatherbound"
+  | "wasteland"
+  | "cinema-verite"
+  | "wicked-fog"
+  | "orchid-noir"
+  | "aura"
+  | "afterglow"
+  | "radioactive";
 
 /**
  * Dialog modal ativo — usado em vez de `window.prompt/confirm` (que
@@ -329,6 +352,10 @@ interface AppState {
    *  e fundo permite centralizar mesmo em docs curtos. */
   typewriterMode: boolean;
   editorToolbarMode: EditorToolbarMode;
+  /** Lado em que o painel "Índice" (Outline) docka. "right" (default)
+   *  fica junto do Inspector na coluna direita; "left" desce embaixo
+   *  da Sidebar na coluna esquerda. */
+  outlineSide: OutlineSide;
   /** Mostra contadores e formato na StatusBar. */
   showStatusStats: boolean;
   /** Mostra caminho completo do arquivo na StatusBar. */
@@ -444,6 +471,7 @@ interface AppState {
   setEditorPaper: (v: EditorPaper) => void;
   setTypewriterMode: (v: boolean) => void;
   setEditorToolbarMode: (v: EditorToolbarMode) => void;
+  setOutlineSide: (v: OutlineSide) => void;
   setShowStatusStats: (v: boolean) => void;
   setShowStatusPath: (v: boolean) => void;
   setShowTitlebarActions: (v: boolean) => void;
@@ -650,6 +678,7 @@ const DEFAULT_EDITOR_FONT_FAMILY: EditorFontFamily = "serif";
 const DEFAULT_EDITOR_PAPER: EditorPaper = "default";
 const DEFAULT_TYPEWRITER_MODE = false;
 const DEFAULT_EDITOR_TOOLBAR_MODE: EditorToolbarMode = "fixed";
+const DEFAULT_OUTLINE_SIDE: OutlineSide = "right";
 const DEFAULT_SHOW_STATUS_STATS = true;
 const DEFAULT_SHOW_STATUS_PATH = true;
 const DEFAULT_SHOW_TITLEBAR_ACTIONS = true;
@@ -681,6 +710,7 @@ const EDITOR_FONT_FAMILY_KEY = "solon:editorFontFamily";
 const EDITOR_PAPER_KEY = "solon:editorPaper";
 const TYPEWRITER_MODE_KEY = "solon:typewriterMode";
 const EDITOR_TOOLBAR_MODE_KEY = "solon:editorToolbarMode";
+const OUTLINE_SIDE_KEY = "solon:outlineSide";
 const SHOW_STATUS_STATS_KEY = "solon:showStatusStats";
 const SHOW_STATUS_PATH_KEY = "solon:showStatusPath";
 const SHOW_TITLEBAR_ACTIONS_KEY = "solon:showTitlebarActions";
@@ -771,6 +801,23 @@ export const EDITOR_PAPERS = [
   { value: "midnight" as const, label: "Noite", hint: "Azul-tinta escuro" },
   { value: "tokyo" as const, label: "Tokyo", hint: "Escuro neon suave" },
   { value: "noir" as const, label: "Noir", hint: "Folha cinza sobre laterais pretas" },
+  // ── Claros (0.9.24) ──
+  { value: "roseglow" as const, label: "Roseglow", hint: "Pêssego rosa, luz da tarde" },
+  { value: "custard" as const, label: "Custard", hint: "Baunilha amarelo, suave" },
+  { value: "petal" as const, label: "Petal", hint: "Rosa flor de cerejeira" },
+  { value: "mermaid" as const, label: "Mermaid", hint: "Verde-azulado pastel" },
+  { value: "pumpkin-spice" as const, label: "Pumpkin spice", hint: "Laranja outono quente" },
+  { value: "cotton-candy" as const, label: "Cotton candy", hint: "Pastel rosa-azul gelado" },
+  { value: "marble" as const, label: "Marble", hint: "Cinza-creme neutro" },
+  // ── Escuros (0.9.24) ──
+  { value: "leatherbound" as const, label: "Leatherbound", hint: "Couro escuro com letras de ouro" },
+  { value: "wasteland" as const, label: "Wasteland", hint: "Verde-oliva e cinza, distópico" },
+  { value: "cinema-verite" as const, label: "Cinema vérité", hint: "Teal cinemático" },
+  { value: "wicked-fog" as const, label: "Wicked fog", hint: "Cinza-azulado de bruma" },
+  { value: "orchid-noir" as const, label: "Orchid noir", hint: "Roxo-rosa profundo" },
+  { value: "aura" as const, label: "Aura", hint: "Violeta-cyan aurora" },
+  { value: "afterglow" as const, label: "Afterglow", hint: "Brasa de pôr do sol" },
+  { value: "radioactive" as const, label: "Radioactive", hint: "Verde-neon contra preto" },
 ];
 
 export const CANVAS_GRID_SIZES = [16, 24, 32, 48] as const;
@@ -859,6 +906,14 @@ function loadEditorToolbarMode(): EditorToolbarMode {
     if (v === "fixed" || v === "hover") return v;
   } catch {}
   return DEFAULT_EDITOR_TOOLBAR_MODE;
+}
+
+function loadOutlineSide(): OutlineSide {
+  try {
+    const v = localStorage.getItem(OUTLINE_SIDE_KEY);
+    if (v === "left" || v === "right") return v;
+  } catch {}
+  return DEFAULT_OUTLINE_SIDE;
 }
 
 function loadNumberOption<T extends readonly number[]>(
@@ -1032,6 +1087,7 @@ export const useAppStore = create<AppState>((set) => ({
   editorPaper: loadEditorPaper(),
   typewriterMode: loadBoolPref(TYPEWRITER_MODE_KEY, DEFAULT_TYPEWRITER_MODE),
   editorToolbarMode: loadEditorToolbarMode(),
+  outlineSide: loadOutlineSide(),
   showStatusStats: loadBoolPref(SHOW_STATUS_STATS_KEY, DEFAULT_SHOW_STATUS_STATS),
   showStatusPath: loadBoolPref(SHOW_STATUS_PATH_KEY, DEFAULT_SHOW_STATUS_PATH),
   showTitlebarActions: loadBoolPref(
@@ -1483,6 +1539,7 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.removeItem(EDITOR_PAPER_KEY);
       localStorage.removeItem(TYPEWRITER_MODE_KEY);
       localStorage.removeItem(EDITOR_TOOLBAR_MODE_KEY);
+      localStorage.removeItem(OUTLINE_SIDE_KEY);
       localStorage.removeItem(SHOW_STATUS_STATS_KEY);
       localStorage.removeItem(SHOW_STATUS_PATH_KEY);
       localStorage.removeItem(SHOW_TITLEBAR_ACTIONS_KEY);
@@ -1518,6 +1575,7 @@ export const useAppStore = create<AppState>((set) => ({
       editorPaper: DEFAULT_EDITOR_PAPER,
       typewriterMode: DEFAULT_TYPEWRITER_MODE,
       editorToolbarMode: DEFAULT_EDITOR_TOOLBAR_MODE,
+      outlineSide: DEFAULT_OUTLINE_SIDE,
       showStatusStats: DEFAULT_SHOW_STATUS_STATS,
       showStatusPath: DEFAULT_SHOW_STATUS_PATH,
       showTitlebarActions: DEFAULT_SHOW_TITLEBAR_ACTIONS,
@@ -1666,6 +1724,16 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ editorToolbarMode: v });
+  },
+
+  setOutlineSide: (v) => {
+    if (v !== "left" && v !== "right") return;
+    try {
+      localStorage.setItem(OUTLINE_SIDE_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ outlineSide: v });
   },
 
   setShowStatusStats: (v) => {

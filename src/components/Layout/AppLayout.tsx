@@ -45,6 +45,7 @@ export function AppLayout() {
   const isInspectorOpen = useAppStore((s) => s.isInspectorOpen);
   const sidebarWidth = useAppStore((s) => s.sidebarWidth);
   const outlineWidth = useAppStore((s) => s.outlineWidth);
+  const outlineSide = useAppStore((s) => s.outlineSide);
   const focusMode = useAppStore((s) => s.focusMode);
   const readingMode = useAppStore((s) => s.readingMode);
   const toggleReadingMode = useAppStore((s) => s.toggleReadingMode);
@@ -73,7 +74,12 @@ export function AppLayout() {
     !inHome;
   const showOutline =
     isOutlineOpen && !focusMode && !readingMode && !inCanvas && !inHome;
-  const showRightPanel = showInspector || showOutline;
+  // Outline pode dockar à esquerda (embaixo da Sidebar, mesma coluna)
+  // ou à direita (junto do Inspector, comportamento clássico).
+  const showOutlineRight = showOutline && outlineSide === "right";
+  const showOutlineLeft = showOutline && outlineSide === "left";
+  const showRightPanel = showInspector || showOutlineRight;
+  const showLeftPanel = showSidebar || showOutlineLeft;
   const showTitlebar = !readingMode;
   const showStatusBar = !readingMode;
   const showTabBar = !inHome && !readingMode;
@@ -150,14 +156,41 @@ export function AppLayout() {
       {showTitlebar && <Titlebar />}
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        {showSidebar && (
+        {/* Coluna esquerda: Sidebar e (opcional) Outline dockado à esquerda.
+            Quando outlineSide=="left" o painel "Índice" desce sob a Sidebar
+            na mesma coluna; sem Sidebar aberta, o Outline ocupa a coluna
+            sozinho (mesma largura sidebarWidth pra reaproveitar o gutter). */}
+        {showLeftPanel && (
           <>
             <div
               style={{ width: sidebarWidth }}
-              className="flex-shrink-0 overflow-hidden"
+              className="flex-shrink-0 overflow-hidden flex flex-col"
             >
-              <Sidebar />
+              {showSidebar && (
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <Sidebar />
+                </div>
+              )}
+              {showSidebar && showOutlineLeft && (
+                <div
+                  className="h-px flex-shrink-0"
+                  style={{ background: "var(--border-subtle)" }}
+                />
+              )}
+              {showOutlineLeft && (
+                <div
+                  className={
+                    showSidebar
+                      ? "flex-shrink-0 overflow-hidden"
+                      : "flex-1 min-h-0 overflow-hidden"
+                  }
+                  style={
+                    showSidebar ? { height: "min(40%, 280px)" } : undefined
+                  }
+                >
+                  <Outline />
+                </div>
+              )}
             </div>
             <ResizeGutter onMouseDown={onSidebarMouseDown} />
           </>
@@ -215,7 +248,9 @@ export function AppLayout() {
           </div>
         </div>
 
-        {/* Painel direito: Inspector e/ou Outline */}
+        {/* Painel direito: Inspector e/ou Outline (quando dockado à direita).
+            Se o Outline estiver dockado à esquerda, este painel só carrega
+            Inspector. */}
         {showRightPanel && (
           <>
             <ResizeGutter onMouseDown={onOutlineMouseDown} />
@@ -223,7 +258,7 @@ export function AppLayout() {
               style={{ width: outlineWidth }}
               className="flex-shrink-0 overflow-hidden flex flex-col"
             >
-              {showInspector && showOutline ? (
+              {showInspector && showOutlineRight ? (
                 <>
                   <div className="flex-1 min-h-0 overflow-hidden">
                     <Inspector />
