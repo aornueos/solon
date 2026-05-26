@@ -73,7 +73,7 @@ export async function listSnapshots(
   filePath: string | null,
 ): Promise<LocalSnapshot[]> {
   if (!isTauri() || !rootFolder || !filePath || !isProjectNotePath(rootFolder, filePath)) return [];
-  const { readDir, stat } = await import("@tauri-apps/plugin-fs");
+  const { readDir, stat, readTextFile } = await import("@tauri-apps/plugin-fs");
   const dir = historyDir(rootFolder, filePath);
   try {
     const entries = await readDir(dir);
@@ -83,11 +83,26 @@ export async function listSnapshots(
         .map(async (entry) => {
           const path = joinPath(dir, entry.name ?? "");
           const createdAt = parseTimestamp(entry.name ?? "");
+          // Tauri @tauri-apps/plugin-fs `stat().size` em alguns builds do Windows
+          // retorna 0 mesmo quando o arquivo existe — provavelmente porque o
+          // metadata da CreationTime/Size vem com flags adicionais que o
+          // plugin nao desempacota. Fallback: ler o conteudo e computar
+          // bytes via TextEncoder. Snapshots ficam em <= ~650KB cada
+          // (LARGE_NOTE_BYTES), entao o custo eh aceitavel pra dar feedback
+          // correto no dialog.
           let size = 0;
           try {
             size = (await stat(path)).size ?? 0;
           } catch {
             /* tamanho e opcional */
+          }
+          if (size <= 0) {
+            try {
+              const raw = await readTextFile(path);
+              size = new TextEncoder().encode(raw).byteLength;
+            } catch {
+              /* mantem 0 se nao da pra ler */
+            }
           }
           return {
             path,
@@ -154,6 +169,37 @@ export async function readSnapshot(path: string): Promise<string> {
   return readTextFile(path);
 }
 
+/**
+ * Limpa o texto bruto pra preview legivel no dialog:
+ *  - remove tags HTML inline (TipTap salva `<p style="text-align: justify">`
+ *    em arquivos justificados — exibir isso cru polui a previa);
+ *  - remove sintaxe de marcacao basica (heading hashes, listas, enfase,
+ *    links/imagens, citacoes, code fences/inline) pra que o leitor veja
+ *    o texto, nao a marcacao;
+ *  - colapsa runs de espaco e quebra de linha excessivas.
+ */
+function previewPlainText(raw: string): string {
+  return raw
+    .replace(/<\/?[a-z][^>]*>/gi, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*>\s?/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/~~([^~]+)~~/g, "$1")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export async function previewSnapshot(path: string): Promise<{
   title: string;
   body: string;
@@ -161,11 +207,14 @@ export async function previewSnapshot(path: string): Promise<{
 }> {
   const raw = await readSnapshot(path);
   const parsed = parseDocument(raw);
-  const text = parsed.body.trim();
-  const firstHeading = text.match(/^#\s+(.+)$/m)?.[1]?.trim();
-  const title = firstHeading || text.split(/\r?\n/).find((line) => line.trim())?.trim() || "Snapshot";
-  const words = text ? text.split(/\s+/).length : 0;
-  return { title, body: text, words };
+  const clean = previewPlainText(parsed.body);
+  const firstHeading = parsed.body.match(/^#\s+(.+)$/m)?.[1]?.trim();
+  const title =
+    firstHeading?.replace(/<\/?[a-z][^>]*>/gi, "").trim() ||
+    clean.split(/\r?\n/).find((line) => line.trim())?.trim() ||
+    "Snapshot";
+  const words = clean ? clean.split(/\s+/).filter(Boolean).length : 0;
+  return { title, body: clean, words };
 }
 
 export async function restoreSnapshot(filePath: string, snapshotPath: string): Promise<string> {

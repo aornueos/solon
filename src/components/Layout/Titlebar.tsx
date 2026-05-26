@@ -204,42 +204,62 @@ function ThemePicker({
             color: "var(--text-primary)",
           }}
         >
-          {EDITOR_PAPERS.map((paper) => {
-            const active = paper.value === value;
+          {(["light", "dark"] as const).map((tone, groupIndex) => {
+            const items = EDITOR_PAPERS.filter((paper) => paper.tone === tone);
+            if (items.length === 0) return null;
             return (
-              <button
-                key={paper.value}
-                role="option"
-                aria-selected={active}
-                type="button"
-                onClick={() => {
-                  onChange(paper.value);
-                  setOpen(false);
-                }}
-                className="block w-full px-2.5 py-1.5 text-left text-[0.72rem] transition-colors"
-                style={{
-                  background: active ? "var(--accent-soft)" : "transparent",
-                  color: active ? "var(--accent)" : "var(--text-secondary)",
-                  fontWeight: active ? 600 : 400,
-                  borderLeft: active
-                    ? "2px solid var(--accent)"
-                    : "2px solid transparent",
-                }}
-                onMouseEnter={(e) => {
-                  if (!active) {
-                    (e.currentTarget as HTMLElement).style.background =
-                      "var(--bg-hover)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!active) {
-                    (e.currentTarget as HTMLElement).style.background =
-                      "transparent";
-                  }
-                }}
-              >
-                {paper.label}
-              </button>
+              <div key={tone}>
+                {groupIndex > 0 && (
+                  <div
+                    className="h-px mt-1"
+                    style={{ background: "var(--border-subtle)" }}
+                  />
+                )}
+                <div
+                  className="px-2.5 pt-1.5 pb-0.5 text-[0.6rem] uppercase tracking-widest font-semibold"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {tone === "light" ? "Claros" : "Escuros"}
+                </div>
+                {items.map((paper) => {
+                  const active = paper.value === value;
+                  return (
+                    <button
+                      key={paper.value}
+                      role="option"
+                      aria-selected={active}
+                      type="button"
+                      onClick={() => {
+                        onChange(paper.value);
+                        setOpen(false);
+                      }}
+                      className="block w-full px-2.5 py-1.5 text-left text-[0.72rem] transition-colors"
+                      style={{
+                        background: active ? "var(--accent-soft)" : "transparent",
+                        color: active ? "var(--accent)" : "var(--text-secondary)",
+                        fontWeight: active ? 600 : 400,
+                        borderLeft: active
+                          ? "2px solid var(--accent)"
+                          : "2px solid transparent",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!active) {
+                          (e.currentTarget as HTMLElement).style.background =
+                            "var(--bg-hover)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!active) {
+                          (e.currentTarget as HTMLElement).style.background =
+                            "transparent";
+                        }
+                      }}
+                    >
+                      {paper.label}
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </div>
@@ -463,13 +483,13 @@ export function Titlebar() {
                 {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
               </IconBtn>
             )}
-            {/* Troca rápida de tema. Antes era um <select> nativo, mas o
-                popup é desenhado pelo Chromium (só aceita color-scheme,
-                não cores custom) e destoava do tema — gritante no Noir.
-                Popover custom usa as mesmas CSS vars que o resto da app. */}
-            <ThemePicker value={editorPaper} onChange={setEditorPaper} />
           </>
         )}
+        {/* Theme picker fica FORA do gate showTitlebarActions: trocar tema
+            é ação essencial mesmo com a fileira de ações extras escondida.
+            Antes ficava dentro do bloco e sumia junto, o que mascarava o
+            seletor pra quem reduziu o chrome. */}
+        <ThemePicker value={editorPaper} onChange={setEditorPaper} />
         <IconBtn onClick={openSettings} title="Preferências (Ctrl+,)">
           <SettingsIcon size={14} />
         </IconBtn>

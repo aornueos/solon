@@ -80,123 +80,6 @@
   --shadow-md: 0 4px 12px rgba(58, 45, 31, 0.14);
 }
 
-[data-paper="sepia"] {
-  --bg-app: #ecdfc0;
-  --bg-panel: #f8ebcb;
-  --bg-panel-2: #e2d1ad;
-  --bg-hover: #d6c49c;
-  --bg-active: #c9b58c;
-  --bg-selected: #d7bf8f;
-  --bg-inverse: #3e2f1a;
-  --bg-code: #ddcba7;
-  --text-primary: #352a1b;
-  --text-secondary: #645237;
-  --text-muted: #826f4f;
-  --text-placeholder: #aa966f;
-  --text-inverse: #f8ebcb;
-  --border: #c4ad82;
-  --border-subtle: #d7c39a;
-  --border-strong: #927b55;
-  --accent: #8b6337;
-  --accent-2: #b98a48;
-  --accent-soft: rgba(139, 99, 55, 0.2);
-  --danger: #93483a;
-  --success: #657d45;
-  --text-selection-bg: rgba(139, 99, 55, 0.24);
-  --heading-rule: #b98a48;
-  --folder-color: #8b6337;
-  --folder-color-open: #a8753f;
-  --dot-grid: #d4bd91;
-  --marquee-fill: rgba(139, 99, 55, 0.09);
-  --marquee-stroke: rgba(139, 99, 55, 0.72);
-  --selection-ring: rgba(139, 99, 55, 0.6);
-  --canvas-text-auto: #352a1b;
-  --canvas-text-placeholder: rgba(53, 42, 27, 0.42);
-  --shadow-sm: 0 1px 2px rgba(62, 47, 26, 0.1);
-  --shadow-md: 0 4px 12px rgba(62, 47, 26, 0.16);
-}
-
-[data-paper="gray"] {
-  --bg-app: #e5e3de;
-  --bg-panel: #f3f1ec;
-  --bg-panel-2: #dad7d0;
-  --bg-hover: #d0ccc4;
-  --bg-active: #c2bdb3;
-  --bg-selected: #d4dde9;
-  --bg-inverse: #272522;
-  --bg-code: #d7d3ca;
-  --text-primary: #1f1e1c;
-  --text-secondary: #4f4c47;
-  --text-muted: #77726b;
-  --text-placeholder: #9c968d;
-  --text-inverse: #f3f1ec;
-  --border: #c4bfb6;
-  --border-subtle: #d5d0c7;
-  --border-strong: #938d83;
-  /* Paleta gray usa accent AZUL-AÇO frio, propositalmente sem nenhuma
-     vermelhidão/laranja. Antes era #7c6b54 (marrom-cinza) que no
-     fundo cinza-neutro o olho ainda lia como "ferrugem laranja" — o
-     que destoava do resto da paleta. Azul-aço neutro garante que
-     wikilink/underline/seleção fiquem visualmente alinhados com o
-     fundo frio. */
-  --accent: #5d7b9c;
-  --accent-2: #7a96b3;
-  --accent-soft: rgba(93, 123, 156, 0.18);
-  --danger: #984f4b;
-  --success: #657c58;
-  --text-selection-bg: rgba(93, 123, 156, 0.22);
-  --heading-rule: #7a96b3;
-  --folder-color: #6c7a8a;
-  --folder-color-open: #5d7b9c;
-  --dot-grid: #cbc6bd;
-  --marquee-fill: rgba(93, 123, 156, 0.08);
-  --marquee-stroke: rgba(93, 123, 156, 0.68);
-  --selection-ring: rgba(93, 123, 156, 0.56);
-  --canvas-text-auto: #1f1e1c;
-  --canvas-text-placeholder: rgba(31, 30, 28, 0.4);
-  --shadow-sm: 0 1px 2px rgba(39, 37, 34, 0.08);
-  --shadow-md: 0 4px 12px rgba(39, 37, 34, 0.13);
-}
-
-[data-paper="midnight"] {
-  --bg-app: #141922;
-  --bg-panel: #1c2330;
-  --bg-panel-2: #222b3a;
-  --bg-hover: #2b3649;
-  --bg-active: #344158;
-  --bg-selected: #2d3d5c;
-  --bg-inverse: #eef2f7;
-  --bg-code: #202a3a;
-  --text-primary: #eef2f7;
-  --text-secondary: #c3cad6;
-  --text-muted: #8d97a8;
-  --text-placeholder: #5d6878;
-  --text-inverse: #141922;
-  --border: #334054;
-  --border-subtle: #273244;
-  --border-strong: #536076;
-  /* Accent FRIO coerente com a paleta de noite. Antes era amarelo-ouro
-     #d9b36a que destoava da paleta azul-noite. Azul-céu noturno
-     mantém o accent visível sem brigar com o tom geral. */
-  --accent: #82aaff;
-  --accent-2: #8ec5ff;
-  --accent-soft: rgba(130, 170, 255, 0.2);
-  --danger: #e06c75;
-  --success: #98c379;
-  --dot-grid: #2a3548;
-  --text-selection-bg: rgba(130, 170, 255, 0.27);
-  --heading-rule: #8ec5ff;
-  --folder-color: #8fa3c8;
-  --folder-color-open: #82aaff;
-  --marquee-fill: rgba(130, 170, 255, 0.1);
-  --marquee-stroke: rgba(130, 170, 255, 0.72);
-  --selection-ring: rgba(130, 170, 255, 0.74);
-  --canvas-text-auto: #f3f5f8;
-  --canvas-text-placeholder: rgba(243, 245, 248, 0.36);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.46);
-  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.58);
-}
-
 [data-paper="tokyo"] {
   --bg-app: #1a1b26;
   --bg-panel: #1f2335;
@@ -288,7 +171,7 @@
    e --editor-paper-bg distinto das laterais (mesma técnica do Noir).
 ───────────────────────────────────────── */
 
-[data-paper="roseglow"] {
+[data-paper="amanhecer"] {
   --bg-app: #fff0e8;
   --bg-panel: #fff9f4;
   --bg-panel-2: #fbe2d4;
@@ -324,7 +207,7 @@
   --shadow-md: 0 4px 12px rgba(74, 42, 32, 0.14);
 }
 
-[data-paper="custard"] {
+[data-paper="mel"] {
   --bg-app: #fbf3d4;
   --bg-panel: #fffaeb;
   --bg-panel-2: #f3e6ad;
@@ -360,7 +243,7 @@
   --shadow-md: 0 4px 12px rgba(61, 53, 32, 0.14);
 }
 
-[data-paper="petal"] {
+[data-paper="cerejeira"] {
   --bg-app: #fde6ec;
   --bg-panel: #fff5f8;
   --bg-panel-2: #f5cdd9;
@@ -396,7 +279,7 @@
   --shadow-md: 0 4px 12px rgba(74, 34, 48, 0.14);
 }
 
-[data-paper="mermaid"] {
+[data-paper="lagoa"] {
   --bg-app: #e7f3ef;
   --bg-panel: #f5fbf8;
   --bg-panel-2: #cee5dc;
@@ -432,7 +315,7 @@
   --shadow-md: 0 4px 12px rgba(31, 58, 50, 0.14);
 }
 
-[data-paper="pumpkin-spice"] {
+[data-paper="paprica"] {
   --bg-app: #f4dfba;
   --bg-panel: #f9eccf;
   --bg-panel-2: #e6c894;
@@ -468,7 +351,7 @@
   --shadow-md: 0 4px 12px rgba(66, 40, 20, 0.15);
 }
 
-[data-paper="cotton-candy"] {
+[data-paper="algodao"] {
   --bg-app: #e8e0f0;
   --bg-panel: #f4eef9;
   --bg-panel-2: #d5c5e2;
@@ -504,43 +387,7 @@
   --shadow-md: 0 4px 12px rgba(58, 42, 74, 0.14);
 }
 
-[data-paper="marble"] {
-  --bg-app: #ebe7e0;
-  --bg-panel: #f6f3ec;
-  --bg-panel-2: #d6d1c6;
-  --bg-hover: #c5c0b3;
-  --bg-active: #afa99a;
-  --bg-selected: #cfcabc;
-  --bg-inverse: #2c2a23;
-  --bg-code: #ddd7c9;
-  --text-primary: #2c2a23;
-  --text-secondary: #58544a;
-  --text-muted: #888371;
-  --text-placeholder: #b3ad99;
-  --text-inverse: #f6f3ec;
-  --border: #c4bea9;
-  --border-subtle: #d8d2bd;
-  --border-strong: #948e7a;
-  --accent: #6e7c8a;
-  --accent-2: #94a2b2;
-  --accent-soft: rgba(110, 124, 138, 0.18);
-  --danger: #b06857;
-  --success: #758d61;
-  --text-selection-bg: rgba(110, 124, 138, 0.22);
-  --heading-rule: #94a2b2;
-  --folder-color: #7d8896;
-  --folder-color-open: #6e7c8a;
-  --dot-grid: #d2ccbb;
-  --marquee-fill: rgba(110, 124, 138, 0.08);
-  --marquee-stroke: rgba(110, 124, 138, 0.7);
-  --selection-ring: rgba(110, 124, 138, 0.55);
-  --canvas-text-auto: #2c2a23;
-  --canvas-text-placeholder: rgba(44, 42, 35, 0.4);
-  --shadow-sm: 0 1px 2px rgba(44, 42, 35, 0.08);
-  --shadow-md: 0 4px 12px rgba(44, 42, 35, 0.13);
-}
-
-[data-paper="leatherbound"] {
+[data-paper="mogno"] {
   --bg-app: #1a1109;
   --bg-panel: #261810;
   --bg-panel-2: #382a1f;
@@ -576,7 +423,7 @@
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.7);
 }
 
-[data-paper="wasteland"] {
+[data-paper="musgo"] {
   --bg-app: #15170e;
   --bg-panel: #1d1f14;
   --bg-panel-2: #2a2d1c;
@@ -612,7 +459,7 @@
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.65);
 }
 
-[data-paper="cinema-verite"] {
+[data-paper="pelicula"] {
   --bg-app: #0a1216;
   --bg-panel: #111c22;
   --bg-panel-2: #1a2832;
@@ -648,7 +495,7 @@
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.7);
 }
 
-[data-paper="wicked-fog"] {
+[data-paper="bruma"] {
   --bg-app: #0f1318;
   --bg-panel: #161b22;
   --bg-panel-2: #1f262e;
@@ -684,43 +531,47 @@
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.65);
 }
 
-[data-paper="orchid-noir"] {
-  --bg-app: #150b14;
-  --bg-panel: #1f1320;
-  --bg-panel-2: #2d1c2d;
-  --bg-hover: #3a2638;
-  --bg-active: #4a3247;
-  --bg-selected: #34203a;
-  --bg-inverse: #e6d8e1;
-  --bg-code: #20142a;
-  --text-primary: #e6d8e1;
-  --text-secondary: #c2b0bf;
-  --text-muted: #8e7a89;
-  --text-placeholder: #5d4a5a;
-  --text-inverse: #150b14;
-  --border: #321f30;
-  --border-subtle: #221520;
-  --border-strong: #533a4f;
-  --accent: #b56688;
-  --accent-2: #d49ab7;
-  --accent-soft: rgba(181, 102, 136, 0.18);
-  --danger: #e07274;
-  --success: #8aaf72;
-  --text-selection-bg: rgba(181, 102, 136, 0.22);
-  --heading-rule: #d49ab7;
-  --folder-color: #a07692;
-  --folder-color-open: #b56688;
-  --dot-grid: #261724;
-  --marquee-fill: rgba(181, 102, 136, 0.1);
-  --marquee-stroke: rgba(181, 102, 136, 0.7);
-  --selection-ring: rgba(181, 102, 136, 0.6);
-  --canvas-text-auto: #e6d8e1;
-  --canvas-text-placeholder: rgba(230, 216, 225, 0.38);
+/* Vinho — tinto profundo / sangue. Substitui o "Ametista" da 0.9.24
+   (mesmo slot conceitual, paleta redesenhada). Borgonha visceral em
+   vez de roxo: bgs em vermelho-quase-preto, accent #c33548 que evoca
+   vinho tinto vívido contra a parede escura da sala. */
+[data-paper="vinho"] {
+  --bg-app: #1a0a0d;
+  --bg-panel: #25101a;
+  --bg-panel-2: #3a1820;
+  --bg-hover: #4a2028;
+  --bg-active: #5a2830;
+  --bg-selected: #38181f;
+  --bg-inverse: #f0d8d8;
+  --bg-code: #2a121a;
+  --text-primary: #f0d8d8;
+  --text-secondary: #c8a3a5;
+  --text-muted: #957275;
+  --text-placeholder: #634a4c;
+  --text-inverse: #1a0a0d;
+  --border: #3a1820;
+  --border-subtle: #251018;
+  --border-strong: #5a3038;
+  --accent: #c33548;
+  --accent-2: #e25d6c;
+  --accent-soft: rgba(195, 53, 72, 0.18);
+  --danger: #f06464;
+  --success: #94b070;
+  --text-selection-bg: rgba(195, 53, 72, 0.24);
+  --heading-rule: #e25d6c;
+  --folder-color: #a55858;
+  --folder-color-open: #c33548;
+  --dot-grid: #28121a;
+  --marquee-fill: rgba(195, 53, 72, 0.10);
+  --marquee-stroke: rgba(195, 53, 72, 0.70);
+  --selection-ring: rgba(195, 53, 72, 0.6);
+  --canvas-text-auto: #f0d8d8;
+  --canvas-text-placeholder: rgba(240, 216, 216, 0.38);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.55);
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.7);
 }
 
-[data-paper="aura"] {
+[data-paper="boreal"] {
   --bg-app: #0f0c1c;
   --bg-panel: #181228;
   --bg-panel-2: #241b3a;
@@ -756,7 +607,7 @@
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.7);
 }
 
-[data-paper="afterglow"] {
+[data-paper="brasa"] {
   --bg-app: #1a1014;
   --bg-panel: #25181d;
   --bg-panel-2: #36242a;
@@ -792,7 +643,7 @@
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.7);
 }
 
-[data-paper="radioactive"] {
+[data-paper="esmeralda"] {
   --bg-app: #0c1208;
   --bg-panel: #131c10;
   --bg-panel-2: #1d2a18;
@@ -914,31 +765,27 @@
    sobrescrito pelos temas escuros. */
 :root,
 [data-theme="light"],
-[data-paper="creme"],
-[data-paper="sepia"],
-[data-paper="gray"] {
+[data-paper="creme"] {
   color-scheme: light;
 }
-[data-paper="midnight"],
 [data-paper="tokyo"],
 [data-paper="noir"],
-[data-paper="leatherbound"],
-[data-paper="wasteland"],
-[data-paper="cinema-verite"],
-[data-paper="wicked-fog"],
-[data-paper="orchid-noir"],
-[data-paper="aura"],
-[data-paper="afterglow"],
-[data-paper="radioactive"] {
+[data-paper="mogno"],
+[data-paper="musgo"],
+[data-paper="pelicula"],
+[data-paper="bruma"],
+[data-paper="vinho"],
+[data-paper="boreal"],
+[data-paper="brasa"],
+[data-paper="esmeralda"] {
   color-scheme: dark;
 }
-[data-paper="roseglow"],
-[data-paper="custard"],
-[data-paper="petal"],
-[data-paper="mermaid"],
-[data-paper="pumpkin-spice"],
-[data-paper="cotton-candy"],
-[data-paper="marble"] {
+[data-paper="amanhecer"],
+[data-paper="mel"],
+[data-paper="cerejeira"],
+[data-paper="lagoa"],
+[data-paper="paprica"],
+[data-paper="algodao"] {
   color-scheme: light;
 }
 
@@ -1026,24 +873,6 @@ select:focus-visible {
   --editor-paper-text-muted: #7a6d5f;
   --editor-paper-text-placeholder: #b8ac9a;
 }
-[data-paper="sepia"] {
-  --editor-paper-bg: #ede0c0;
-  --editor-paper-text: #3e3220;
-  --editor-paper-text-muted: #7a6a4d;
-  --editor-paper-text-placeholder: #bcaa84;
-}
-[data-paper="gray"] {
-  --editor-paper-bg: #e3e1dc;
-  --editor-paper-text: #1f1e1c;
-  --editor-paper-text-muted: #6a6764;
-  --editor-paper-text-placeholder: #a5a29e;
-}
-[data-paper="midnight"] {
-  --editor-paper-bg: #1a1e26;
-  --editor-paper-text: #dde2ea;
-  --editor-paper-text-muted: #8b94a4;
-  --editor-paper-text-placeholder: #5f6878;
-}
 [data-paper="tokyo"] {
   --editor-paper-bg: #1a1b26;
   --editor-paper-text: #c0caf5;
@@ -1064,91 +893,85 @@ select:focus-visible {
 
 /* Paper-variants dos temas adicionais (0.9.24). Espelham o chrome
    acima — a folha geralmente é o bg-panel do tema correspondente. */
-[data-paper="roseglow"] {
+[data-paper="amanhecer"] {
   --editor-paper-bg: #fff9f4;
   --editor-paper-text: #4a2a20;
   --editor-paper-text-muted: #75483a;
   --editor-paper-text-placeholder: #9c7765;
 }
-[data-paper="custard"] {
+[data-paper="mel"] {
   --editor-paper-bg: #fffaeb;
   --editor-paper-text: #3d3520;
   --editor-paper-text-muted: #685b3a;
   --editor-paper-text-placeholder: #8c7e58;
 }
-[data-paper="petal"] {
+[data-paper="cerejeira"] {
   --editor-paper-bg: #fff5f8;
   --editor-paper-text: #4a2230;
   --editor-paper-text-muted: #74485a;
   --editor-paper-text-placeholder: #9c7588;
 }
-[data-paper="mermaid"] {
+[data-paper="lagoa"] {
   --editor-paper-bg: #f5fbf8;
   --editor-paper-text: #1f3a32;
   --editor-paper-text-muted: #3f5e54;
   --editor-paper-text-placeholder: #6a8579;
 }
-[data-paper="pumpkin-spice"] {
+[data-paper="paprica"] {
   --editor-paper-bg: #f9eccf;
   --editor-paper-text: #422814;
   --editor-paper-text-muted: #6c4828;
   --editor-paper-text-placeholder: #98724a;
 }
-[data-paper="cotton-candy"] {
+[data-paper="algodao"] {
   --editor-paper-bg: #f4eef9;
   --editor-paper-text: #3a2a4a;
   --editor-paper-text-muted: #5d4870;
   --editor-paper-text-placeholder: #8770a0;
 }
-[data-paper="marble"] {
-  --editor-paper-bg: #f6f3ec;
-  --editor-paper-text: #2c2a23;
-  --editor-paper-text-muted: #58544a;
-  --editor-paper-text-placeholder: #888371;
-}
-[data-paper="leatherbound"] {
+[data-paper="mogno"] {
   --editor-paper-bg: #261810;
   --editor-paper-text: #f0e2c8;
   --editor-paper-text-muted: #c8b694;
   --editor-paper-text-placeholder: #6c5d44;
 }
-[data-paper="wasteland"] {
+[data-paper="musgo"] {
   --editor-paper-bg: #1d1f14;
   --editor-paper-text: #d8d4b2;
   --editor-paper-text-muted: #b0ab8a;
   --editor-paper-text-placeholder: #54513c;
 }
-[data-paper="cinema-verite"] {
+[data-paper="pelicula"] {
   --editor-paper-bg: #111c22;
   --editor-paper-text: #d6e4ed;
   --editor-paper-text-muted: #aabaca;
   --editor-paper-text-placeholder: #4f6175;
 }
-[data-paper="wicked-fog"] {
+[data-paper="bruma"] {
   --editor-paper-bg: #161b22;
   --editor-paper-text: #d2d6dc;
   --editor-paper-text-muted: #a8aeb8;
   --editor-paper-text-placeholder: #4d535c;
 }
-[data-paper="orchid-noir"] {
-  --editor-paper-bg: #1f1320;
-  --editor-paper-text: #e6d8e1;
-  --editor-paper-text-muted: #c2b0bf;
-  --editor-paper-text-placeholder: #5d4a5a;
+[data-paper="vinho"] {
+  --editor-paper-bg: #25101a;
+  --editor-paper-text: #f0d8d8;
+  --editor-paper-text-muted: #c8a3a5;
+  --editor-paper-text-placeholder: #634a4c;
 }
-[data-paper="aura"] {
+[data-paper="boreal"] {
   --editor-paper-bg: #181228;
   --editor-paper-text: #e0d8ee;
   --editor-paper-text-muted: #b8aed4;
   --editor-paper-text-placeholder: #5a4d76;
 }
-[data-paper="afterglow"] {
+[data-paper="brasa"] {
   --editor-paper-bg: #25181d;
   --editor-paper-text: #f0d8d2;
   --editor-paper-text-muted: #c8aaa3;
   --editor-paper-text-placeholder: #685550;
 }
-[data-paper="radioactive"] {
+[data-paper="esmeralda"] {
   --editor-paper-bg: #131c10;
   --editor-paper-text: #d8efc8;
   --editor-paper-text-muted: #aac294;

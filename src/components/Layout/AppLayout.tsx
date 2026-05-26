@@ -74,10 +74,12 @@ export function AppLayout() {
     !inHome;
   const showOutline =
     isOutlineOpen && !focusMode && !readingMode && !inCanvas && !inHome;
-  // Outline pode dockar à esquerda (embaixo da Sidebar, mesma coluna)
-  // ou à direita (junto do Inspector, comportamento clássico).
+  // Outline pode dockar à direita (clássico, junto do Inspector),
+  // à esquerda (embaixo da Sidebar) ou flutuar (painel arrastável,
+  // estilo FloatingInspector).
   const showOutlineRight = showOutline && outlineSide === "right";
   const showOutlineLeft = showOutline && outlineSide === "left";
+  const showOutlineFloating = showOutline && outlineSide === "floating";
   const showRightPanel = showInspector || showOutlineRight;
   const showLeftPanel = showSidebar || showOutlineLeft;
   const showTitlebar = !readingMode;
@@ -300,6 +302,7 @@ export function AppLayout() {
       {floatingInspector.enabled && isInspectorOpen && !readingMode && (
         <FloatingInspector />
       )}
+      {showOutlineFloating && <FloatingOutline />}
       {readingMode && (
         <button
           type="button"
@@ -379,6 +382,64 @@ function FloatingInspector() {
       }}
     >
       <Inspector />
+    </div>
+  );
+}
+
+/**
+ * Painel flutuante do Outline (Índice). Mesmo padrão do FloatingInspector:
+ * fixed-positioned, drag na faixa de 44px do topo (evita arrastar quando
+ * o usuário interage com headings dentro do outline). Estado runtime do
+ * rect — não persiste entre sessões; intencional pra que o painel sempre
+ * apareça num lugar previsível ao reabrir o app.
+ */
+function FloatingOutline() {
+  const rect = useAppStore((s) => s.floatingOutline);
+  const setRect = useAppStore((s) => s.setFloatingOutlineRect);
+
+  const startMove = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest("button,input,textarea,select")) return;
+      if (e.clientY > rect.y + 44) return;
+      e.preventDefault();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const origX = rect.x;
+      const origY = rect.y;
+      startDrag({
+        onMove: (ev) => {
+          setRect({
+            x: Math.max(
+              8,
+              Math.min(window.innerWidth - rect.width - 8, origX + ev.clientX - startX),
+            ),
+            y: Math.max(
+              8,
+              Math.min(window.innerHeight - 120, origY + ev.clientY - startY),
+            ),
+          });
+        },
+      });
+    },
+    [rect.height, rect.width, rect.x, rect.y, setRect],
+  );
+
+  return (
+    <div
+      className="fixed z-[120] overflow-hidden rounded-lg"
+      onMouseDownCapture={startMove}
+      style={{
+        left: rect.x,
+        top: rect.y,
+        width: rect.width,
+        height: rect.height,
+        background: "var(--bg-panel-2)",
+        border: "1px solid var(--border)",
+        boxShadow: "var(--shadow-md)",
+      }}
+    >
+      <Outline />
     </div>
   );
 }

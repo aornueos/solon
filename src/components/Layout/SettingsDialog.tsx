@@ -429,6 +429,24 @@ export function SettingsDialog() {
               </Row>
 
               <Row
+                label="Duplo clique no canvas"
+                hint={
+                  CANVAS_DBLCLICK_ACTIONS.find(
+                    (option) => option.value === canvasDblClickCreates,
+                  )?.hint
+                }
+              >
+                <SelectControl
+                  value={canvasDblClickCreates}
+                  options={CANVAS_DBLCLICK_ACTIONS.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  onChange={setCanvasDblClickCreates}
+                />
+              </Row>
+
+              <Row
                 label="Ortografia pt-BR"
                 hint={
                   personalDictSize > 0
@@ -506,11 +524,13 @@ export function SettingsDialog() {
               </Row>
 
               <Row
-                label="Lado do Índice"
+                label="Posição do Índice"
                 hint={
                   outlineSide === "left"
-                    ? "Embaixo da Sidebar (esquerda)"
-                    : "Junto do Inspector (direita)"
+                    ? "Embaixo da Sidebar"
+                    : outlineSide === "floating"
+                      ? "Painel flutuante (arrastável)"
+                      : "Junto do Inspector"
                 }
               >
                 <SelectControl
@@ -518,6 +538,7 @@ export function SettingsDialog() {
                   options={[
                     { value: "right", label: "Direita" },
                     { value: "left", label: "Esquerda" },
+                    { value: "floating", label: "Flutuante" },
                   ]}
                   onChange={setOutlineSide}
                 />
@@ -536,26 +557,6 @@ export function SettingsDialog() {
                   checked={showStatusPath}
                   onChange={setShowStatusPath}
                   label={showStatusPath ? "Ativado" : "Desativado"}
-                />
-              </Row>
-            </Section>
-
-            <Section title="Canvas" description="Comportamento do quadro de planejamento visual.">
-              <Row
-                label="Duplo clique no fundo"
-                hint={
-                  CANVAS_DBLCLICK_ACTIONS.find(
-                    (option) => option.value === canvasDblClickCreates,
-                  )?.hint
-                }
-              >
-                <SelectControl
-                  value={canvasDblClickCreates}
-                  options={CANVAS_DBLCLICK_ACTIONS.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  onChange={setCanvasDblClickCreates}
                 />
               </Row>
             </Section>

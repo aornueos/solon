@@ -136,9 +136,13 @@ export function LocalHistoryDialog() {
                     }}
                   >
                     <span className="block text-[0.78rem]">{item.label}</span>
-                    <span className="block text-[0.66rem]" style={{ color: "var(--text-muted)" }}>
-                      {(item.size / 1024).toFixed(1)} KB
-                    </span>
+                    {item.size > 0 && (
+                      <span className="block text-[0.66rem]" style={{ color: "var(--text-muted)" }}>
+                        {item.size < 1024
+                          ? `${item.size} B`
+                          : `${(item.size / 1024).toFixed(1)} KB`}
+                      </span>
+                    )}
                   </button>
                 );
               })

@@ -34,7 +34,14 @@ export interface Toast {
 
 export type EditorFontFamily = "serif" | "sans" | "mono";
 export type EditorToolbarMode = "fixed" | "hover";
-export type OutlineSide = "left" | "right";
+export type OutlineSide = "left" | "right" | "floating";
+
+export interface FloatingOutlineRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 export type EditorPageLayout = "fluid" | "a4-continuous";
 export type EditorTextSize = "small" | "medium" | "large";
 
@@ -42,26 +49,24 @@ export type EditorTextSize = "small" | "medium" | "large";
 export type EditorPaper =
   | "default"
   | "creme"
-  | "sepia"
-  | "gray"
-  | "midnight"
   | "tokyo"
   | "noir"
-  | "roseglow"
-  | "custard"
-  | "petal"
-  | "mermaid"
-  | "pumpkin-spice"
-  | "cotton-candy"
-  | "marble"
-  | "leatherbound"
-  | "wasteland"
-  | "cinema-verite"
-  | "wicked-fog"
-  | "orchid-noir"
-  | "aura"
-  | "afterglow"
-  | "radioactive";
+  | "amanhecer"
+  | "mel"
+  | "cerejeira"
+  | "lagoa"
+  | "paprica"
+  | "algodao"
+  | "mogno"
+  | "musgo"
+  | "pelicula"
+  | "bruma"
+  | "vinho"
+  | "boreal"
+  | "brasa"
+  | "esmeralda";
+
+export type EditorPaperTone = "light" | "dark";
 
 /**
  * Dialog modal ativo — usado em vez de `window.prompt/confirm` (que
@@ -354,8 +359,12 @@ interface AppState {
   editorToolbarMode: EditorToolbarMode;
   /** Lado em que o painel "Índice" (Outline) docka. "right" (default)
    *  fica junto do Inspector na coluna direita; "left" desce embaixo
-   *  da Sidebar na coluna esquerda. */
+   *  da Sidebar na coluna esquerda; "floating" vira um painel
+   *  arrastável independente das colunas. */
   outlineSide: OutlineSide;
+  /** Retângulo do Outline quando outlineSide==="floating". Runtime
+   *  apenas (não persiste entre sessões — igual floatingInspector). */
+  floatingOutline: FloatingOutlineRect;
   /** Mostra contadores e formato na StatusBar. */
   showStatusStats: boolean;
   /** Mostra caminho completo do arquivo na StatusBar. */
@@ -472,6 +481,7 @@ interface AppState {
   setTypewriterMode: (v: boolean) => void;
   setEditorToolbarMode: (v: EditorToolbarMode) => void;
   setOutlineSide: (v: OutlineSide) => void;
+  setFloatingOutlineRect: (rect: Partial<FloatingOutlineRect>) => void;
   setShowStatusStats: (v: boolean) => void;
   setShowStatusPath: (v: boolean) => void;
   setShowTitlebarActions: (v: boolean) => void;
@@ -793,31 +803,32 @@ export const EDITOR_FONT_FAMILIES = [
 /** Lista canonica de variantes de papel + meta visual.
  *  Hex coordenado com legibilidade: contraste minimo AA pra texto
  *  normal mantido em todos os pares bg/text. */
-export const EDITOR_PAPERS = [
-  { value: "default" as const, label: "Solon", hint: "Editorial claro" },
-  { value: "creme" as const, label: "Creme", hint: "Papel quente claro" },
-  { value: "sepia" as const, label: "Sépia", hint: "Pergaminho" },
-  { value: "gray" as const, label: "Cinza", hint: "Neutro frio" },
-  { value: "midnight" as const, label: "Noite", hint: "Azul-tinta escuro" },
-  { value: "tokyo" as const, label: "Tokyo", hint: "Escuro neon suave" },
-  { value: "noir" as const, label: "Noir", hint: "Folha cinza sobre laterais pretas" },
-  // ── Claros (0.9.24) ──
-  { value: "roseglow" as const, label: "Roseglow", hint: "Pêssego rosa, luz da tarde" },
-  { value: "custard" as const, label: "Custard", hint: "Baunilha amarelo, suave" },
-  { value: "petal" as const, label: "Petal", hint: "Rosa flor de cerejeira" },
-  { value: "mermaid" as const, label: "Mermaid", hint: "Verde-azulado pastel" },
-  { value: "pumpkin-spice" as const, label: "Pumpkin spice", hint: "Laranja outono quente" },
-  { value: "cotton-candy" as const, label: "Cotton candy", hint: "Pastel rosa-azul gelado" },
-  { value: "marble" as const, label: "Marble", hint: "Cinza-creme neutro" },
-  // ── Escuros (0.9.24) ──
-  { value: "leatherbound" as const, label: "Leatherbound", hint: "Couro escuro com letras de ouro" },
-  { value: "wasteland" as const, label: "Wasteland", hint: "Verde-oliva e cinza, distópico" },
-  { value: "cinema-verite" as const, label: "Cinema vérité", hint: "Teal cinemático" },
-  { value: "wicked-fog" as const, label: "Wicked fog", hint: "Cinza-azulado de bruma" },
-  { value: "orchid-noir" as const, label: "Orchid noir", hint: "Roxo-rosa profundo" },
-  { value: "aura" as const, label: "Aura", hint: "Violeta-cyan aurora" },
-  { value: "afterglow" as const, label: "Afterglow", hint: "Brasa de pôr do sol" },
-  { value: "radioactive" as const, label: "Radioactive", hint: "Verde-neon contra preto" },
+export const EDITOR_PAPERS: ReadonlyArray<{
+  value: EditorPaper;
+  label: string;
+  hint: string;
+  tone: EditorPaperTone;
+}> = [
+  // ── Claros ──
+  { value: "default", label: "Solon", hint: "Editorial claro", tone: "light" },
+  { value: "creme", label: "Creme", hint: "Papel quente claro", tone: "light" },
+  { value: "amanhecer", label: "Amanhecer", hint: "Pêssego e rosa", tone: "light" },
+  { value: "mel", label: "Mel", hint: "Amarelo baunilha", tone: "light" },
+  { value: "cerejeira", label: "Cerejeira", hint: "Rosa pastel", tone: "light" },
+  { value: "lagoa", label: "Lagoa", hint: "Verde-azulado pastel", tone: "light" },
+  { value: "paprica", label: "Páprica", hint: "Laranja de outono", tone: "light" },
+  { value: "algodao", label: "Algodão", hint: "Pastel rosa-azul", tone: "light" },
+  // ── Escuros ──
+  { value: "tokyo", label: "Tokyo", hint: "Escuro neon suave", tone: "dark" },
+  { value: "noir", label: "Noir", hint: "Folha cinza sobre laterais pretas", tone: "dark" },
+  { value: "mogno", label: "Mogno", hint: "Couro escuro de biblioteca", tone: "dark" },
+  { value: "musgo", label: "Musgo", hint: "Oliva e cinza distópico", tone: "dark" },
+  { value: "pelicula", label: "Película", hint: "Teal cinemático", tone: "dark" },
+  { value: "bruma", label: "Bruma", hint: "Cinza-azulado de neblina", tone: "dark" },
+  { value: "vinho", label: "Vinho", hint: "Tinto profundo e visceral", tone: "dark" },
+  { value: "boreal", label: "Boreal", hint: "Violeta-ciano aurora", tone: "dark" },
+  { value: "brasa", label: "Brasa", hint: "Crepúsculo morno", tone: "dark" },
+  { value: "esmeralda", label: "Esmeralda", hint: "Verde-neon contra preto", tone: "dark" },
 ];
 
 export const CANVAS_GRID_SIZES = [16, 24, 32, 48] as const;
@@ -873,13 +884,50 @@ function loadEditorFontFamily(): EditorFontFamily {
   return DEFAULT_EDITOR_FONT_FAMILY;
 }
 
+// Migração 0.9.24 → 0.9.25: 15 temas foram renomeados pra não copiar
+// refs externos. Mapa preserva a escolha do usuário em vez de cair no
+// default. Pode ser removido em algum 1.x quando todos os instalados
+// já tiverem sido atualizados.
+// Migrações 0.9.24 → 0.9.25. Os 15 temas adicionados em 0.9.24 foram
+// renomeados pra não copiar refs externos. 4 temas foram removidos
+// (sepia, gray, midnight, marble) — não estão aqui porque o validador
+// já cai no DEFAULT_EDITOR_PAPER pra qualquer valor desconhecido. O
+// "orchid-noir" mapeia pra "vinho" (mesmo slot conceitual, paleta
+// redesenhada de roxo pra tinto na 0.9.25).
+const EDITOR_PAPER_RENAMES_0_9_25: Record<string, EditorPaper> = {
+  roseglow: "amanhecer",
+  custard: "mel",
+  petal: "cerejeira",
+  mermaid: "lagoa",
+  "pumpkin-spice": "paprica",
+  "cotton-candy": "algodao",
+  leatherbound: "mogno",
+  wasteland: "musgo",
+  "cinema-verite": "pelicula",
+  "wicked-fog": "bruma",
+  "orchid-noir": "vinho",
+  ametista: "vinho",
+  aura: "boreal",
+  afterglow: "brasa",
+  radioactive: "esmeralda",
+};
+
 function loadEditorPaper(): EditorPaper {
   try {
-    const v = localStorage.getItem(EDITOR_PAPER_KEY);
-    if (
-      v === "default" || v === "creme" || v === "sepia" ||
-      v === "gray" || v === "midnight" || v === "tokyo"
-    ) return v;
+    let v = localStorage.getItem(EDITOR_PAPER_KEY);
+    if (v && EDITOR_PAPER_RENAMES_0_9_25[v]) {
+      v = EDITOR_PAPER_RENAMES_0_9_25[v];
+      try {
+        localStorage.setItem(EDITOR_PAPER_KEY, v);
+      } catch {
+        /* ignora */
+      }
+    }
+    // Valida contra a lista canônica em vez de hard-coded — assim,
+    // adicionar tema novo basta entrar em EDITOR_PAPERS.
+    if (v && EDITOR_PAPERS.some((p) => p.value === v)) {
+      return v as EditorPaper;
+    }
   } catch {}
   return DEFAULT_EDITOR_PAPER;
 }
@@ -911,7 +959,7 @@ function loadEditorToolbarMode(): EditorToolbarMode {
 function loadOutlineSide(): OutlineSide {
   try {
     const v = localStorage.getItem(OUTLINE_SIDE_KEY);
-    if (v === "left" || v === "right") return v;
+    if (v === "left" || v === "right" || v === "floating") return v;
   } catch {}
   return DEFAULT_OUTLINE_SIDE;
 }
@@ -1088,6 +1136,7 @@ export const useAppStore = create<AppState>((set) => ({
   typewriterMode: loadBoolPref(TYPEWRITER_MODE_KEY, DEFAULT_TYPEWRITER_MODE),
   editorToolbarMode: loadEditorToolbarMode(),
   outlineSide: loadOutlineSide(),
+  floatingOutline: { x: 360, y: 120, width: 320, height: 420 },
   showStatusStats: loadBoolPref(SHOW_STATUS_STATS_KEY, DEFAULT_SHOW_STATUS_STATS),
   showStatusPath: loadBoolPref(SHOW_STATUS_PATH_KEY, DEFAULT_SHOW_STATUS_PATH),
   showTitlebarActions: loadBoolPref(
@@ -1727,7 +1776,7 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   setOutlineSide: (v) => {
-    if (v !== "left" && v !== "right") return;
+    if (v !== "left" && v !== "right" && v !== "floating") return;
     try {
       localStorage.setItem(OUTLINE_SIDE_KEY, v);
     } catch {
@@ -1735,6 +1784,11 @@ export const useAppStore = create<AppState>((set) => ({
     }
     set({ outlineSide: v });
   },
+
+  setFloatingOutlineRect: (rect) =>
+    set((s) => ({
+      floatingOutline: { ...s.floatingOutline, ...rect },
+    })),
 
   setShowStatusStats: (v) => {
     try {

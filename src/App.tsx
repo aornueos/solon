@@ -143,9 +143,21 @@ export default function App() {
 
   // No app desktop, bloqueia os atalhos classicos de DevTools. No browser
   // web eles continuam livres, o que ajuda no desenvolvimento da versao web.
+  // F11 tambem entra aqui (em capture) pra garantir que nenhum editor/dialog
+  // consuma o evento antes do toggle de fullscreen — TipTap e prosemirror
+  // tem listeners proprios que as vezes "engolem" teclas de funcao.
   useEffect(() => {
-    if (!isTauriRuntime()) return;
+    const inTauri = isTauriRuntime();
     const handler = (e: KeyboardEvent) => {
+      if (e.key === "F11") {
+        e.preventDefault();
+        e.stopPropagation();
+        void toggleAppFullscreen().catch((err) => {
+          console.error("F11 fullscreen failed:", err);
+        });
+        return;
+      }
+      if (!inTauri) return;
       const key = e.key.toLowerCase();
       const devtoolsShortcut =
         e.key === "F12" ||
@@ -256,13 +268,8 @@ export default function App() {
         e.preventDefault();
         setActiveView("home");
       }
-      if (e.key === "F11") {
-        e.preventDefault();
-        void toggleAppFullscreen().catch((err) => {
-          console.error("F11 fullscreen failed:", err);
-        });
-        return;
-      }
+      // F11 — tratado no listener de capture acima pra evitar que editores
+      // (TipTap/prosemirror) consumam o evento. Veja useEffect anterior.
       // Ctrl+, abre preferencias — convencao de macOS/VSCode/Obsidian.
       if ((e.ctrlKey || e.metaKey) && e.key === ",") {
         e.preventDefault();
