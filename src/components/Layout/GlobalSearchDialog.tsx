@@ -92,8 +92,7 @@ export function GlobalSearchDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-[128] flex items-start justify-center px-4 pt-[12vh]"
-      style={{ background: "rgba(0,0,0,0.38)" }}
+      className="solon-dialog-overlay fixed inset-0 z-[128] flex items-start justify-center px-4 pt-[12vh]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close();
       }}
@@ -102,15 +101,10 @@ export function GlobalSearchDialog() {
         role="dialog"
         aria-modal="true"
         aria-label="Busca global"
-        className="w-full max-w-2xl rounded-lg shadow-xl overflow-hidden"
-        style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
-          color: "var(--text-primary)",
-        }}
+        className="solon-dialog w-full max-w-2xl overflow-hidden"
       >
-        <div className="flex items-center gap-3 px-4 py-3">
-          <Search size={16} style={{ color: "var(--text-muted)" }} />
+        <div className="flex items-center gap-3 px-4 py-3.5">
+          <Search size={16} style={{ color: "var(--accent)" }} />
           <input
             ref={inputRef}
             value={query}
@@ -119,22 +113,27 @@ export function GlobalSearchDialog() {
               if (e.key === "Escape") close();
               if (e.key === "Enter" && results[0]) void go(results[0]);
             }}
-            placeholder="Buscar no projeto..."
-            className="flex-1 bg-transparent outline-none text-[0.92rem]"
-            style={{ color: "var(--text-primary)" }}
+            placeholder="Buscar no projeto…"
+            className="flex-1 bg-transparent outline-none"
+            style={{
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-display)",
+              fontSize: "1rem",
+              letterSpacing: "-0.005em",
+            }}
           />
-          <button onClick={close} aria-label="Fechar" className="p-1 rounded">
+          <button onClick={close} aria-label="Fechar" className="solon-dialog-close">
             <X size={14} />
           </button>
         </div>
         <div
           className="max-h-[460px] overflow-y-auto py-1"
-          style={{ borderTop: "1px solid var(--border-subtle)" }}
+          style={{ borderTop: "2px solid var(--border-strong)" }}
         >
           {query.trim().length < 1 ? (
             <Empty text="Digite para buscar notas, pastas e conteúdo." />
           ) : searching ? (
-            <Empty text="Buscando..." />
+            <Empty text="Buscando…" />
           ) : results.length === 0 ? (
             <Empty text="Nada encontrado." />
           ) : (
@@ -142,26 +141,53 @@ export function GlobalSearchDialog() {
               <button
                 key={`${result.path}:${result.line}:${index}`}
                 onClick={() => void go(result)}
-                className="w-full flex items-start gap-3 px-4 py-2.5 text-left"
-                style={{ color: "var(--text-primary)" }}
+                className="w-full flex items-start gap-3 px-4 py-2.5 text-left transition-colors"
+                style={{
+                  color: "var(--text-primary)",
+                  borderLeft: "3px solid transparent",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--bg-hover)";
+                  e.currentTarget.style.borderLeftColor = "var(--accent)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.borderLeftColor = "transparent";
+                }}
               >
                 {result.kind === "folder" ? (
-                  <FolderOpen size={15} style={{ color: "var(--text-muted)", marginTop: 2 }} />
+                  <FolderOpen size={15} style={{ color: "var(--text-muted)", marginTop: 3 }} />
                 ) : (
-                  <FileText size={15} style={{ color: "var(--text-muted)", marginTop: 2 }} />
+                  <FileText size={15} style={{ color: "var(--text-muted)", marginTop: 3 }} />
                 )}
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
-                    <span className="text-[0.82rem] font-medium truncate">
+                    <span
+                      className="truncate"
+                      style={{
+                        fontFamily: "var(--font-display)",
+                        fontSize: "0.88rem",
+                        fontWeight: 600,
+                      }}
+                    >
                       {result.name.replace(/\.(md|txt)$/i, "")}
                     </span>
                     {result.line && (
-                      <span className="text-[0.68rem]" style={{ color: "var(--text-muted)" }}>
+                      <span
+                        className="solon-caps--sm"
+                        style={{ color: "var(--text-muted)" }}
+                      >
                         linha {result.line}
                       </span>
                     )}
                   </span>
-                  <span className="block text-[0.74rem] truncate" style={{ color: "var(--text-secondary)" }}>
+                  <span
+                    className="block text-[0.76rem] truncate italic"
+                    style={{
+                      color: "var(--text-secondary)",
+                      fontFamily: "var(--font-display)",
+                    }}
+                  >
                     {result.snippet}
                   </span>
                 </span>
@@ -176,7 +202,15 @@ export function GlobalSearchDialog() {
 
 function Empty({ text }: { text: string }) {
   return (
-    <div className="px-4 py-8 text-center text-[0.8rem]" style={{ color: "var(--text-muted)" }}>
+    <div
+      className="px-4 py-8 text-center"
+      style={{
+        color: "var(--text-muted)",
+        fontFamily: "var(--font-display)",
+        fontStyle: "italic",
+        fontSize: "0.82rem",
+      }}
+    >
       {text}
     </div>
   );

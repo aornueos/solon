@@ -250,8 +250,7 @@ export function SettingsDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.45)" }}
+      className="solon-dialog-overlay fixed inset-0 z-[110] flex items-center justify-center p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close();
       }}
@@ -260,22 +259,14 @@ export function SettingsDialog() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="w-full max-w-5xl max-h-[86vh] rounded-lg shadow-xl flex flex-col overflow-hidden"
-        style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
-          color: "var(--text-primary)",
-        }}
+        className="solon-dialog w-full max-w-5xl max-h-[86vh] flex flex-col overflow-hidden"
       >
-        <div
-          className="px-5 py-4 flex items-center justify-between gap-4"
-          style={{ borderBottom: "1px solid var(--border-subtle)" }}
-        >
+        <div className="solon-dialog-header">
           <div className="min-w-0">
-            <h2 id="settings-title" className="text-[0.95rem] font-semibold">
-              Ajustes
+            <h2 id="settings-title" className="solon-dialog-title">
+              <span className="solon-plaque solon-plaque--lg">Ajustes</span>
             </h2>
-            <p className="text-[0.7rem] mt-0.5" style={{ color: "var(--text-muted)" }}>
+            <p className="solon-dialog-subtitle">
               Preferências de escrita, interface e projeto.
             </p>
           </div>
@@ -283,8 +274,7 @@ export function SettingsDialog() {
             onClick={close}
             title="Fechar"
             aria-label="Fechar ajustes"
-            className="h-8 w-8 rounded-md flex items-center justify-center transition-colors"
-            style={{ color: "var(--text-muted)", background: "var(--bg-hover)" }}
+            className="solon-dialog-close"
           >
             <X size={14} />
           </button>
@@ -692,14 +682,7 @@ export function SettingsDialog() {
           <div className="text-[0.65rem] tabular-nums" style={{ color: "var(--text-placeholder)" }}>
             v{APP_VERSION}
           </div>
-          <button
-            onClick={close}
-            className="px-3 py-1.5 rounded-md text-[0.76rem] font-medium transition-colors"
-            style={{
-              background: "var(--accent)",
-              color: "var(--text-inverse, #fff)",
-            }}
-          >
+          <button onClick={close} className="solon-btn solon-btn--primary">
             Fechar
           </button>
         </div>
@@ -721,16 +704,32 @@ function DictionaryPanel({
 }) {
   return (
     <div
-      className="rounded-md p-3 flex flex-col gap-2"
+      className="p-3 flex flex-col gap-2"
       style={{
-        border: "1px solid var(--border-subtle)",
+        border: "1.5px solid var(--border-strong)",
+        borderRadius: 0,
         background: "color-mix(in srgb, var(--bg-panel) 70%, transparent)",
       }}
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-[0.78rem] font-medium">Dicionário pessoal</div>
-          <div className="text-[0.68rem]" style={{ color: "var(--text-muted)" }}>
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "0.84rem",
+              fontWeight: 600,
+            }}
+          >
+            Dicionário pessoal
+          </div>
+          <div
+            className="italic"
+            style={{
+              color: "var(--text-muted)",
+              fontFamily: "var(--font-display)",
+              fontSize: "0.72rem",
+            }}
+          >
             {size} {size === 1 ? "palavra adicionada" : "palavras adicionadas"}
           </div>
         </div>
@@ -770,23 +769,31 @@ function Section({
   description?: string;
   children: React.ReactNode;
 }) {
+  // Section vira um "card brutalist" leve — borda 2px, sem rounded, sombra
+  // chapada compacta. Header usa plaqueta serif pra casar com os paineis.
   return (
     <section
-      className="rounded-lg p-4 flex flex-col gap-3"
+      className="p-4 flex flex-col gap-3"
       style={{
         background: "var(--bg-panel-2)",
-        border: "1px solid var(--border-subtle)",
+        border: "2px solid var(--border-strong)",
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat-sm)",
       }}
     >
       <div>
-        <h3
-          className="text-[0.66rem] uppercase tracking-[0.18em] font-semibold"
-          style={{ color: "var(--text-muted)" }}
-        >
-          {title}
-        </h3>
+        <div className="mb-1">
+          <span className="solon-plaque">{title}</span>
+        </div>
         {description && (
-          <p className="text-[0.68rem] mt-1 leading-snug" style={{ color: "var(--text-placeholder)" }}>
+          <p
+            className="text-[0.74rem] mt-1.5 leading-snug"
+            style={{
+              color: "var(--text-muted)",
+              fontFamily: "var(--font-display)",
+              fontStyle: "italic",
+            }}
+          >
             {description}
           </p>
         )}
@@ -809,8 +816,11 @@ function Row({
 }) {
   return (
     <div
-      className="rounded-md px-3 py-2.5"
-      style={{ background: "color-mix(in srgb, var(--bg-panel) 64%, transparent)" }}
+      className="px-3 py-2.5"
+      style={{
+        background: "color-mix(in srgb, var(--bg-panel) 64%, transparent)",
+        borderLeft: "2px solid var(--border)",
+      }}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -819,7 +829,12 @@ function Row({
               {icon}
             </span>
           )}
-          <span className="text-[0.78rem] font-medium truncate">{label}</span>
+          <span
+            className="text-[0.82rem] truncate"
+            style={{ fontFamily: "var(--font-display)", fontWeight: 500 }}
+          >
+            {label}
+          </span>
         </div>
         <div className="flex-shrink-0 flex items-center">{children}</div>
       </div>
@@ -875,10 +890,14 @@ function RangeRow({
         <button
           title="Restaurar 100%"
           onClick={onReset}
-          className="px-1.5 py-0.5 rounded text-[0.65rem]"
+          className="px-1.5 py-0.5 tabular-nums"
           style={{
-            border: "1px solid var(--border)",
+            border: "1.5px solid var(--border-strong)",
+            borderRadius: 0,
             color: "var(--text-muted)",
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.66rem",
+            background: "transparent",
           }}
         >
           100%
@@ -901,11 +920,14 @@ function SelectControl<T extends string>({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value as T)}
-      className="min-w-[152px] rounded-md px-2.5 py-1.5 text-[0.74rem] outline-none"
+      className="min-w-[152px] px-2.5 py-1.5 outline-none"
       style={{
         background: "var(--bg-panel)",
         color: "var(--text-primary)",
-        border: "1px solid var(--border)",
+        border: "1.5px solid var(--border-strong)",
+        borderRadius: 0,
+        fontFamily: "var(--font-display)",
+        fontSize: "0.78rem",
       }}
     >
       {options.map((opt) => (
@@ -926,6 +948,8 @@ function Toggle({
   onChange: (v: boolean) => void;
   label: string;
 }) {
+  // Toggle brutalist: caixa 16px quadrada com ✓ accent quando ligado, em
+  // vez de switch redondo. Mesma gramatica do Toggle do CanvasSidePanel.
   return (
     <button
       role="switch"
@@ -935,21 +959,28 @@ function Toggle({
       className="inline-flex items-center gap-2"
     >
       <span
-        className="relative inline-block w-8 h-[18px] rounded-full transition-colors"
-        style={{ background: checked ? "var(--accent)" : "var(--border)" }}
+        className="inline-flex items-center justify-center"
+        style={{
+          width: 16,
+          height: 16,
+          background: checked ? "var(--accent)" : "transparent",
+          border: `1.5px solid ${checked ? "var(--accent)" : "var(--border-strong)"}`,
+          borderRadius: 0,
+          color: "var(--text-inverse)",
+          fontSize: 11,
+          lineHeight: 1,
+          fontWeight: 700,
+        }}
+        aria-hidden
       >
-        <span
-          className="absolute top-0.5 left-0.5 w-[14px] h-[14px] rounded-full transition-transform"
-          style={{
-            background: "var(--bg-panel)",
-            transform: checked ? "translateX(14px)" : "translateX(0)",
-            boxShadow: "var(--shadow-sm)",
-          }}
-        />
+        {checked ? "✓" : ""}
       </span>
       <span
-        className="text-[0.72rem]"
-        style={{ color: checked ? "var(--text-primary)" : "var(--text-muted)" }}
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: "0.78rem",
+          color: checked ? "var(--text-primary)" : "var(--text-muted)",
+        }}
       >
         {label}
       </span>
@@ -972,12 +1003,12 @@ function ActionButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[0.72rem] font-medium transition-opacity disabled:opacity-60"
-      style={{
-        background: strong ? "var(--bg-inverse)" : "var(--bg-panel)",
-        color: strong ? "var(--text-inverse, #fff)" : "var(--text-secondary)",
-        border: strong ? "1px solid var(--bg-inverse)" : "1px solid var(--border)",
-      }}
+      className={
+        strong
+          ? "solon-btn solon-btn--primary inline-flex items-center gap-1.5 disabled:opacity-60"
+          : "solon-btn inline-flex items-center gap-1.5 disabled:opacity-60"
+      }
+      style={{ padding: "0.35rem 0.7rem", fontSize: "0.74rem" }}
     >
       {children}
     </button>

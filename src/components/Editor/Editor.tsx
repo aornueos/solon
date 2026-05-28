@@ -840,19 +840,36 @@ export function Editor() {
             }
             style={isA4Continuous ? a4BaseStyle : { maxWidth: editorMaxWidth }}
           >
-            <p
-              className="font-serif italic text-[1.05rem]"
-              style={{
-                color:
-                  editorPaper === "default"
-                    ? "var(--text-placeholder)"
-                    : "var(--editor-paper-text-placeholder)",
-                lineHeight: 1.6,
-              }}
-            >
-              Nenhum arquivo aberto. Escolha um no explorador à esquerda
-              ou volte para a página inicial pra começar.
-            </p>
+            <div className="flex flex-col items-start gap-4">
+              <span
+                style={{
+                  color:
+                    editorPaper === "default"
+                      ? "var(--border-strong)"
+                      : "var(--editor-paper-text-placeholder)",
+                  fontSize: 28,
+                }}
+                aria-hidden
+              >
+                ❦
+              </span>
+              <p
+                className="italic"
+                style={{
+                  color:
+                    editorPaper === "default"
+                      ? "var(--text-placeholder)"
+                      : "var(--editor-paper-text-placeholder)",
+                  fontFamily: "var(--font-display)",
+                  fontSize: "1.05rem",
+                  lineHeight: 1.6,
+                  maxWidth: "42ch",
+                }}
+              >
+                Nenhum arquivo aberto. Escolha um no explorador à esquerda
+                ou volte para a página inicial.
+              </p>
+            </div>
           </div>
         </div>
       </div>

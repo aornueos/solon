@@ -72,8 +72,7 @@ export function DialogLayer() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.35)" }}
+      className="solon-dialog-overlay fixed inset-0 z-[100] flex items-center justify-center p-4"
       onMouseDown={(e) => {
         // Click no backdrop (fora do painel) = cancela.
         if (e.target === e.currentTarget) onCancel();
@@ -86,31 +85,23 @@ export function DialogLayer() {
         aria-labelledby={`dialog-title-${dialog.id}`}
         aria-describedby={dialog.message ? `dialog-msg-${dialog.id}` : undefined}
         onKeyDown={onKeyDown}
-        className="w-full max-w-md rounded-lg shadow-xl animate-in fade-in zoom-in-95"
-        style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
-          color: "var(--text-primary)",
-        }}
+        className="solon-dialog w-full max-w-md animate-in fade-in zoom-in-95"
       >
-        <div className="px-5 pt-4 pb-2">
-          {/* Titulo do dialog herda Inter (font do body) — antes forcava
-              "Georgia, serif" e destoava do resto do app, que usa Inter
-              em UI/paineis e reserva Lora/Garamond para o corpo editorial.
-              Tamanho e peso (0.95rem / 600) batem com headers de Inspector
-              e ContextMenu. */}
-          <h2
-            id={`dialog-title-${dialog.id}`}
-            className="text-[0.95rem] font-semibold leading-tight tracking-tight"
-            style={{ color: "var(--text-primary)" }}
-          >
+        <div className="px-5 pt-5 pb-3">
+          {/* Titulo em serif display + plaqueta nao porque dialog ja' tem
+              header proprio nas variantes maiores (Settings/Shortcuts);
+              prompt/confirm sao compactos demais pra plaqueta full. */}
+          <h2 id={`dialog-title-${dialog.id}`} className="solon-dialog-title">
             {dialog.title}
           </h2>
           {dialog.message && (
             <p
               id={`dialog-msg-${dialog.id}`}
-              className="mt-2 text-[0.82rem] leading-relaxed"
-              style={{ color: "var(--text-secondary)" }}
+              className="mt-2.5 text-[0.82rem] leading-relaxed"
+              style={{
+                color: "var(--text-secondary)",
+                fontFamily: "var(--font-display)",
+              }}
             >
               {dialog.message}
             </p>
@@ -125,59 +116,22 @@ export function DialogLayer() {
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder={dialog.placeholder}
-              className="w-full px-3 py-2 rounded text-[0.85rem] outline-none transition-colors"
-              style={{
-                background: "var(--bg-app)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "var(--accent)";
-                e.currentTarget.style.boxShadow = "0 0 0 2px var(--accent-soft)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "var(--border)";
-                e.currentTarget.style.boxShadow = "";
-              }}
+              className="solon-input"
             />
           </div>
         )}
 
-        <div className="px-5 pt-3 pb-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-3 py-1.5 rounded text-[0.8rem] transition-colors"
-            style={{
-              background: "transparent",
-              border: "1px solid var(--border)",
-              color: "var(--text-secondary)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--bg-hover)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-            }}
-          >
+        <div className="solon-dialog-actions">
+          <button type="button" onClick={onCancel} className="solon-btn">
             {cancelLabel}
           </button>
           <button
             ref={confirmBtnRef}
             type="button"
             onClick={onConfirm}
-            className="px-3 py-1.5 rounded text-[0.8rem] font-medium transition-colors"
-            style={{
-              background: dialog.danger ? "var(--danger)" : "var(--accent)",
-              border: `1px solid ${dialog.danger ? "var(--danger)" : "var(--accent)"}`,
-              color: "var(--text-inverse, #fff)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.filter = "brightness(0.92)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.filter = "";
-            }}
+            className={
+              dialog.danger ? "solon-btn solon-btn--danger" : "solon-btn solon-btn--primary"
+            }
           >
             {confirmLabel}
           </button>

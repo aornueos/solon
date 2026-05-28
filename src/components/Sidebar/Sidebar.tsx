@@ -192,20 +192,15 @@ export function Sidebar() {
       className="flex flex-col h-full"
       style={{
         background: "var(--bg-panel-2)",
-        borderRight: "1px solid var(--border-subtle)",
+        borderRight: "2px solid var(--border-strong)",
       }}
     >
-      {/* Header */}
+      {/* Header — plaqueta `| ARQUIVOS |` com filete grosso embaixo.
+          Substitui o label em Inter uppercase por placa de biblioteca. */}
       <div
-        className="flex items-center justify-between px-3 py-3"
-        style={{ borderBottom: "1px solid var(--border-subtle)" }}
+        className="flex items-center justify-between px-3.5 py-3 solon-plaque-bar"
       >
-        <span
-          className="text-[0.7rem] font-semibold uppercase tracking-widest truncate"
-          style={{ color: "var(--text-muted)" }}
-        >
-          Arquivos
-        </span>
+        <span className="solon-plaque truncate">Arquivos</span>
         <div className="flex items-center gap-0.5">
           {rootFolder && (
             <>
@@ -231,21 +226,34 @@ export function Sidebar() {
                 ref={tagBtnRef}
                 onClick={() => setTagPopoverOpen((v) => !v)}
                 title="Filtrar por tag"
-                className="p-1 rounded transition-colors"
+                className="transition-colors flex items-center justify-center"
                 style={{
+                  width: 22,
+                  height: 22,
                   color: activeTagFilter
                     ? "var(--accent)"
                     : "var(--text-muted)",
                   background: tagPopoverOpen ? "var(--bg-hover)" : "transparent",
+                  border:
+                    activeTagFilter || tagPopoverOpen
+                      ? "1px solid var(--accent)"
+                      : "1px solid transparent",
+                  borderRadius: 0,
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "var(--bg-hover)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = tagPopoverOpen
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--bg-hover)";
+                  if (!activeTagFilter && !tagPopoverOpen) {
+                    e.currentTarget.style.borderColor = "var(--border-strong)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = tagPopoverOpen
                     ? "var(--bg-hover)"
-                    : "transparent")
-                }
+                    : "transparent";
+                  if (!activeTagFilter && !tagPopoverOpen) {
+                    e.currentTarget.style.borderColor = "transparent";
+                  }
+                }}
               >
                 <TagIcon size={13} />
               </button>
@@ -308,28 +316,21 @@ export function Sidebar() {
         }}
       >
         {fileTree.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 px-4 text-center">
-            <FolderOpen size={32} style={{ color: "var(--border)" }} />
+          <div className="flex flex-col items-center justify-center h-full gap-4 px-4 text-center">
+            <span style={{ color: "var(--border-strong)", fontSize: 28 }} aria-hidden>
+              ❦
+            </span>
             <p
-              className="text-[0.75rem] leading-relaxed"
-              style={{ color: "var(--text-placeholder)" }}
+              className="italic leading-relaxed"
+              style={{
+                color: "var(--text-placeholder)",
+                fontFamily: "var(--font-display)",
+                fontSize: "0.82rem",
+              }}
             >
               Abra uma pasta para começar seu projeto
             </p>
-            <button
-              onClick={openFolder}
-              className="text-[0.75rem] px-3 py-1.5 rounded-md transition-colors"
-              style={{
-                background: "var(--accent)",
-                color: "var(--text-inverse)",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.filter = "brightness(0.92)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.filter = "";
-              }}
-            >
+            <button onClick={openFolder} className="solon-btn solon-btn--primary">
               Abrir pasta
             </button>
           </div>
@@ -420,16 +421,25 @@ function HeaderBtn({
     <button
       onClick={onClick}
       aria-label={title}
-      className="p-1 rounded transition-colors"
+      className="transition-colors flex items-center justify-center"
       title={title}
-      style={{ color: "var(--text-muted)", background: "transparent" }}
+      style={{
+        width: 22,
+        height: 22,
+        color: "var(--text-muted)",
+        background: "transparent",
+        border: "1px solid transparent",
+        borderRadius: 0,
+      }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-        (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
+        (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
+        (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)";
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLElement).style.background = "transparent";
         (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+        (e.currentTarget as HTMLElement).style.borderColor = "transparent";
       }}
     >
       {children}
@@ -741,15 +751,33 @@ function FileTreeRow({
       aria-selected={node.type === "file" ? isActive : undefined}
       aria-expanded={node.type === "folder" ? node.expanded : undefined}
       className={clsx(
-        "flex items-center gap-1.5 py-[3px] px-2 rounded-sm mx-1 group relative",
+        "flex items-center gap-1.5 py-[3px] pr-2 mx-0 group relative",
         "transition-colors text-[0.8125rem]",
         node.type === "folder" ? "cursor-default" : "cursor-pointer",
         isActive && "font-medium",
       )}
       style={{
+        // Padding-left = (depth*14) + 8 base + 3 pra abrir espaco da
+        // faixa accent vertical no item ativo (acomoda a borda lateral
+        // sem deslocar o conteudo quando torna-se ativo).
         paddingLeft: `${8 + depth * 14}px`,
         background: bg,
         color: fg,
+        borderRadius: 0,
+        // Faixa accent 3px na borda esquerda quando arquivo ativo —
+        // marca catalogica clara, mesma gramatica do CommandPalette
+        // / ContextMenu. Pastas nao tem (so' arquivo "ativo" tem
+        // sentido como selecao).
+        borderLeft:
+          node.type === "file" && isActive
+            ? "3px solid var(--accent)"
+            : "3px solid transparent",
+        // Pasta em serif italic (estilo capitulo de livro);
+        // arquivo continua Inter pra legibilidade em densidade alta.
+        fontFamily:
+          node.type === "folder" ? "var(--font-display)" : undefined,
+        fontStyle: node.type === "folder" ? "italic" : undefined,
+        fontWeight: node.type === "folder" ? 600 : undefined,
         // Item sendo arrastado fica meio-transparente como feedback.
         opacity: dragPath === node.path ? 0.4 : 1,
         // Indicador visual de drop: linha fina no topo do alvo,
@@ -1042,13 +1070,16 @@ function ContextMenu({
 
   return (
     <div
-      className="fixed z-50 min-w-[160px] rounded-md py-1 text-[0.78rem]"
+      className="fixed z-50 min-w-[170px] py-1"
       style={{
         left: menu.x,
         top: menu.y,
         background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
-        boxShadow: "var(--shadow-md)",
+        border: "2px solid var(--border-strong)",
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat-sm)",
+        fontFamily: "var(--font-display)",
+        fontSize: "0.82rem",
       }}
       onClick={(e) => e.stopPropagation()}
     >

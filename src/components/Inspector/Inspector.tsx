@@ -62,7 +62,7 @@ export function Inspector() {
 
   const shellStyle: React.CSSProperties = {
     background: "var(--bg-panel-2)",
-    borderLeft: "1px solid var(--border-subtle)",
+    borderLeft: "2px solid var(--border-strong)",
   };
 
   if (!activeFilePath) {
@@ -73,10 +73,17 @@ export function Inspector() {
           floating={floatingInspector}
           onFloat={() => setFloatingInspector(!floatingInspector)}
         />
-        <div className="flex-1 flex items-center justify-center px-4 text-center">
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 text-center">
+          <span style={{ color: "var(--border-strong)", fontSize: 22 }} aria-hidden>
+            ❦
+          </span>
           <p
-            className="text-[0.75rem] leading-relaxed"
-            style={{ color: "var(--text-placeholder)" }}
+            className="leading-relaxed italic"
+            style={{
+              color: "var(--text-placeholder)",
+              fontFamily: "var(--font-display)",
+              fontSize: "0.82rem",
+            }}
           >
             Nenhuma cena aberta.
           </p>
@@ -153,7 +160,7 @@ export function Inspector() {
             }
             placeholder="Resumo em 1–2 frases do que acontece nesta cena."
             rows={3}
-            className="w-full resize-none px-2 py-1.5 text-[0.78rem] rounded outline-none leading-relaxed"
+            className="w-full resize-none px-2 py-1.5 text-[0.78rem] outline-none leading-relaxed"
             style={{
               background: "var(--bg-panel)",
               border: "1px solid var(--border)",
@@ -183,7 +190,7 @@ export function Inspector() {
                 });
               }}
               placeholder="0"
-              className="w-24 px-2 py-1 text-[0.78rem] rounded outline-none"
+              className="w-24 px-2 py-1 text-[0.78rem] outline-none"
               style={{
                 background: "var(--bg-panel)",
                 border: "1px solid var(--border)",
@@ -206,8 +213,11 @@ export function Inspector() {
           {target > 0 && (
             <div className="mt-2 space-y-1">
               <div
-                className="h-1.5 rounded-full overflow-hidden"
-                style={{ background: "var(--bg-hover)" }}
+                className="h-[4px] overflow-hidden"
+                style={{
+                  background: "var(--bg-hover)",
+                  border: "1px solid var(--border-strong)",
+                }}
               >
                 <div
                   className="h-full transition-all"
@@ -328,16 +338,11 @@ function Header({
 }) {
   const [hovered, setHovered] = useState(false);
   return (
-    <div
-      className="flex items-center justify-between px-3 py-3"
-      style={{ borderBottom: "1px solid var(--border-subtle)" }}
-    >
-      <span
-        className="text-[0.7rem] font-semibold uppercase tracking-widest"
-        style={{ color: "var(--text-muted)" }}
-      >
-        Cena
-      </span>
+    <div className="flex items-center justify-between px-3.5 py-3 solon-plaque-bar">
+      {/* Plaqueta `| CENA |` — placa de ficha catalografica. Mesma
+          gramatica de Sidebar/Outline; o conteudo abaixo (campos do
+          frontmatter) e' literalmente uma ficha. */}
+      <span className="solon-plaque">Cena</span>
       <div className="flex items-center gap-1">
         <button
           onClick={onFloat}
@@ -374,14 +379,14 @@ function Field({
   label: string;
   children: React.ReactNode;
 }) {
+  // Field vira "etiqueta de ficha catalografica". Label em serif small-caps
+  // (.solon-caps--sm) ao inves de Inter uppercase pra casar com a plaqueta
+  // do header. O campo abaixo (input/textarea) continua estilizado pelos
+  // estilos de cada componente — visualmente, a ficha do Inspector inteira
+  // parece um cartao de catalogo de biblioteca antiga.
   return (
-    <div className="space-y-1">
-      <div
-        className="text-[0.65rem] font-semibold uppercase tracking-wider"
-        style={{ color: "var(--text-muted)" }}
-      >
-        {label}
-      </div>
+    <div className="space-y-1.5">
+      <div className="solon-caps--sm">{label}</div>
       {children}
     </div>
   );
@@ -402,7 +407,7 @@ function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-2 py-1 text-[0.78rem] rounded outline-none"
+      className="w-full px-2 py-1 text-[0.78rem] outline-none"
       style={{
         background: "var(--bg-panel)",
         border: "1px solid var(--border)",
@@ -535,7 +540,7 @@ function TagsEditor({
           }
         }}
         placeholder="Adicionar tag + Enter"
-        className="w-full px-2 py-1 text-[0.75rem] rounded outline-none"
+        className="w-full px-2 py-1 text-[0.75rem] outline-none"
         style={{
           background: "var(--bg-panel)",
           border: "1px solid var(--border)",

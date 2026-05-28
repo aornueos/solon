@@ -70,23 +70,28 @@ export function Scratchpad() {
 
   return (
     <div
-      className="fixed right-5 bottom-8 z-[130] w-[min(520px,calc(100vw-40px))] rounded-lg overflow-hidden"
+      className="fixed right-5 bottom-8 z-[130] w-[min(520px,calc(100vw-40px))] overflow-hidden"
       style={{
         background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
-        boxShadow: "var(--shadow-lg)",
+        border: "2px solid var(--border-strong)",
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat)",
       }}
     >
-      <div
-        className="h-10 px-3 flex items-center gap-2"
-        style={{ borderBottom: "1px solid var(--border-subtle)" }}
-      >
-        <FilePlus2 size={14} />
-        <span className="text-[0.78rem] font-medium flex-1">Scratchpad</span>
-        <span className="text-[0.68rem]" style={{ color: "var(--text-muted)" }}>
-          efêmero
-        </span>
-        <button className="p-1 rounded" type="button" onClick={close} aria-label="Fechar">
+      <div className="solon-dialog-header" style={{ padding: "0.6rem 0.85rem" }}>
+        <div className="flex items-center gap-2">
+          <FilePlus2 size={14} style={{ color: "var(--accent)" }} />
+          <span className="solon-plaque">Scratchpad</span>
+          <span className="solon-caps--sm" style={{ color: "var(--text-muted)" }}>
+            efêmero
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Fechar"
+          className="solon-dialog-close"
+        >
           <X size={13} />
         </button>
       </div>
@@ -94,20 +99,20 @@ export function Scratchpad() {
         value={text}
         onChange={(e) => setText(e.target.value)}
         autoFocus
-        placeholder="Escreva sem criar arquivo..."
-        className="w-full h-56 resize-none bg-transparent outline-none px-4 py-3 text-[0.95rem] leading-relaxed"
-        style={{ color: "var(--text-primary)" }}
+        placeholder="Escreva sem criar arquivo…"
+        className="w-full h-56 resize-none bg-transparent outline-none px-4 py-3 leading-relaxed"
+        style={{
+          color: "var(--text-primary)",
+          fontFamily: "var(--font-display)",
+          fontSize: "0.98rem",
+        }}
       />
-      <div
-        className="px-3 py-2 flex items-center justify-end gap-2"
-        style={{ borderTop: "1px solid var(--border-subtle)" }}
-      >
+      <div className="solon-dialog-actions" style={{ padding: "0.6rem 0.85rem" }}>
         <button
           type="button"
           disabled={!text.trim()}
           onClick={appendToActive}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[0.78rem] disabled:opacity-40"
-          style={{ background: "var(--bg-panel-2)", color: "var(--text-secondary)" }}
+          className="solon-btn inline-flex items-center gap-1.5 disabled:opacity-40"
         >
           <Send size={13} />
           Inserir no ativo
@@ -116,8 +121,7 @@ export function Scratchpad() {
           type="button"
           disabled={!rootFolder || !text.trim() || saving}
           onClick={saveAsNote}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[0.78rem] disabled:opacity-40"
-          style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+          className="solon-btn solon-btn--primary inline-flex items-center gap-1.5 disabled:opacity-40"
         >
           <FilePlus2 size={13} />
           Salvar nota

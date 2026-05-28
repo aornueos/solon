@@ -79,28 +79,25 @@ export function TagFilterPopover({ onClose, anchor }: Props) {
       ref={popoverRef}
       role="dialog"
       aria-label="Filtrar por tag"
-      className="fixed z-[110] rounded-md shadow-xl overflow-hidden"
+      className="fixed z-[110] overflow-hidden"
       style={{
         top: position.top,
         left: position.left,
-        minWidth: 200,
+        minWidth: 220,
         maxWidth: 280,
         maxHeight: 360,
         background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
+        border: "2px solid var(--border-strong)",
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat-sm)",
         color: "var(--text-primary)",
       }}
     >
       <div
         className="px-3 py-2 flex items-center justify-between"
-        style={{ borderBottom: "1px solid var(--border-subtle)" }}
+        style={{ borderBottom: "2px solid var(--border-strong)" }}
       >
-        <span
-          className="text-[0.65rem] font-semibold uppercase tracking-widest"
-          style={{ color: "var(--text-muted)" }}
-        >
-          Filtrar por tag
-        </span>
+        <span className="solon-plaque">Tags</span>
         {activeTagFilter && (
           <button
             onClick={() => {

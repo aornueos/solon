@@ -308,14 +308,22 @@ export const Card = memo(function Card({ card }: Props) {
         width: card.w,
         height: card.h,
         background: color,
-        borderLeft: isScene ? `4px solid ${statusBorder}` : undefined,
-        borderColor: isSelected ? "var(--accent)" : "var(--border)",
-        boxShadow: isSelected ? "var(--shadow-md)" : "var(--shadow-sm)",
+        // Borda 2px brutalist + borda-esquerda accent quando scene (status
+        // color) ou ainda mais grossa quando selecionado. Sombra chapada
+        // pra que cards pareçam "fichas físicas sobre a mesa".
+        borderLeft: isScene
+          ? `4px solid ${statusBorder}`
+          : `2px solid ${isSelected ? "var(--accent)" : "var(--border-strong)"}`,
+        borderTop: `2px solid ${isSelected ? "var(--accent)" : "var(--border-strong)"}`,
+        borderRight: `2px solid ${isSelected ? "var(--accent)" : "var(--border-strong)"}`,
+        borderBottom: `2px solid ${isSelected ? "var(--accent)" : "var(--border-strong)"}`,
+        borderRadius: 0,
+        boxShadow: isSelected ? "var(--shadow-flat)" : "var(--shadow-flat-sm)",
         ...ringStyle,
       }}
       data-canvas-entity-id={card.id}
       className={clsx(
-        "rounded-md border transition-shadow group",
+        "transition-shadow group",
         isLinkSource || isLinkCandidate || tool === "arrow"
           ? "cursor-crosshair"
           : tool === "eraser"
@@ -445,11 +453,12 @@ export const Card = memo(function Card({ card }: Props) {
       {showPalette && (
         <div
           data-card-action
-          className="absolute -top-7 left-14 flex gap-1 rounded px-1.5 py-1 z-10"
+          className="absolute -top-8 left-14 flex gap-1 px-1.5 py-1 z-10"
           style={{
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
-            boxShadow: "var(--shadow-sm)",
+            border: "2px solid var(--border-strong)",
+            borderRadius: 0,
+            boxShadow: "var(--shadow-flat-sm)",
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -652,12 +661,13 @@ function ActionBtn({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="p-1 rounded transition-colors"
+      className="p-1 transition-colors"
       style={{
         background: bg,
         color: fg,
-        border: `1px solid ${bd}`,
-        boxShadow: "var(--shadow-sm)",
+        border: `1.5px solid ${bd}`,
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat-sm)",
       }}
     >
       {children}
@@ -703,8 +713,13 @@ function SceneBody({
         </div>
         {status && (
           <span
-            className="flex-shrink-0 text-[0.58rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
-            style={{ background: `${status.color}22`, color: status.color }}
+            className="flex-shrink-0 px-1.5 py-0.5 solon-caps--sm"
+            style={{
+              background: `${status.color}22`,
+              color: status.color,
+              border: `1px solid ${status.color}55`,
+              borderRadius: 0,
+            }}
           >
             {status.label}
           </span>

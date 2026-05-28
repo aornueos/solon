@@ -22,16 +22,18 @@ export function StatusBar() {
 
   return (
     <div
-      className="solon-statusbar flex items-center justify-between h-6 px-4 text-[0.68rem]"
+      className="solon-statusbar flex items-center justify-between h-7 px-4"
       role="status"
       aria-live="polite"
       style={{
         background: "var(--bg-panel-2)",
-        borderTop: "1px solid var(--border-subtle)",
+        borderTop: "2px solid var(--border-strong)",
         color: "var(--text-muted)",
+        fontFamily: "var(--font-display)",
+        fontSize: "0.7rem",
       }}
     >
-      <div className="truncate max-w-[40%] flex items-center gap-3">
+      <div className="truncate max-w-[50%] flex items-center gap-3">
         {activeFilePath ? (
           <>
             {showStatusPath && (
@@ -39,11 +41,20 @@ export function StatusBar() {
                 onClick={openFolder}
                 title="Trocar pasta de trabalho"
                 aria-label="Trocar pasta de trabalho"
-                className="truncate font-mono opacity-60 hover:opacity-100 hover:underline underline-offset-2 transition-opacity"
-                style={{ background: "transparent", color: "inherit" }}
+                className="truncate opacity-60 hover:opacity-100 hover:underline underline-offset-[3px] transition-opacity"
+                style={{
+                  background: "transparent",
+                  color: "inherit",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "0.68rem",
+                  letterSpacing: "0.01em",
+                }}
               >
                 {activeFilePath}
               </button>
+            )}
+            {showStatusPath && (
+              <Lozenge />
             )}
             <SaveIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
           </>
@@ -51,31 +62,36 @@ export function StatusBar() {
           <button
             onClick={openFolder}
             aria-label="Abrir pasta"
-            className="hover:underline underline-offset-2 transition-opacity"
+            className="hover:underline underline-offset-[3px] transition-opacity solon-caps"
             style={{ background: "transparent", color: "inherit" }}
           >
             Abrir pasta…
           </button>
         )}
       </div>
-      <div className="flex items-center gap-4">
-        <UpdateIndicator
-          status={updateStatus}
-          onClick={openUpdateDialog}
-        />
+      <div className="flex items-center gap-3">
+        <UpdateIndicator status={updateStatus} onClick={openUpdateDialog} />
         {showStatusStats && (
           <>
             {target > 0 ? (
               <div className="flex items-center gap-2">
                 <span
-                  className={clsx("tabular-nums", onTarget && "font-medium")}
-                  style={onTarget ? { color: "var(--success)" } : undefined}
+                  className={clsx("tabular-nums", onTarget && "font-semibold")}
+                  style={
+                    onTarget
+                      ? { color: "var(--success)", fontStyle: "italic" }
+                      : { fontStyle: "italic" }
+                  }
                 >
-                  {wordCount.toLocaleString("pt-BR")} / {target.toLocaleString("pt-BR")} palavras
+                  {wordCount.toLocaleString("pt-BR")} / {target.toLocaleString("pt-BR")}{" "}
+                  palavras
                 </span>
                 <div
-                  className="w-20 h-1 rounded-full overflow-hidden"
-                  style={{ background: "var(--bg-hover)" }}
+                  className="w-20 h-[3px] overflow-hidden"
+                  style={{
+                    background: "var(--bg-hover)",
+                    border: "1px solid var(--border)",
+                  }}
                 >
                   <div
                     className="h-full transition-all"
@@ -87,18 +103,46 @@ export function StatusBar() {
                 </div>
               </div>
             ) : (
-              <span className="tabular-nums">
+              <span className="tabular-nums" style={{ fontStyle: "italic" }}>
                 {wordCount.toLocaleString("pt-BR")} palavras
               </span>
             )}
-            <span className="tabular-nums">
+            <Lozenge />
+            <span className="tabular-nums" style={{ fontStyle: "italic" }}>
               {charCount.toLocaleString("pt-BR")} caracteres
             </span>
-            <span style={{ color: "var(--accent)" }}>Markdown</span>
+            <Lozenge />
+            <span
+              className="solon-caps--sm"
+              style={{ color: "var(--accent)" }}
+            >
+              Markdown
+            </span>
           </>
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Separador em losango pequeno (4×4 girado 45°). Mesma gramatica usada
+ * em Titlebar e HomePage. Reutilizar o mesmo glifo cria coerencia de
+ * "vocabulario editorial" pelo app inteiro.
+ */
+function Lozenge() {
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: "inline-block",
+        width: 3.5,
+        height: 3.5,
+        background: "var(--border-strong)",
+        transform: "rotate(45deg)",
+        opacity: 0.7,
+      }}
+    />
   );
 }
 

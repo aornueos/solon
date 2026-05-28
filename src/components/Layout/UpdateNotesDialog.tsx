@@ -107,8 +107,7 @@ export function UpdateNotesDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.45)" }}
+      className="solon-dialog-overlay fixed inset-0 z-[100] flex items-center justify-center p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !downloading) close();
       }}
@@ -116,38 +115,32 @@ export function UpdateNotesDialog() {
       <div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-xl rounded-lg shadow-xl flex flex-col max-h-[80vh]"
-        style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
-          color: "var(--text-primary)",
-        }}
+        className="solon-dialog w-full max-w-xl flex flex-col max-h-[80vh]"
       >
-        {/* Header */}
-        <div
-          className="px-6 pt-5 pb-4 flex items-start justify-between gap-4"
-          style={{ borderBottom: "1px solid var(--border-subtle)" }}
-        >
+        {/* Header — "PROJETO · METADATA" no estilo da HomePage: meta-label
+            em solon-caps em cima, versao em display monumental embaixo.
+            Cria coerencia com a hero do app. */}
+        <div className="solon-dialog-header items-start">
           <div className="min-w-0">
-            <div
-              className="text-[0.62rem] uppercase tracking-[0.25em] mb-1.5"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {ready ? "Pronto pra reiniciar" : "Nova versão disponível"}
+            <div className="solon-caps mb-1.5">
+              {ready ? "Pronto pra reiniciar" : "Nova edição"}
             </div>
             <h2
-              className="font-serif text-2xl tracking-tight"
-              style={{ color: "var(--text-primary)" }}
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "1.85rem",
+                fontWeight: 700,
+                lineHeight: 1,
+                letterSpacing: "-0.025em",
+                color: "var(--text-primary)",
+              }}
             >
               Solon{" "}
-              <span style={{ color: "var(--text-secondary)" }}>
+              <span style={{ color: "var(--accent)" }}>
                 {info.version}
               </span>
             </h2>
-            <div
-              className="text-[0.75rem] mt-1"
-              style={{ color: "var(--text-muted)" }}
-            >
+            <div className="solon-dialog-subtitle">
               Você está na {info.currentVersion}
               {info.date ? ` · ${formatDate(info.date)}` : ""}
             </div>
@@ -156,18 +149,9 @@ export function UpdateNotesDialog() {
             <button
               onClick={close}
               title="Fechar"
-              className="p-1 rounded transition-colors"
-              style={{ color: "var(--text-muted)" }}
-              onMouseEnter={(e) =>
-                ((e.currentTarget as HTMLElement).style.background =
-                  "var(--bg-hover)")
-              }
-              onMouseLeave={(e) =>
-                ((e.currentTarget as HTMLElement).style.background =
-                  "transparent")
-              }
+              className="solon-dialog-close"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           )}
         </div>
@@ -182,8 +166,11 @@ export function UpdateNotesDialog() {
             <div dangerouslySetInnerHTML={{ __html: notesHtml }} />
           ) : (
             <p
-              className="font-serif italic"
-              style={{ color: "var(--text-muted)" }}
+              className="italic"
+              style={{
+                color: "var(--text-muted)",
+                fontFamily: "var(--font-display)",
+              }}
             >
               Sem notas de lançamento.
             </p>
@@ -192,21 +179,30 @@ export function UpdateNotesDialog() {
 
         {/* Footer: progresso + acoes */}
         <div
-          className="px-6 py-4"
-          style={{ borderTop: "1px solid var(--border-subtle)" }}
+          className="px-5 py-3.5"
+          style={{ borderTop: "2px solid var(--border-strong)" }}
         >
           {downloading && (
             <div className="mb-3">
-              <div
-                className="flex items-center justify-between text-[0.75rem] mb-1.5"
-                style={{ color: "var(--text-muted)" }}
-              >
-                <span>Baixando…</span>
-                <span className="tabular-nums">{progressPct}%</span>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="solon-caps">Baixando…</span>
+                <span
+                  className="tabular-nums"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "0.78rem",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {progressPct}%
+                </span>
               </div>
               <div
-                className="h-1 rounded-full overflow-hidden"
-                style={{ background: "var(--bg-hover)" }}
+                className="h-[3px] overflow-hidden"
+                style={{
+                  background: "var(--bg-hover)",
+                  border: "1px solid var(--border-strong)",
+                }}
               >
                 <div
                   className="h-full transition-all"
@@ -222,35 +218,45 @@ export function UpdateNotesDialog() {
           <div className="flex justify-end gap-2">
             {status.kind === "available" && (
               <>
-                <FooterBtn variant="ghost" onClick={onSkip}>
+                <button onClick={onSkip} className="solon-btn">
                   Ignorar {info.version}
-                </FooterBtn>
-                <FooterBtn variant="ghost" onClick={close}>
+                </button>
+                <button onClick={close} className="solon-btn">
                   Mais tarde
-                </FooterBtn>
-                <FooterBtn variant="primary" onClick={onInstall}>
+                </button>
+                <button
+                  onClick={onInstall}
+                  className="solon-btn solon-btn--primary inline-flex items-center gap-1.5"
+                >
                   <Download size={13} />
                   Atualizar agora
-                </FooterBtn>
+                </button>
               </>
             )}
             {downloading && (
               <span
-                className="text-[0.75rem] italic self-center"
-                style={{ color: "var(--text-muted)" }}
+                className="self-center italic"
+                style={{
+                  color: "var(--text-muted)",
+                  fontFamily: "var(--font-display)",
+                  fontSize: "0.8rem",
+                }}
               >
                 Continue escrevendo — a gente avisa quando terminar.
               </span>
             )}
             {ready && (
               <>
-                <FooterBtn variant="ghost" onClick={close}>
+                <button onClick={close} className="solon-btn">
                   Reiniciar depois
-                </FooterBtn>
-                <FooterBtn variant="primary" onClick={onRestart}>
+                </button>
+                <button
+                  onClick={onRestart}
+                  className="solon-btn solon-btn--primary inline-flex items-center gap-1.5"
+                >
                   <RotateCw size={13} />
                   Reiniciar agora
-                </FooterBtn>
+                </button>
               </>
             )}
           </div>
@@ -278,45 +284,6 @@ function isSafeExternalUrl(value: string): boolean {
   } catch {
     return false;
   }
-}
-
-function FooterBtn({
-  children,
-  onClick,
-  variant,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  variant: "ghost" | "primary";
-}) {
-  const primary = variant === "primary";
-  return (
-    <button
-      onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[0.8rem] font-medium transition-colors"
-      style={{
-        background: primary ? "var(--accent)" : "transparent",
-        border: `1px solid ${primary ? "var(--accent)" : "var(--border)"}`,
-        color: primary ? "var(--text-inverse, #fff)" : "var(--text-secondary)",
-      }}
-      onMouseEnter={(e) => {
-        if (primary) {
-          (e.currentTarget as HTMLElement).style.filter = "brightness(0.92)";
-        } else {
-          (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (primary) {
-          (e.currentTarget as HTMLElement).style.filter = "";
-        } else {
-          (e.currentTarget as HTMLElement).style.background = "transparent";
-        }
-      }}
-    >
-      {children}
-    </button>
-  );
 }
 
 function formatDate(iso: string): string {

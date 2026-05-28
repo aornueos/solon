@@ -446,8 +446,7 @@ export function CommandPalette() {
 
   return (
     <div
-      className="fixed inset-0 z-[130] flex items-start justify-center px-4 pt-[14vh]"
-      style={{ background: "rgba(0,0,0,0.38)" }}
+      className="solon-dialog-overlay fixed inset-0 z-[130] flex items-start justify-center px-4 pt-[14vh]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close();
       }}
@@ -456,16 +455,13 @@ export function CommandPalette() {
         role="dialog"
         aria-modal="true"
         aria-label="Paleta de comandos"
-        className="w-full max-w-xl rounded-lg shadow-xl overflow-hidden"
-        style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
-          color: "var(--text-primary)",
-        }}
+        className="solon-dialog w-full max-w-xl overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-3 px-4 py-3">
-          <Search size={16} style={{ color: "var(--text-muted)" }} />
+        {/* Linha de busca — sem borda interna; a borda 2px do .solon-dialog
+            ja' delimita. Input em tipografia editorial pra dar peso. */}
+        <div className="flex items-center gap-3 px-4 py-3.5">
+          <Search size={16} style={{ color: "var(--accent)" }} />
           <input
             ref={inputRef}
             value={query}
@@ -487,26 +483,38 @@ export function CommandPalette() {
                 void run(filtered[activeIndex]);
               }
             }}
-            placeholder="Buscar comando, nota ou pasta..."
-            className="flex-1 bg-transparent outline-none text-[0.92rem]"
-            style={{ color: "var(--text-primary)" }}
+            placeholder="Buscar comando, nota ou pasta…"
+            className="flex-1 bg-transparent outline-none"
+            style={{
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-display)",
+              fontSize: "1rem",
+              letterSpacing: "-0.005em",
+            }}
           />
           <kbd
-            className="text-[0.65rem] px-1.5 py-0.5 rounded"
+            className="text-[0.65rem] px-1.5 py-0.5 tabular-nums"
             style={{
               color: "var(--text-muted)",
-              border: "1px solid var(--border)",
+              border: "1.5px solid var(--border-strong)",
               background: "var(--bg-panel-2)",
+              fontFamily: "var(--font-mono)",
+              borderRadius: 0,
             }}
           >
             Esc
           </kbd>
         </div>
-        <div style={{ borderTop: "1px solid var(--border-subtle)" }}>
+        <div style={{ borderTop: "2px solid var(--border-strong)" }}>
           {filtered.length === 0 ? (
             <div
-              className="px-4 py-6 text-center text-[0.8rem]"
-              style={{ color: "var(--text-muted)" }}
+              className="px-4 py-6 text-center"
+              style={{
+                color: "var(--text-muted)",
+                fontFamily: "var(--font-display)",
+                fontStyle: "italic",
+                fontSize: "0.82rem",
+              }}
             >
               Nenhum comando encontrado.
             </div>
@@ -523,17 +531,32 @@ export function CommandPalette() {
                     style={{
                       background: active ? "var(--bg-hover)" : "transparent",
                       color: "var(--text-primary)",
+                      // Faixa accent vertical no item ativo — substitui o
+                      // hover sutil por marca clara de selecao.
+                      borderLeft: active
+                        ? "3px solid var(--accent)"
+                        : "3px solid transparent",
                     }}
                   >
                     <span style={{ color: "var(--text-muted)" }}>{item.icon}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[0.82rem] truncate">
+                      <span
+                        className="block truncate"
+                        style={{
+                          fontFamily: "var(--font-display)",
+                          fontSize: "0.88rem",
+                          fontWeight: active ? 600 : 500,
+                        }}
+                      >
                         {item.label}
                       </span>
                       {item.hint && (
                         <span
-                          className="block text-[0.68rem] truncate"
-                          style={{ color: "var(--text-muted)" }}
+                          className="block text-[0.7rem] truncate italic"
+                          style={{
+                            color: "var(--text-muted)",
+                            fontFamily: "var(--font-display)",
+                          }}
                         >
                           {item.hint}
                         </span>

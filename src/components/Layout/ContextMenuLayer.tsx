@@ -136,7 +136,7 @@ export function ContextMenuLayer() {
         ref={menuRef}
         role="menu"
         aria-orientation="vertical"
-        className="absolute min-w-[200px] py-1 rounded-md"
+        className="absolute min-w-[210px] py-1"
         style={{
           left: pos?.left ?? menu.x,
           top: pos?.top ?? menu.y,
@@ -144,8 +144,9 @@ export function ContextMenuLayer() {
           // off-screen no primeiro frame.
           opacity: pos ? 1 : 0,
           background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
-          boxShadow: "var(--shadow-md)",
+          border: "2px solid var(--border-strong)",
+          borderRadius: 0,
+          boxShadow: "var(--shadow-flat-sm)",
           color: "var(--text-primary)",
         }}
       >
@@ -156,7 +157,7 @@ export function ContextMenuLayer() {
                 key={`sep-${i}`}
                 role="separator"
                 className="my-1 h-px"
-                style={{ background: "var(--border-subtle)" }}
+                style={{ background: "var(--border-strong)", opacity: 0.5 }}
               />
             );
           }
@@ -215,7 +216,7 @@ function ContextMenuItemView({
       }}
       onClick={onSelect}
       disabled={item.disabled}
-      className="w-full flex items-center gap-3 px-3 py-1.5 text-left text-[0.82rem] transition-colors"
+      className="w-full flex items-center gap-3 px-3 py-1.5 text-left transition-colors"
       style={{
         background: focused ? "var(--bg-hover)" : "transparent",
         color: item.disabled
@@ -224,6 +225,13 @@ function ContextMenuItemView({
           ? "var(--danger)"
           : "var(--text-primary)",
         cursor: item.disabled ? "not-allowed" : "pointer",
+        fontFamily: "var(--font-display)",
+        fontSize: "0.84rem",
+        // Borda accent na lateral quando focused — eco do CommandPalette
+        // pra coerencia entre menus.
+        borderLeft: focused
+          ? "3px solid var(--accent)"
+          : "3px solid transparent",
       }}
     >
       {/* Slot fixo de 14px pra icon ou check — alinha colunas mesmo
@@ -241,8 +249,14 @@ function ContextMenuItemView({
       <span className="flex-1 truncate">{item.label}</span>
       {item.shortcut && (
         <span
-          className="text-[0.7rem] tabular-nums tracking-wide flex-shrink-0"
-          style={{ color: "var(--text-muted)" }}
+          className="text-[0.68rem] tabular-nums tracking-wide flex-shrink-0 px-1.5 py-0.5"
+          style={{
+            color: "var(--text-muted)",
+            fontFamily: "var(--font-mono)",
+            border: "1px solid var(--border-strong)",
+            borderRadius: 0,
+            background: "var(--bg-panel-2)",
+          }}
         >
           {item.shortcut}
         </span>

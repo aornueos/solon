@@ -79,8 +79,7 @@ export function LocalHistoryDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-[125] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.42)" }}
+      className="solon-dialog-overlay fixed inset-0 z-[125] flex items-center justify-center p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close();
       }}
@@ -89,38 +88,44 @@ export function LocalHistoryDialog() {
         role="dialog"
         aria-modal="true"
         aria-label="Historico local"
-        className="w-full max-w-3xl rounded-lg shadow-xl overflow-hidden"
-        style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
-          color: "var(--text-primary)",
-        }}
+        className="solon-dialog w-full max-w-3xl overflow-hidden"
       >
-        <div
-          className="px-4 py-3 flex items-center justify-between"
-          style={{ borderBottom: "1px solid var(--border-subtle)" }}
-        >
-          <div className="flex items-center gap-2">
-            <Clock size={15} style={{ color: "var(--text-muted)" }} />
-            <h2 className="text-[0.78rem] font-semibold">Histórico local</h2>
+        <div className="solon-dialog-header">
+          <div className="flex items-center gap-2.5">
+            <Clock size={15} style={{ color: "var(--accent)" }} />
+            <span className="solon-plaque solon-plaque--lg">Histórico</span>
           </div>
-          <button onClick={close} aria-label="Fechar" className="p-1 rounded">
+          <button onClick={close} aria-label="Fechar" className="solon-dialog-close">
             <X size={14} />
           </button>
         </div>
 
-        <div className="grid grid-cols-[240px_1fr] min-h-[420px]">
+        <div className="grid grid-cols-[260px_1fr] min-h-[420px]">
           <div
             className="overflow-y-auto p-2"
-            style={{ borderRight: "1px solid var(--border-subtle)" }}
+            style={{ borderRight: "2px solid var(--border-strong)" }}
           >
             {loading ? (
-              <div className="px-2 py-6 text-[0.78rem]" style={{ color: "var(--text-muted)" }}>
-                Carregando...
+              <div
+                className="px-2 py-6 text-center italic"
+                style={{
+                  color: "var(--text-muted)",
+                  fontFamily: "var(--font-display)",
+                  fontSize: "0.82rem",
+                }}
+              >
+                carregando…
               </div>
             ) : items.length === 0 ? (
-              <div className="px-2 py-6 text-[0.78rem]" style={{ color: "var(--text-muted)" }}>
-                Nenhum snapshot ainda.
+              <div
+                className="px-2 py-6 text-center italic"
+                style={{
+                  color: "var(--text-muted)",
+                  fontFamily: "var(--font-display)",
+                  fontSize: "0.82rem",
+                }}
+              >
+                nenhum snapshot ainda.
               </div>
             ) : (
               items.map((item) => {
@@ -129,15 +134,28 @@ export function LocalHistoryDialog() {
                   <button
                     key={item.path}
                     onClick={() => setSelected(item)}
-                    className="w-full text-left rounded px-2 py-2 mb-1"
+                    className="w-full text-left px-2.5 py-2 mb-0.5 transition-colors"
                     style={{
                       background: active ? "var(--bg-hover)" : "transparent",
                       color: "var(--text-primary)",
+                      borderLeft: active
+                        ? "3px solid var(--accent)"
+                        : "3px solid transparent",
+                      borderRadius: 0,
                     }}
                   >
-                    <span className="block text-[0.78rem]">{item.label}</span>
+                    <span
+                      className="block"
+                      style={{
+                        fontFamily: "var(--font-display)",
+                        fontSize: "0.82rem",
+                        fontWeight: active ? 600 : 500,
+                      }}
+                    >
+                      {item.label}
+                    </span>
                     {item.size > 0 && (
-                      <span className="block text-[0.66rem]" style={{ color: "var(--text-muted)" }}>
+                      <span className="solon-caps--sm block mt-0.5">
                         {item.size < 1024
                           ? `${item.size} B`
                           : `${(item.size / 1024).toFixed(1)} KB`}
@@ -152,14 +170,30 @@ export function LocalHistoryDialog() {
           <div className="p-4 flex flex-col min-w-0">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="min-w-0">
-                <div className="text-[0.72rem]" style={{ color: "var(--text-muted)" }}>
+                <div className="solon-caps--sm">
                   {activeFileName ?? "Arquivo ativo"}
                 </div>
-                <h3 className="font-serif text-lg truncate">
+                <h3
+                  className="truncate mt-0.5"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "1.15rem",
+                    fontWeight: 700,
+                    letterSpacing: "-0.01em",
+                  }}
+                >
                   {preview?.title ?? "Selecione um snapshot"}
                 </h3>
                 {preview && (
-                  <div className="text-[0.68rem]" style={{ color: "var(--text-muted)" }}>
+                  <div
+                    className="mt-0.5"
+                    style={{
+                      color: "var(--text-muted)",
+                      fontFamily: "var(--font-display)",
+                      fontStyle: "italic",
+                      fontSize: "0.78rem",
+                    }}
+                  >
                     {preview.words.toLocaleString("pt-BR")} palavras
                   </div>
                 )}
@@ -167,22 +201,21 @@ export function LocalHistoryDialog() {
               <button
                 onClick={restore}
                 disabled={!selected}
-                className="inline-flex items-center gap-2 px-3 py-1 rounded text-[0.78rem] disabled:opacity-40"
-                style={{
-                  background: "var(--bg-inverse)",
-                  color: "var(--text-inverse)",
-                }}
+                className="solon-btn solon-btn--primary inline-flex items-center gap-2 disabled:opacity-40"
               >
                 <RotateCcw size={13} />
                 Restaurar
               </button>
             </div>
             <div
-              className="flex-1 overflow-y-auto rounded p-3 font-serif text-[0.92rem] leading-relaxed whitespace-pre-wrap"
+              className="flex-1 overflow-y-auto p-4 leading-relaxed whitespace-pre-wrap"
               style={{
                 background: "var(--bg-app)",
-                border: "1px solid var(--border-subtle)",
+                border: "2px solid var(--border-strong)",
+                borderRadius: 0,
                 color: "var(--text-secondary)",
+                fontFamily: "var(--font-display)",
+                fontSize: "0.92rem",
               }}
             >
               {preview?.body || "Sem prévia."}

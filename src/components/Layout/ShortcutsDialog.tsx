@@ -105,8 +105,7 @@ export function ShortcutsDialog({ open, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-start justify-center px-4 pt-[8vh]"
-      style={{ background: "rgba(0,0,0,0.4)" }}
+      className="solon-dialog-overlay fixed inset-0 z-[120] flex items-start justify-center px-4 pt-[8vh]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -115,32 +114,23 @@ export function ShortcutsDialog({ open, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label="Atalhos de teclado"
-        className="w-full max-w-3xl max-h-[80vh] rounded-lg shadow-xl overflow-hidden flex flex-col"
-        style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
-          color: "var(--text-primary)",
-        }}
+        className="solon-dialog w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div
-          className="flex items-center justify-between px-5 py-3.5"
-          style={{ borderBottom: "1px solid var(--border-subtle)" }}
-        >
-          <h2 className="text-[1rem] font-medium">Atalhos de teclado</h2>
+        <div className="solon-dialog-header">
+          {/* Plaqueta em vez de h2 plain — coerencia com headers dos painéis
+              (Sidebar/Outline/Inspector usam .solon-plaque). */}
+          <span className="solon-plaque solon-plaque--lg">Atalhos</span>
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="p-1.5 rounded"
-            style={{ color: "var(--text-muted)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            className="solon-dialog-close"
           >
             <X size={14} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
             {GROUPS.map((group) => (
               <ShortcutGroupBlock key={group.title} group={group} />
             ))}
@@ -152,32 +142,39 @@ export function ShortcutsDialog({ open, onClose }: Props) {
 }
 
 function ShortcutGroupBlock({ group }: { group: ShortcutGroup }) {
+  // Cada grupo vira uma "secao" com plaqueta menor — escala fractal
+  // do header do dialog. Itens em serif italic + kbd brutalista (borda
+  // pesada, sem rounded, mono).
   return (
     <section>
-      <h3
-        className="text-[0.65rem] font-semibold uppercase tracking-widest mb-2"
-        style={{ color: "var(--text-muted)" }}
-      >
-        {group.title}
-      </h3>
-      <ul className="space-y-1">
+      <div className="mb-3">
+        <span className="solon-plaque">{group.title}</span>
+      </div>
+      <ul className="space-y-1.5">
         {group.items.map((it) => (
           <li
             key={it.keys + it.label}
             className="flex items-baseline justify-between gap-3"
           >
             <span
-              className="text-[0.78rem]"
-              style={{ color: "var(--text-secondary)" }}
+              style={{
+                fontFamily: "var(--font-display)",
+                fontStyle: "italic",
+                fontSize: "0.82rem",
+                color: "var(--text-secondary)",
+              }}
             >
               {it.label}
             </span>
             <kbd
-              className="text-[0.68rem] px-1.5 py-0.5 rounded font-mono flex-shrink-0 tabular-nums"
+              className="text-[0.68rem] px-1.5 py-0.5 flex-shrink-0 tabular-nums"
               style={{
+                fontFamily: "var(--font-mono)",
                 background: "var(--bg-panel-2)",
                 color: "var(--text-primary)",
-                border: "1px solid var(--border)",
+                border: "1.5px solid var(--border-strong)",
+                borderRadius: 0,
+                letterSpacing: "0.02em",
               }}
             >
               {it.keys}

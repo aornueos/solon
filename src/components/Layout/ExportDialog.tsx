@@ -115,8 +115,7 @@ export function ExportDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-[125] flex items-center justify-center px-4"
-      style={{ background: "rgba(0,0,0,0.4)" }}
+      className="solon-dialog-overlay fixed inset-0 z-[125] flex items-center justify-center px-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close();
       }}
@@ -125,29 +124,20 @@ export function ExportDialog() {
         role="dialog"
         aria-modal="true"
         aria-label="Exportar"
-        className="w-full max-w-md rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
-        style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
-          color: "var(--text-primary)",
-        }}
+        className="solon-dialog w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div
-          className="flex items-center justify-between px-5 py-3.5 shrink-0"
-          style={{ borderBottom: "1px solid var(--border-subtle)" }}
-        >
-          <div className="inline-flex items-center gap-2">
-            <FileDown size={15} />
-            <h2 className="text-[1rem] font-medium">
-              {format === "docx" ? "Exportar manuscrito (DOCX)" : "Exportar para PDF"}
-            </h2>
+        <div className="solon-dialog-header shrink-0">
+          <div className="inline-flex items-center gap-2.5">
+            <FileDown size={15} style={{ color: "var(--accent)" }} />
+            <span className="solon-plaque solon-plaque--lg">
+              {format === "docx" ? "Manuscrito" : "Exportar PDF"}
+            </span>
           </div>
           <button
             onClick={close}
             aria-label="Fechar"
-            className="p-1.5 rounded"
-            style={{ color: "var(--text-muted)" }}
+            className="solon-dialog-close"
           >
             <X size={14} />
           </button>
@@ -282,32 +272,15 @@ export function ExportDialog() {
           )}
         </div>
 
-        <div
-          className="px-5 py-3 flex items-center justify-end gap-2 shrink-0"
-          style={{ borderTop: "1px solid var(--border-subtle)" }}
-        >
-          <button
-            type="button"
-            onClick={close}
-            className="text-[0.82rem] px-3 py-1.5 rounded"
-            style={{
-              background: "var(--bg-panel-2)",
-              border: "1px solid var(--border)",
-              color: "var(--text-primary)",
-            }}
-          >
+        <div className="solon-dialog-actions shrink-0">
+          <button type="button" onClick={close} className="solon-btn">
             Cancelar
           </button>
           <button
             type="button"
             onClick={handleExport}
             disabled={busy || (scope === "file" ? !canExportFile : !canExportProject)}
-            className="text-[0.82rem] px-3 py-1.5 rounded inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{
-              background: "var(--accent)",
-              color: "var(--text-inverse)",
-              border: "1px solid var(--accent)",
-            }}
+            className="solon-btn solon-btn--primary inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <FileDown size={12} />
             {busy ? "Gerando..." : "Exportar"}
@@ -327,11 +300,8 @@ function Section({
 }) {
   return (
     <div>
-      <div
-        className="text-[0.65rem] font-semibold uppercase tracking-widest mb-1.5"
-        style={{ color: "var(--text-muted)" }}
-      >
-        {title}
+      <div className="mb-2">
+        <span className="solon-plaque">{title}</span>
       </div>
       <div className="space-y-1.5">{children}</div>
     </div>

@@ -191,29 +191,34 @@ export function FindBar({ editor, open, onClose, initialQuery }: Props) {
 
   return (
     <div
-      className="absolute top-2 right-3 z-30 flex flex-col gap-1.5 px-2 py-1.5 rounded shadow-md"
+      className="absolute top-2 right-3 z-30 flex flex-col gap-1.5 px-2.5 py-2"
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       style={{
         background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
+        border: "2px solid var(--border-strong)",
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat-sm)",
         color: "var(--text-primary)",
       }}
     >
       <div className="flex items-center gap-1">
-        <Search size={12} style={{ color: "var(--text-muted)" }} />
+        <Search size={12} style={{ color: "var(--accent)" }} />
         <input
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKey}
-          placeholder="Buscar..."
-          className="bg-transparent outline-none text-[0.78rem] w-[180px]"
-          style={{ color: "var(--text-primary)" }}
+          placeholder="Buscar…"
+          className="bg-transparent outline-none w-[180px]"
+          style={{
+            color: "var(--text-primary)",
+            fontFamily: "var(--font-display)",
+            fontSize: "0.82rem",
+          }}
         />
         <span
-          className="text-[0.7rem] tabular-nums px-1 min-w-[64px] text-right"
-          style={{ color: "var(--text-muted)" }}
+          className="solon-caps--sm tabular-nums px-1 min-w-[64px] text-right"
         >
           {counter}
         </span>
@@ -262,9 +267,13 @@ export function FindBar({ editor, open, onClose, initialQuery }: Props) {
           value={replaceWith}
           onChange={(e) => setReplaceWith(e.target.value)}
           onKeyDown={handleKey}
-          placeholder="Substituir..."
-          className="bg-transparent outline-none text-[0.78rem] w-[180px]"
-          style={{ color: "var(--text-primary)" }}
+          placeholder="Substituir…"
+          className="bg-transparent outline-none w-[180px]"
+          style={{
+            color: "var(--text-primary)",
+            fontFamily: "var(--font-display)",
+            fontSize: "0.82rem",
+          }}
         />
         <TextButton disabled={matches.length === 0} onClick={replaceCurrent}>
           Um
@@ -295,10 +304,14 @@ function IconButton({
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className="p-0.5 rounded transition-colors disabled:opacity-30"
+      className="transition-colors disabled:opacity-30 flex items-center justify-center"
       style={{
-        background: active ? "var(--bg-hover)" : "transparent",
-        color: active ? "var(--text-primary)" : "var(--text-secondary)",
+        width: 20,
+        height: 20,
+        background: active ? "var(--accent-soft)" : "transparent",
+        color: active ? "var(--accent)" : "var(--text-secondary)",
+        border: active ? "1px solid var(--accent)" : "1px solid transparent",
+        borderRadius: 0,
       }}
     >
       {children}
@@ -324,11 +337,16 @@ function TextButton({
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className="px-2 py-0.5 rounded text-[0.68rem] disabled:opacity-35"
+      className="px-2 py-0.5 disabled:opacity-35"
       style={{
-        border: "1px solid var(--border)",
-        background: active ? "var(--bg-hover)" : "transparent",
-        color: active ? "var(--text-primary)" : "var(--text-secondary)",
+        border: "1.5px solid var(--border-strong)",
+        borderRadius: 0,
+        background: active ? "var(--accent-soft)" : "transparent",
+        color: active ? "var(--accent)" : "var(--text-secondary)",
+        fontFamily: "var(--font-display)",
+        fontSize: "0.72rem",
+        fontWeight: 600,
+        letterSpacing: "0.02em",
       }}
     >
       {children}

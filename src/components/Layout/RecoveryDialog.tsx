@@ -61,73 +61,74 @@ export function RecoveryDialog() {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[140] flex items-center justify-center px-4"
-      style={{ background: "rgba(0,0,0,0.45)" }}
-    >
+    <div className="solon-dialog-overlay fixed inset-0 z-[140] flex items-center justify-center px-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Recuperar rascunhos"
-        className="w-full max-w-lg rounded-lg shadow-xl overflow-hidden"
-        style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
-          color: "var(--text-primary)",
-        }}
+        className="solon-dialog w-full max-w-lg overflow-hidden"
       >
-        <div className="px-5 py-4 flex items-start gap-3" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-          <AlertTriangle size={18} style={{ color: "var(--accent-2, #c89a3a)", marginTop: 2 }} />
-          <div className="flex-1">
-            <h2 className="text-[1rem] font-medium leading-snug">
-              Rascunho não salvo encontrado
-            </h2>
-            <p
-              className="text-[0.8rem] mt-1 leading-relaxed"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              {drafts.length === 1
-                ? "O Solon detectou um arquivo com edições que não chegaram a ser salvas (provavelmente por um fechamento abrupto)."
-                : `O Solon detectou ${drafts.length} arquivos com edições que não chegaram a ser salvas.`}{" "}
-              Você pode recuperar agora ou manter a versão atual do disco.
-            </p>
+        <div className="solon-dialog-header items-start">
+          <div className="flex items-start gap-3 flex-1">
+            <AlertTriangle
+              size={18}
+              style={{ color: "var(--accent-2)", marginTop: 2, flexShrink: 0 }}
+            />
+            <div className="flex-1 min-w-0">
+              <span className="solon-plaque solon-plaque--lg">Rascunhos</span>
+              <p className="solon-dialog-subtitle mt-1.5">
+                {drafts.length === 1
+                  ? "Um arquivo com edições que não chegaram a ser salvas."
+                  : `${drafts.length} arquivos com edições que não chegaram a ser salvas.`}{" "}
+                Recuperar ou manter a versão do disco.
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto py-1">
+        <div className="max-h-[50vh] overflow-y-auto">
           {drafts.map((draft) => {
             const name = draft.path.split(/[\\/]/).pop() ?? draft.path;
             const ageMin = Math.max(
               1,
               Math.floor((Date.now() - draft.savedAt) / 60000),
             );
-            // Preview minusculo do body — primeiras palavras do conteudo
-            // (apos parse de frontmatter) pra dar contexto sem expor o
-            // doc inteiro.
             const preview = previewOf(draft.content);
             const busy = processing === draft.path;
             return (
               <div
                 key={draft.path}
-                className="px-5 py-3 flex items-start gap-3"
-                style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                className="px-5 py-3.5 flex items-start gap-3"
+                style={{ borderBottom: "1px solid var(--border)" }}
               >
                 <div className="flex-1 min-w-0">
-                  <div className="text-[0.85rem] font-medium truncate" title={draft.path}>
+                  <div
+                    className="truncate"
+                    title={draft.path}
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: "0.92rem",
+                      fontWeight: 600,
+                    }}
+                  >
                     {name}
                   </div>
                   <div
-                    className="text-[0.7rem] mt-0.5"
+                    className="solon-caps--sm mt-0.5"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    rascunho salvo há ~{ageMin}{ageMin === 1 ? " min" : " min"}
+                    Há {ageMin} min
                   </div>
                   {preview && (
                     <div
-                      className="text-[0.74rem] mt-1.5 italic line-clamp-2"
-                      style={{ color: "var(--text-secondary)" }}
+                      className="text-[0.78rem] mt-2 line-clamp-2"
+                      style={{
+                        color: "var(--text-secondary)",
+                        fontFamily: "var(--font-display)",
+                        fontStyle: "italic",
+                      }}
                     >
-                      "{preview}"
+                      “{preview}”
                     </div>
                   )}
                 </div>
@@ -137,12 +138,8 @@ export function RecoveryDialog() {
                     onClick={() => discard(draft.path)}
                     disabled={busy}
                     title="Manter versão do disco"
-                    className="p-1.5 rounded transition-colors disabled:opacity-40"
-                    style={{
-                      background: "var(--bg-panel-2)",
-                      border: "1px solid var(--border)",
-                      color: "var(--text-muted)",
-                    }}
+                    className="solon-btn disabled:opacity-40"
+                    style={{ padding: "0.4rem 0.6rem" }}
                   >
                     <X size={13} />
                   </button>
@@ -151,13 +148,7 @@ export function RecoveryDialog() {
                     onClick={() => recover(draft.path, draft.content)}
                     disabled={busy}
                     title="Recuperar este rascunho"
-                    className="px-2.5 py-1.5 rounded transition-colors disabled:opacity-40 inline-flex items-center gap-1"
-                    style={{
-                      background: "var(--accent)",
-                      color: "var(--text-inverse)",
-                      border: "1px solid var(--accent)",
-                      fontSize: "0.75rem",
-                    }}
+                    className="solon-btn solon-btn--primary disabled:opacity-40 inline-flex items-center gap-1"
                   >
                     <Check size={12} /> Recuperar
                   </button>
@@ -167,27 +158,18 @@ export function RecoveryDialog() {
           })}
         </div>
 
-        <div
-          className="px-5 py-3 flex items-center justify-between gap-2"
-          style={{ borderTop: "1px solid var(--border-subtle)" }}
-        >
+        <div className="solon-dialog-actions justify-between">
           <button
             type="button"
             onClick={discardAll}
-            className="text-[0.78rem] hover:underline underline-offset-2"
-            style={{ color: "var(--text-muted)" }}
+            className="solon-btn solon-btn--danger"
           >
             Descartar tudo
           </button>
           <button
             type="button"
             onClick={clearDrafts}
-            className="text-[0.78rem] px-3 py-1.5 rounded"
-            style={{
-              background: "var(--bg-panel-2)",
-              border: "1px solid var(--border)",
-              color: "var(--text-primary)",
-            }}
+            className="solon-btn"
           >
             Decidir depois
           </button>

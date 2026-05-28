@@ -679,6 +679,27 @@
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.7);
 }
 
+/* ─────────────────────────────────────────
+   Design tokens — Dark Academia + Brutalist (0.9.26)
+   Tokens derivados que herdam dos tokens de tema (--border-strong,
+   --bg-panel, etc) ja' definidos por paper variant. Centralizar aqui
+   evita repetir borda-pesada/sombra-chapada/serifa-display em cada
+   componente — todo chrome novo consome essas vars e segue cada tema
+   automaticamente.
+───────────────────────────────────────── */
+:root {
+  --border-heavy: 2px solid var(--border-strong);
+  --border-medium: 1.5px solid var(--border);
+  --shadow-flat: 3px 3px 0 var(--border-strong);
+  --shadow-flat-sm: 2px 2px 0 var(--border-strong);
+  --font-display: "Lora", "EB Garamond", Georgia, serif;
+  --font-ui: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --tracking-caps: 0.22em;
+  --tracking-caps-tight: 0.14em;
+  --tracking-wordmark: 0.32em;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -750,10 +771,341 @@
     }
   }
 
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+  /* Scrollbars brutalist: 9px (largura industrial), thumb em
+     border-strong com bordas retas (border-radius 0). Hover engrossa
+     pra accent. Coerente com o vocabulario de bordas pesadas do app. */
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-panel-2);
+    border-left: 1px solid var(--border);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 0;
+    border: 1px solid var(--bg-panel-2);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+  }
+  ::-webkit-scrollbar-corner {
+    background: var(--bg-panel-2);
+  }
+  /* Firefox */
+  * { scrollbar-color: var(--border-strong) var(--bg-panel-2); }
+}
+
+/* ─────────────────────────────────────────
+   Chrome editorial — plaquetas, ornamentos, blocos brutalistas
+   Vocabulario visual compartilhado entre Sidebar/Outline/Inspector/
+   HomePage/StatusBar/Dialogs. Cada utility consome tokens de tema:
+   trocar paper variant repinta tudo sem tocar nos componentes.
+───────────────────────────────────────── */
+
+/* Plaqueta `| TITULO |` — placa de biblioteca antiga. Serifa display
+   em small-caps com pipes em ::before/::after (filete vertical 1px na
+   altura do x-height). Usado nos headers de Sidebar/Outline/Inspector
+   e em dialogs. Combina com .solon-plaque-bar pra ganhar filete grosso
+   embaixo. */
+.solon-plaque {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  line-height: 1;
+}
+.solon-plaque::before,
+.solon-plaque::after {
+  content: "";
+  display: block;
+  width: 1.5px;
+  height: 0.85em;
+  background: var(--border-strong);
+}
+.solon-plaque--lg {
+  font-size: 0.82rem;
+  letter-spacing: var(--tracking-caps);
+}
+.solon-plaque--lg::before,
+.solon-plaque--lg::after {
+  width: 2px;
+  height: 0.95em;
+}
+
+/* Wrapper que da' filete grosso embaixo da plaqueta. Aplicar no row
+   inteiro do header pra que o filete atravesse o painel inteiro,
+   nao so' embaixo das letras. */
+.solon-plaque-bar {
+  border-bottom: 2px solid var(--border-strong);
+}
+
+/* Divisor ornado central com losango — pra HomePage e separadores
+   de cena fora do editor. Mais quente que <hr>. */
+.solon-divider-ornate {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1;
+  user-select: none;
+}
+.solon-divider-ornate::before,
+.solon-divider-ornate::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-strong);
+}
+
+/* Display serif gigante — HomePage hero e cabec,alhos de dialog peso
+   editorial. line-height 0.92 e tracking negativo simulam capa de livro.
+   Responsive font-size via clamp para nao explodir em ultrawide. */
+.solon-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+  color: var(--text-primary);
+}
+
+/* Label serif compacto em small-caps. Quente; substitui Inter uppercase
+   em metadados editoriais. Pra metadados de codigo continua o mono. */
+.solon-caps {
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.solon-caps--sm {
+  font-size: 0.6rem;
+  letter-spacing: var(--tracking-caps);
+}
+
+/* Wordmark "SOLON" — caps espacadas. Titlebar e dialogs. */
+.solon-wordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wordmark);
+  text-transform: uppercase;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+/* Numeracao romana editorial — recents na HomePage, itens enumerados.
+   Mono pra alinhamento tabular + tracking pra dar respiro. */
+.solon-roman {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  font-feature-settings: "tnum" 1;
+  color: var(--text-placeholder);
+  text-transform: uppercase;
+}
+
+/* Bloco brutalista — 90° corners, borda 2px solid, sombra chapada.
+   Pra cards na HomePage (Recents, hero), dialog cards, popovers
+   importantes. Sombra usa --border-strong (mesma cor da borda) pra
+   ter look de carimbo/imprensa, nao de elevacao. */
+.solon-block {
+  border: 2px solid var(--border-strong);
+  background: var(--bg-panel);
+  border-radius: 0;
+  position: relative;
+}
+.solon-block--shadow {
+  box-shadow: var(--shadow-flat);
+}
+.solon-block--shadow-sm {
+  box-shadow: var(--shadow-flat-sm);
+}
+.solon-block--lift {
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.solon-block--lift:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--border-strong);
+}
+.solon-block--lift:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--border-strong);
+}
+
+/* Linha "marginalia" — notas laterais editoriais. Aplicado em StatusBar
+   pra dar look de margem de livro: small-caps, separadores em losango
+   suave. */
+.solon-marginalia {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+/* Botao "ler" / CTA editorial — borda pesada, hover preenche em accent
+   suave. Substitui CTAs minimalistas em HomePage e dialogs. */
+.solon-cta {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: var(--tracking-caps-tight);
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1.25rem;
+  border: 2px solid var(--text-primary);
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: 0;
+  cursor: default;
+  transition: background 140ms ease, color 140ms ease, transform 140ms ease,
+    box-shadow 140ms ease;
+  box-shadow: var(--shadow-flat);
+}
+.solon-cta:hover {
+  background: var(--text-primary);
+  color: var(--text-inverse);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--border-strong);
+}
+.solon-cta:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--border-strong);
+}
+
+/* ─────────────────────────────────────────
+   Dialogs e overlays — vocabulario brutalist compartilhado
+   Substituem rounded-lg/shadow-xl espalhados em SettingsDialog,
+   ShortcutsDialog, ExportDialog, DialogLayer (prompt/confirm), etc.
+   Cada dialog so' precisa trocar as classes — sem repetir estilo.
+───────────────────────────────────────── */
+.solon-dialog-overlay {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.solon-dialog {
+  background: var(--bg-panel);
+  border: 2px solid var(--border-strong);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-flat);
+  border-radius: 0;
+}
+
+.solon-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.15rem;
+  border-bottom: 2px solid var(--border-strong);
+}
+
+.solon-dialog-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.solon-dialog-subtitle {
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.solon-dialog-close {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 0;
+  cursor: default;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+  flex-shrink: 0;
+}
+.solon-dialog-close:hover {
+  background: var(--danger);
+  color: var(--text-inverse);
+  border-color: var(--danger);
+}
+
+/* Botoes de dialog — primario (accent/danger preenchido) e ghost (borda).
+   Substituem rounded/filter-brightness por borda pesada + hover preenchido.
+   Pareados em .solon-dialog-actions com gap consistente. */
+.solon-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 0.85rem 1.15rem;
+  border-top: 2px solid var(--border-strong);
+}
+.solon-btn {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.45rem 0.95rem;
+  border-radius: 0;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: default;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.solon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.solon-btn--primary {
+  border-color: var(--text-primary);
+  background: var(--text-primary);
+  color: var(--text-inverse);
+}
+.solon-btn--primary:hover {
+  background: transparent;
+  color: var(--text-primary);
+}
+.solon-btn--danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--text-inverse);
+}
+.solon-btn--danger:hover {
+  background: transparent;
+  color: var(--danger);
+}
+
+/* Inputs em dialogs — borda pesada brutalist em vez de rounded + ring sutil.
+   Aplica em prompt/confirm e formularios. */
+.solon-input {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  background: var(--bg-app);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 0;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.solon-input:focus {
+  border-color: var(--accent);
+  box-shadow: 2px 2px 0 var(--accent-soft);
 }
 
 /* ─────────────────────────────────────────
