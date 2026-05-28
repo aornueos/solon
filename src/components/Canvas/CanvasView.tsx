@@ -827,13 +827,21 @@ export function CanvasView() {
       {!activeFilePath && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div
-            className="text-center text-sm rounded-lg px-5 py-3 shadow-sm"
+            className="text-center px-6 py-4 flex flex-col items-center gap-2"
             style={{
-              color: "var(--text-muted)",
+              color: "var(--text-secondary)",
               background: "var(--bg-panel)",
-              border: "1px solid var(--border)",
+              border: "2px solid var(--border-strong)",
+              borderRadius: 0,
+              boxShadow: "var(--shadow-flat-sm)",
+              fontFamily: "var(--font-display)",
+              fontSize: "0.9rem",
+              fontStyle: "italic",
             }}
           >
+            <span style={{ color: "var(--accent)", fontSize: 22 }} aria-hidden>
+              ❦
+            </span>
             {rootFolder
               ? "Abra um arquivo para ver seu canvas."
               : "Abra uma pasta para começar."}
@@ -905,20 +913,35 @@ export function CanvasView() {
       {emptyLinkMenu && (
         <div
           data-canvas-link-menu
-          className="absolute z-[80] min-w-36 rounded-md p-1 shadow-lg"
+          className="absolute z-[80] min-w-40 p-1"
           style={{
             left: Math.min(emptyLinkMenu.screenX + 10, window.innerWidth - 180),
             top: Math.min(emptyLinkMenu.screenY + 10, window.innerHeight - 110),
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "2px solid var(--border-strong)",
+            borderRadius: 0,
+            boxShadow: "var(--shadow-flat-sm)",
             color: "var(--text-primary)",
+            fontFamily: "var(--font-display)",
           }}
           onMouseDown={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         >
           <button
-            className="block w-full rounded px-3 py-1.5 text-left text-[0.78rem]"
-            style={{ color: "var(--text-primary)" }}
+            className="block w-full px-3 py-1.5 text-left transition-colors"
+            style={{
+              color: "var(--text-primary)",
+              borderLeft: "3px solid transparent",
+              fontSize: "0.82rem",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--bg-hover)";
+              e.currentTarget.style.borderLeftColor = "var(--accent)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.borderLeftColor = "transparent";
+            }}
             onClick={(e) => {
               e.stopPropagation();
               createLinkedItem("text");
@@ -927,8 +950,20 @@ export function CanvasView() {
             Novo texto
           </button>
           <button
-            className="block w-full rounded px-3 py-1.5 text-left text-[0.78rem]"
-            style={{ color: "var(--text-primary)" }}
+            className="block w-full px-3 py-1.5 text-left transition-colors"
+            style={{
+              color: "var(--text-primary)",
+              borderLeft: "3px solid transparent",
+              fontSize: "0.82rem",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--bg-hover)";
+              e.currentTarget.style.borderLeftColor = "var(--accent)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.borderLeftColor = "transparent";
+            }}
             onClick={(e) => {
               e.stopPropagation();
               createLinkedItem("card");
@@ -941,10 +976,16 @@ export function CanvasView() {
 
       {(linkingFromId || tool === "arrow") && (
         <div
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[0.72rem] px-3 py-1.5 rounded-full shadow-md z-10"
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 z-10"
           style={{
             background: "var(--bg-inverse)",
             color: "var(--text-inverse)",
+            border: "2px solid var(--bg-inverse)",
+            borderRadius: 0,
+            boxShadow: "var(--shadow-flat-sm)",
+            fontFamily: "var(--font-display)",
+            fontSize: "0.78rem",
+            fontStyle: "italic",
           }}
         >
           {linkingFromId
@@ -955,10 +996,16 @@ export function CanvasView() {
 
       {tool === "eraser" && (
         <div
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[0.72rem] px-3 py-1.5 rounded-full shadow-md z-10"
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 z-10"
           style={{
-            background: "var(--bg-inverse)",
+            background: "var(--danger)",
             color: "var(--text-inverse)",
+            border: "2px solid var(--danger)",
+            borderRadius: 0,
+            boxShadow: "var(--shadow-flat-sm)",
+            fontFamily: "var(--font-display)",
+            fontSize: "0.78rem",
+            fontStyle: "italic",
           }}
         >
           Borracha — clique em qualquer item para apagar (V p/ voltar)

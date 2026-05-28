@@ -237,11 +237,15 @@ export function AppLayout() {
             </Suspense>
             {tabDropHint && (
               <div
-                className="absolute top-3 bottom-3 right-3 w-[45%] rounded-lg pointer-events-none flex items-center justify-center text-[0.78rem]"
+                className="absolute top-3 bottom-3 right-3 w-[45%] pointer-events-none flex items-center justify-center"
                 style={{
-                  border: "1px solid var(--accent)",
+                  border: "2px dashed var(--accent)",
                   background: "color-mix(in srgb, var(--accent) 14%, transparent)",
                   color: "var(--text-primary)",
+                  borderRadius: 0,
+                  fontFamily: "var(--font-display)",
+                  fontSize: "0.82rem",
+                  fontStyle: "italic",
                 }}
               >
                 Soltar como painel de referência
@@ -309,16 +313,17 @@ export function AppLayout() {
           onClick={toggleReadingMode}
           aria-label="Sair do modo leitura"
           title="Sair do modo leitura (Esc ou Ctrl+Shift+R)"
-          className="fixed top-3 right-3 z-[90] flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-opacity text-[0.72rem]"
+          className="fixed top-3 right-3 z-[90] flex items-center gap-1.5 px-3 py-1.5 transition-opacity"
           style={{
-            // Opacidade alta (0.85) — antes era 0.3, quase invisivel
-            // no dark theme. Em fundo escuro, 0.3 dava preto-em-preto
-            // e o user nao via o botao. Confiavel > sutil.
             background: "var(--bg-panel)",
-            border: "1px solid var(--accent)",
+            border: "2px solid var(--accent)",
+            borderRadius: 0,
             color: "var(--text-primary)",
             opacity: 0.85,
-            boxShadow: "var(--shadow-md)",
+            boxShadow: "var(--shadow-flat-sm)",
+            fontFamily: "var(--font-display)",
+            fontSize: "0.78rem",
+            letterSpacing: "0.04em",
           }}
           onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.opacity = "1")}
           onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.opacity = "0.85")}
@@ -369,7 +374,7 @@ function FloatingInspector() {
 
   return (
     <div
-      className="fixed z-[120] overflow-hidden rounded-lg"
+      className="fixed z-[120] overflow-hidden"
       onMouseDownCapture={startMove}
       style={{
         left: rect.x,
@@ -377,8 +382,9 @@ function FloatingInspector() {
         width: rect.width,
         height: rect.height,
         background: "var(--bg-panel-2)",
-        border: "1px solid var(--border)",
-        boxShadow: "var(--shadow-lg)",
+        border: "2px solid var(--border-strong)",
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat)",
       }}
     >
       <Inspector />
@@ -427,7 +433,7 @@ function FloatingOutline() {
 
   return (
     <div
-      className="fixed z-[120] overflow-hidden rounded-lg"
+      className="fixed z-[120] overflow-hidden"
       onMouseDownCapture={startMove}
       style={{
         left: rect.x,
@@ -435,8 +441,9 @@ function FloatingOutline() {
         width: rect.width,
         height: rect.height,
         background: "var(--bg-panel-2)",
-        border: "1px solid var(--border)",
-        boxShadow: "var(--shadow-md)",
+        border: "2px solid var(--border-strong)",
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat)",
       }}
     >
       <Outline />

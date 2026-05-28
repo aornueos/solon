@@ -179,11 +179,14 @@ function ThemePicker({
         aria-expanded={open}
         title="Tema visual"
         onClick={() => setOpen((o) => !o)}
-        className="h-6 ml-0.5 px-1.5 text-[0.7rem] rounded inline-flex items-center gap-1 transition-colors outline-none"
+        className="h-6 ml-0.5 px-2 text-[0.7rem] inline-flex items-center gap-1 transition-colors outline-none"
         style={{
           background: open ? "var(--bg-hover)" : "transparent",
           color: open ? "var(--text-primary)" : "var(--text-secondary)",
-          border: "1px solid var(--border-subtle)",
+          border: "1.5px solid var(--border-strong)",
+          borderRadius: 0,
+          fontFamily: "var(--font-display)",
+          letterSpacing: "0.04em",
         }}
       >
         <span>{current?.label ?? "Tema"}</span>
@@ -194,13 +197,14 @@ function ThemePicker({
         <div
           role="listbox"
           aria-label="Temas"
-          className="absolute right-0 mt-1 rounded-md overflow-hidden z-[60]"
+          className="absolute right-0 mt-1 overflow-hidden z-[60]"
           style={{
             top: "100%",
-            minWidth: 168,
+            minWidth: 180,
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
-            boxShadow: "var(--shadow-md)",
+            border: "2px solid var(--border-strong)",
+            borderRadius: 0,
+            boxShadow: "var(--shadow-flat-sm)",
             color: "var(--text-primary)",
           }}
         >
@@ -215,11 +219,10 @@ function ThemePicker({
                     style={{ background: "var(--border-subtle)" }}
                   />
                 )}
-                <div
-                  className="px-2.5 pt-1.5 pb-0.5 text-[0.6rem] uppercase tracking-widest font-semibold"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  {tone === "light" ? "Claros" : "Escuros"}
+                <div className="px-2.5 pt-2 pb-1">
+                  <span className="solon-caps--sm">
+                    {tone === "light" ? "Claros" : "Escuros"}
+                  </span>
                 </div>
                 {items.map((paper) => {
                   const active = paper.value === value;
@@ -322,24 +325,24 @@ export function Titlebar() {
       className="solon-titlebar flex items-center h-9 select-none"
       style={{
         background: "var(--bg-panel-2)",
-        borderBottom: "1px solid var(--border-subtle)",
+        borderBottom: "2px solid var(--border-strong)",
       }}
       data-tauri-drag-region
       onDoubleClick={onTitlebarDoubleClick}
     >
-      {/* Logo / Nome — clicavel, leva pra home page. Stop drag pra que o
-          clique nao seja interceptado pelo `data-tauri-drag-region` do pai. */}
-      <div className="px-4 flex items-center gap-2">
+      {/* Wordmark — caps espacadas SOLON (.solon-wordmark consome
+          --font-display + tracking-wordmark 0.32em). Sai do serif
+          lowercase pra ganhar peso de logotipo editorial. */}
+      <div className="px-4 flex items-center gap-3">
         <button
           onClick={() => setActiveView("home")}
           onMouseDown={(e) => e.stopPropagation()}
           title="Início"
           aria-label="Inicio"
-          className="font-serif font-bold text-[0.95rem] transition-opacity hover:opacity-70"
+          className="solon-wordmark transition-opacity hover:opacity-70"
           style={{
             background: "transparent",
-            color: "var(--text-primary)",
-            opacity: activeView === "home" ? 0.6 : 1,
+            opacity: activeView === "home" ? 0.5 : 1,
             cursor: "default",
           }}
         >
@@ -347,17 +350,30 @@ export function Titlebar() {
         </button>
         {activeFileName && (
           <>
-            <span style={{ color: "var(--border)" }}>/</span>
-            {/* Clicavel: leva para a escrita com o arquivo aberto. Util
-                quando o user esta no canvas/home e quer voltar pro
-                texto sem ter que achar o item no sidebar. */}
+            {/* Separador editorial — losango pequeno girado, mesma gramatica
+                dos separadores da HomePage e StatusBar. Substitui o "/"
+                neutro por algo coerente com o vocabulario do app. */}
+            <span
+              aria-hidden
+              style={{
+                display: "inline-block",
+                width: 4,
+                height: 4,
+                background: "var(--border-strong)",
+                transform: "rotate(45deg)",
+                opacity: 0.7,
+              }}
+            />
             <button
               onClick={() => setActiveView("editor")}
               onMouseDown={(e) => e.stopPropagation()}
               title="Ir para escrita"
               aria-label="Ir para escrita"
-              className="text-[0.78rem] truncate max-w-[240px] transition-opacity hover:opacity-70"
+              className="truncate max-w-[260px] transition-opacity hover:opacity-70"
               style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "0.82rem",
+                fontStyle: "italic",
                 color: "var(--text-secondary)",
                 background: "transparent",
                 opacity: activeView === "editor" ? 1 : 0.85,
@@ -368,8 +384,14 @@ export function Titlebar() {
             </button>
             {status && (
               <span
-                className="text-[0.62rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
-                style={{ background: `${status.color}22`, color: status.color }}
+                className="solon-caps--sm px-1.5 py-[3px]"
+                style={{
+                  background: `${status.color}1f`,
+                  color: status.color,
+                  border: `1px solid ${status.color}55`,
+                  borderRadius: 0,
+                  textTransform: "uppercase",
+                }}
                 title={`Status: ${status.label}`}
               >
                 {status.label}
@@ -377,8 +399,12 @@ export function Titlebar() {
             )}
             {sceneMeta.pov && (
               <span
-                className="text-[0.7rem] italic"
-                style={{ color: "var(--text-muted)" }}
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "0.72rem",
+                  fontStyle: "italic",
+                  color: "var(--text-muted)",
+                }}
               >
                 · {sceneMeta.pov}
               </span>
@@ -390,10 +416,15 @@ export function Titlebar() {
       {/* Espaço arrastável */}
       <div className="flex-1" data-tauri-drag-region />
 
-      {/* Toggle de visão (Livre / Página / Canvas) */}
+      {/* Toggle de visão (Livre / Página / Canvas) — borda fina ao inves
+          de fundo solido, cantos retos. Coerencia com a linguagem
+          brutalist do chrome novo. */}
       <div
-        className="flex items-center gap-0 rounded-md p-0.5 mr-2"
-        style={{ background: "var(--bg-hover)" }}
+        className="flex items-center gap-0 p-0 mr-2"
+        style={{
+          border: "1.5px solid var(--border-strong)",
+          background: "var(--bg-panel)",
+        }}
       >
         <ViewTab
           onClick={openFluidEditor}
@@ -588,20 +619,21 @@ function ViewTab({
       aria-label={title}
       aria-pressed={active}
       className={clsx(
-        "flex items-center gap-1 px-2 py-1 rounded transition-colors",
+        "flex items-center gap-1 px-2.5 py-1 transition-colors",
       )}
       style={
         active
           ? {
-              background: "var(--bg-panel)",
-              color: "var(--text-primary)",
-              boxShadow: "var(--shadow-sm)",
+              background: "var(--text-primary)",
+              color: "var(--text-inverse)",
               cursor: "default",
+              borderRadius: 0,
             }
           : {
               color: "var(--text-muted)",
               background: "transparent",
               cursor: "default",
+              borderRadius: 0,
             }
       }
     >
@@ -621,27 +653,35 @@ function IconBtn({
   active?: boolean;
   title?: string;
 }) {
+  // Botao da Titlebar — cantos retos, borda accent quando ativo (em vez
+  // de fundo cinza). Coerencia com ToolBtn do EditorToolbar.
   return (
     <button
       onClick={onClick}
       title={title}
       aria-label={title}
       aria-pressed={active}
-      className="p-1.5 rounded transition-colors"
+      className="transition-colors flex items-center justify-center"
       style={{
-        color: active ? "var(--text-secondary)" : "var(--text-placeholder)",
-        background: active ? "var(--bg-hover)" : "transparent",
+        width: 26,
+        height: 24,
+        color: active ? "var(--accent)" : "var(--text-placeholder)",
+        background: active ? "var(--accent-soft)" : "transparent",
+        border: active ? "1px solid var(--accent)" : "1px solid transparent",
+        borderRadius: 0,
         cursor: "default",
       }}
       onMouseEnter={(e) => {
         if (active) return;
         (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
         (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+        (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)";
       }}
       onMouseLeave={(e) => {
         if (active) return;
         (e.currentTarget as HTMLElement).style.color = "var(--text-placeholder)";
         (e.currentTarget as HTMLElement).style.background = "transparent";
+        (e.currentTarget as HTMLElement).style.borderColor = "transparent";
       }}
     >
       {children}

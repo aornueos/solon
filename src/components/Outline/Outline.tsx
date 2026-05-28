@@ -31,29 +31,28 @@ export function Outline() {
       className="flex flex-col h-full"
       style={{
         background: "var(--bg-panel-2)",
-        borderLeft: "1px solid var(--border-subtle)",
+        borderLeft: "2px solid var(--border-strong)",
       }}
     >
-      {/* Header */}
-      <div
-        className="px-3 py-3"
-        style={{ borderBottom: "1px solid var(--border-subtle)" }}
-      >
-        <span
-          className="text-[0.7rem] font-semibold uppercase tracking-widest"
-          style={{ color: "var(--text-muted)" }}
-        >
-          Índice
-        </span>
+      {/* Header — plaqueta `| ÍNDICE |`. Mesma gramatica da Sidebar. */}
+      <div className="px-3.5 py-3 solon-plaque-bar">
+        <span className="solon-plaque">Índice</span>
       </div>
 
       {/* Lista de headings */}
       <div className="flex-1 overflow-y-auto py-2">
         {headings.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full px-4 text-center">
+          <div className="flex flex-col items-center justify-center h-full gap-3 px-4 text-center">
+            <span style={{ color: "var(--border-strong)", fontSize: 22 }} aria-hidden>
+              ❦
+            </span>
             <p
-              className="text-[0.75rem] leading-relaxed"
-              style={{ color: "var(--text-placeholder)" }}
+              className="leading-relaxed italic"
+              style={{
+                color: "var(--text-placeholder)",
+                fontFamily: "var(--font-display)",
+                fontSize: "0.82rem",
+              }}
             >
               {activeFileName
                 ? "Adicione títulos (#, ##, ###) para ver o índice"

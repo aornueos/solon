@@ -238,11 +238,13 @@ export function CanvasSidePanel() {
         onClick={() => setCollapsed(false)}
         title="Abrir ajustes do canvas"
         aria-label="Abrir ajustes do canvas"
-        className="absolute z-20 h-9 w-9 rounded-lg shadow-md flex items-center justify-center transition-colors"
+        className="absolute z-20 h-9 w-9 flex items-center justify-center transition-colors"
         style={{
           ...floatingStyle,
           background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
+          border: "2px solid var(--border-strong)",
+          borderRadius: 0,
+          boxShadow: "var(--shadow-flat-sm)",
           color: "var(--text-secondary)",
         }}
       >
@@ -256,37 +258,43 @@ export function CanvasSidePanel() {
       ref={panelRef}
       onMouseDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
-      className="absolute z-20 w-56 rounded-lg shadow-md px-3 py-3 flex flex-col gap-3"
+      className="absolute z-20 px-3 py-3 flex flex-col gap-3"
       style={{
         ...floatingStyle,
         width: PANEL_W,
         background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
+        border: "2px solid var(--border-strong)",
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat-sm)",
         color: "var(--text-primary)",
       }}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div
+        className="flex items-center justify-between gap-2 -mx-3 -mt-3 px-3 py-2"
+        style={{ borderBottom: "2px solid var(--border-strong)" }}
+      >
         <button
           onMouseDown={(e) => startPanelDrag(e)}
           title="Mover painel"
           aria-label="Mover painel"
-          className="h-7 w-7 rounded-md flex items-center justify-center transition-colors cursor-grab active:cursor-grabbing"
-          style={{ color: "var(--text-muted)", background: "var(--bg-hover)" }}
+          className="h-7 w-7 flex items-center justify-center transition-colors cursor-grab active:cursor-grabbing"
+          style={{
+            color: "var(--text-muted)",
+            border: "1px solid var(--border-strong)",
+            borderRadius: 0,
+          }}
         >
           <GripVertical size={14} />
         </button>
-        <div
-          className="text-[0.6rem] uppercase tracking-[0.18em] font-semibold flex-1"
-          style={{ color: "var(--text-muted)" }}
-        >
-          Canvas
+        <div className="flex-1 text-center">
+          <span className="solon-plaque">Canvas</span>
         </div>
         <button
           onClick={resetPanelPosition}
           title="Voltar para canto"
           aria-label="Voltar para canto"
-          className="h-7 w-7 rounded-md flex items-center justify-center transition-colors"
-          style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }}
+          className="solon-dialog-close"
+          style={{ width: 26, height: 26 }}
         >
           <LocateFixed size={13} />
         </button>
@@ -294,8 +302,8 @@ export function CanvasSidePanel() {
           onClick={() => setCollapsed(true)}
           title="Recolher ajustes do canvas"
           aria-label="Recolher ajustes do canvas"
-          className="h-7 w-7 rounded-md flex items-center justify-center transition-colors"
-          style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }}
+          className="solon-dialog-close"
+          style={{ width: 26, height: 26 }}
         >
           <PanelRightClose size={14} />
         </button>
@@ -320,8 +328,15 @@ export function CanvasSidePanel() {
           </IconChoice>
         </div>
         <div
-          className="text-[0.68rem] tabular-nums text-center rounded-md py-1"
-          style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }}
+          className="tabular-nums text-center py-1"
+          style={{
+            background: "var(--bg-hover)",
+            color: "var(--text-primary)",
+            border: "1.5px solid var(--border-strong)",
+            borderRadius: 0,
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.72rem",
+          }}
         >
           {Math.round(viewport.zoom * 100)}%
         </div>
@@ -444,11 +459,8 @@ function PanelSection({
 }) {
   return (
     <section className="flex flex-col gap-2">
-      <div
-        className="text-[0.6rem] uppercase tracking-[0.18em] font-semibold"
-        style={{ color: "var(--text-muted)" }}
-      >
-        {title}
+      <div>
+        <span className="solon-caps--sm">{title}</span>
       </div>
       {children}
     </section>
@@ -468,10 +480,16 @@ function SmallChoice({
     <button
       aria-pressed={active}
       onClick={onClick}
-      className="rounded-md px-2 py-1 text-[0.68rem] transition-colors"
+      className="px-2 py-1 transition-colors tabular-nums"
       style={{
-        background: active ? "var(--bg-active)" : "var(--bg-hover)",
-        color: active ? "var(--text-primary)" : "var(--text-muted)",
+        background: active ? "var(--accent-soft)" : "transparent",
+        color: active ? "var(--accent)" : "var(--text-muted)",
+        border: active
+          ? "1.5px solid var(--accent)"
+          : "1.5px solid var(--border-strong)",
+        borderRadius: 0,
+        fontFamily: "var(--font-mono)",
+        fontSize: "0.7rem",
       }}
     >
       {children}
@@ -495,10 +513,24 @@ function IconChoice({
       title={title}
       aria-label={title}
       onClick={onClick}
-      className="h-8 rounded-md flex items-center justify-center transition-colors"
+      className="h-8 flex items-center justify-center transition-colors"
       style={{
-        background: "var(--bg-hover)",
+        background: "transparent",
         color: danger ? "var(--danger)" : "var(--text-secondary)",
+        border: "1.5px solid var(--border-strong)",
+        borderRadius: 0,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = danger
+          ? "var(--danger)"
+          : "var(--bg-hover)";
+        if (danger) e.currentTarget.style.color = "var(--text-inverse)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "transparent";
+        e.currentTarget.style.color = danger
+          ? "var(--danger)"
+          : "var(--text-secondary)";
       }}
     >
       {children}
@@ -517,26 +549,36 @@ function Toggle({
   label: string;
   icon?: React.ReactNode;
 }) {
+  // Toggle brutalist: caixa quadrada com ✓ quando ativo, em vez do
+  // switch-track redondo. Mantem familia visual do app.
   return (
     <button
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="inline-flex items-center gap-1.5 text-[0.7rem]"
-      style={{ color: checked ? "var(--text-primary)" : "var(--text-muted)" }}
+      className="inline-flex items-center gap-1.5"
+      style={{
+        color: checked ? "var(--text-primary)" : "var(--text-muted)",
+        fontFamily: "var(--font-display)",
+        fontSize: "0.74rem",
+      }}
     >
       {icon}
       <span
-        className="w-7 h-4 rounded-full relative"
-        style={{ background: checked ? "var(--accent)" : "var(--border)" }}
+        className="inline-flex items-center justify-center"
+        style={{
+          width: 14,
+          height: 14,
+          background: checked ? "var(--accent)" : "transparent",
+          border: `1.5px solid ${checked ? "var(--accent)" : "var(--border-strong)"}`,
+          borderRadius: 0,
+          color: "var(--text-inverse)",
+          fontSize: 10,
+          lineHeight: 1,
+        }}
+        aria-hidden
       >
-        <span
-          className="absolute top-0.5 left-0.5 w-3 h-3 rounded-full transition-transform"
-          style={{
-            background: "var(--bg-panel)",
-            transform: checked ? "translateX(12px)" : "translateX(0)",
-          }}
-        />
+        {checked ? "✓" : ""}
       </span>
       {label}
     </button>

@@ -144,28 +144,25 @@ export function WikilinkAutocomplete({ editor }: Props) {
     <div
       role="listbox"
       aria-label="Sugestões de wikilink"
-      className="fixed z-[115] rounded-md shadow-xl overflow-hidden"
+      className="fixed z-[115] overflow-hidden"
       style={{
         left: state.left,
         top: state.top,
         minWidth: 220,
         maxWidth: 340,
         background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
+        border: "2px solid var(--border-strong)",
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat-sm)",
         color: "var(--text-primary)",
       }}
-      // Impede que click no popup roube o foco do editor (perderia o
-      // caret e a transacao de insert).
       onMouseDown={(e) => e.preventDefault()}
     >
       <div
-        className="px-2 py-1 text-[0.62rem] uppercase tracking-widest"
-        style={{
-          color: "var(--text-muted)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
+        className="px-2.5 py-1.5"
+        style={{ borderBottom: "2px solid var(--border-strong)" }}
       >
-        Wikilink → arquivo
+        <span className="solon-caps--sm">Wikilink → arquivo</span>
       </div>
       <ul className="py-1 max-h-[40vh] overflow-y-auto">
         {results.map((f, idx) => {
@@ -184,13 +181,26 @@ export function WikilinkAutocomplete({ editor }: Props) {
                 style={{
                   background: isActive ? "var(--bg-hover)" : "transparent",
                   color: isActive ? "var(--accent)" : "var(--text-primary)",
+                  borderLeft: isActive
+                    ? "3px solid var(--accent)"
+                    : "3px solid transparent",
                 }}
               >
                 <FileText
                   size={12}
                   style={{ color: "var(--text-muted)", flexShrink: 0 }}
                 />
-                <span className="truncate text-[0.78rem]">{display}</span>
+                <span
+                  className="truncate"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "0.82rem",
+                    fontStyle: isActive ? "normal" : "italic",
+                    fontWeight: isActive ? 600 : 500,
+                  }}
+                >
+                  {display}
+                </span>
               </button>
             </li>
           );

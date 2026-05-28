@@ -224,13 +224,13 @@ export function TabBar() {
       className="flex items-stretch overflow-x-auto overflow-y-hidden flex-shrink-0"
       style={{
         background: "var(--bg-panel-2)",
-        borderBottom: "1px solid var(--border-subtle)",
+        borderBottom: "2px solid var(--border-strong)",
         // Altura fixa ajuda a previne layout shift quando a TabBar nasce/
-        // morre (fixa = 32px = padding 6px × 2 + content ~20px).
-        minHeight: 32,
+        // morre (fixa = 34px = padding 6px × 2 + content ~22px).
+        minHeight: 34,
         scrollbarWidth: "thin",
-        padding: "3px 6px 0",
-        gap: 4,
+        padding: "4px 8px 0",
+        gap: 0,
       }}
       role="tablist"
       aria-label="Arquivos abertos"
@@ -404,25 +404,29 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
       style={{
         // Padding lateral assimetrico — mais a' direita pra dar respiro
         // pro botao ✕. minWidth garante que aba "x" curta nao some.
-        padding: "5px 7px",
-        minWidth: 96,
-        maxWidth: 220,
-        fontSize: "0.78rem",
-        // Aba ativa "destaca" do bg-panel-2 da TabBar com a cor do conteudo
-        // (bg-app), criando a sensacao classica de "esta aba e' o documento
-        // visivel atras". Inativas ficam no fundo.
+        padding: "5px 9px",
+        minWidth: 110,
+        maxWidth: 240,
+        fontSize: "0.8rem",
+        fontFamily: "var(--font-display)",
+        // Aba ativa = fundo do conteudo (bg-app) + borda-top GROSSA accent
+        // (look de lombada de livro com fita de marcador). Inativas saem
+        // do bg-panel-2 com borda sutil em volta.
         background: isActive ? "var(--bg-app)" : "color-mix(in srgb, var(--bg-panel) 45%, transparent)",
         color: isActive ? "var(--text-primary)" : "var(--text-muted)",
-        // Borda direita serve de separador entre abas (fica entre cada par).
-        // A ativa tem borda-top accent pra reforcar o estado.
-        border: `1px solid ${dropTarget ? "var(--accent)" : "var(--border-subtle)"}`,
-        borderTop: isActive ? "2px solid var(--accent)" : "1px solid var(--border-subtle)",
+        borderLeft: `1px solid ${dropTarget ? "var(--accent)" : "var(--border)"}`,
+        borderRight: `1px solid ${dropTarget ? "var(--accent)" : "var(--border)"}`,
+        borderTop: isActive
+          ? "3px solid var(--accent)"
+          : `1px solid ${dropTarget ? "var(--accent)" : "var(--border)"}`,
+        // marginBottom -2 cobre a borda inferior pesada da TabBar com a
+        // propria aba ativa (criando sensacao "esta aba e' a folha"). -1
+        // pras inativas pra alinhar.
         borderBottom: isActive
-          ? "1px solid var(--bg-app)"
-          : `1px solid ${dropTarget ? "var(--accent)" : "var(--border-subtle)"}`,
-        borderRadius: "7px 7px 0 0",
-        marginBottom: "-1px",
-        boxShadow: isActive ? "var(--shadow-sm)" : undefined,
+          ? "2px solid var(--bg-app)"
+          : `1px solid ${dropTarget ? "var(--accent)" : "var(--border)"}`,
+        marginBottom: "-2px",
+        borderRadius: 0,
       }}
       title={fullName}
     >
@@ -449,7 +453,9 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
       <span
         className="truncate flex-1"
         style={{
-          fontWeight: isActive ? 500 : 400,
+          fontWeight: isActive ? 600 : 400,
+          fontStyle: isActive ? "normal" : "italic",
+          letterSpacing: isActive ? "0.01em" : 0,
         }}
       >
         {displayName}

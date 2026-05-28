@@ -58,32 +58,43 @@ export function ReferencePane({
   return (
     <section className="h-full flex flex-col" style={{ background: "var(--bg-app)" }}>
       <div
-        className="h-9 flex items-center gap-2 px-3 flex-shrink-0"
+        className="h-10 flex items-center gap-3 px-3.5 flex-shrink-0"
         style={{
           background: "var(--bg-panel-2)",
-          borderBottom: "1px solid var(--border-subtle)",
+          borderBottom: "2px solid var(--border-strong)",
           color: "var(--text-secondary)",
         }}
       >
-        <span className="text-[0.72rem] uppercase tracking-[0.18em]">Referência</span>
-        <span className="text-[0.78rem] truncate flex-1" title={path}>
+        <span className="solon-plaque">Referência</span>
+        <span
+          className="truncate flex-1"
+          title={path}
+          style={{
+            fontFamily: "var(--font-display)",
+            fontStyle: "italic",
+            fontSize: "0.85rem",
+            color: "var(--text-primary)",
+          }}
+        >
           {name.replace(/\.(md|txt)$/i, "")}
         </span>
         <button
           type="button"
-          className="p-1 rounded"
+          className="solon-dialog-close"
           title="Abrir como aba ativa"
           aria-label="Abrir como aba ativa"
           onClick={makeActive}
+          style={{ width: 24, height: 24 }}
         >
           <ExternalLink size={13} />
         </button>
         <button
           type="button"
-          className="p-1 rounded"
+          className="solon-dialog-close"
           title="Fechar painel"
           aria-label="Fechar painel"
           onClick={closeSplitPane}
+          style={{ width: 24, height: 24 }}
         >
           <X size={13} />
         </button>

@@ -66,12 +66,14 @@ export function CanvasMinimap() {
 
   return (
     <div
-      className="absolute right-3 bottom-3 z-20 rounded-lg shadow-md overflow-hidden"
+      className="absolute right-3 bottom-3 z-20 overflow-hidden"
       style={{
         width: MINIMAP_W,
         height: MINIMAP_H,
         background: "color-mix(in srgb, var(--bg-panel) 92%, transparent)",
-        border: "1px solid var(--border)",
+        border: "2px solid var(--border-strong)",
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat-sm)",
       }}
       onPointerDown={onPointerDown}
       onMouseDown={(e) => e.stopPropagation()}

@@ -100,14 +100,19 @@ function BannerShell({
   trailing?: React.ReactNode;
   progress?: number;
 }) {
+  // Banner virou bloco brutalist alinhado com a HomePage nova. Borda
+  // pesada 2px + sombra chapada que levanta no hover quando interativo
+  // (downloading nao tem hover — mostra progress bar 2px no bottom).
   const interactive = !!onClick;
   const inner = (
     <div
-      className="flex items-center gap-3 px-4 py-2.5 rounded-md transition-colors w-full"
+      className="relative flex items-center gap-3 px-4 py-3 w-full transition-all"
       style={{
         background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
+        border: "2px solid var(--border-strong)",
+        borderRadius: 0,
         color: "var(--text-secondary)",
+        boxShadow: "var(--shadow-flat-sm)",
       }}
     >
       <span
@@ -117,25 +122,35 @@ function BannerShell({
       >
         {icon}
       </span>
-      <span className="font-serif text-[0.95rem] flex-1 truncate">
+      <span
+        className="flex-1 truncate"
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: "0.92rem",
+          fontStyle: "italic",
+        }}
+      >
         {label}
       </span>
       {trailing}
       {cta && (
         <span
-          className="inline-flex items-center gap-1 text-[0.78rem] font-medium"
+          className="inline-flex items-center gap-1.5 solon-caps"
           style={{ color: "var(--text-primary)" }}
         >
           {cta}
           <ArrowRight size={12} />
         </span>
       )}
-      {/* Barra de progresso fina embutida no bottom border quando baixando. */}
+      {/* Barra de progresso 2px no bottom border quando baixando — mais
+          grossa que antes pra ficar visivel com a borda nova. */}
       {typeof progress === "number" && (
         <div
           aria-hidden
-          className="absolute bottom-0 left-0 h-px transition-all"
+          className="absolute left-0 transition-all"
           style={{
+            bottom: -2,
+            height: 2,
             width: `${Math.round(progress * 100)}%`,
             background: "var(--accent)",
           }}
@@ -145,13 +160,28 @@ function BannerShell({
   );
 
   if (!interactive) {
-    return <div className="relative mb-8">{inner}</div>;
+    return <div className="relative mb-10 w-full max-w-md">{inner}</div>;
   }
 
   return (
     <button
       onClick={onClick}
-      className="relative w-full text-left mb-8 hover:opacity-90 transition-opacity"
+      className="relative w-full max-w-md text-left mb-10 transition-transform"
+      style={{ cursor: "default" }}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget.firstChild as HTMLElement;
+        if (el) {
+          el.style.transform = "translate(-1px, -1px)";
+          el.style.boxShadow = "3px 3px 0 var(--border-strong)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget.firstChild as HTMLElement;
+        if (el) {
+          el.style.transform = "";
+          el.style.boxShadow = "var(--shadow-flat-sm)";
+        }
+      }}
     >
       {inner}
     </button>

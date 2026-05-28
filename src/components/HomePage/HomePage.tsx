@@ -1,4 +1,4 @@
-import { ArrowRight, FolderOpen, FileText } from "lucide-react";
+import { ArrowRight, FolderOpen } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useAppStore, FileNode } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
@@ -6,21 +6,28 @@ import { parseDocument } from "../../lib/frontmatter";
 import { UpdateBanner } from "./UpdateBanner";
 
 /**
- * Landing minima — pagina de transicao, NAO um dashboard. Funcao unica:
- * dar contexto rapido (qual projeto, quanto ja foi escrito) e empurrar
- * pra escrita com 1 clique.
+ * Landing — versao "biblioteca antiga". Layout editorial centrado num
+ * eixo vertical com hierarquia brutal:
  *
- * Layout: vertical centralizado, max-w-md. Hierarquia clara:
- *   1. Solon (marca pequena, masthead)
- *   2. Nome do projeto (capa do livro)
- *   3. Stats numa linha so (palavras + arquivos)
- *   4. CTA grande pra continuar / abrir
- *   5. Acoes secundarias inline minusculas
+ *   PROJETO · METADADOS                  (small-caps serif)
+ *   ────────────────                      (filete grosso)
  *
- * Estados:
- *   - sem rootFolder: empty state com CTA "Abrir pasta"
- *   - com rootFolder + activeFilePath: "Continuar lendo X"
- *   - com rootFolder, sem activeFilePath: "Ir para livre"
+ *   NOME DO PROJETO                       (display serif gigante)
+ *
+ *   ─────  ❦  ─────                       (ornamento)
+ *
+ *   ⟶ CONTINUAR LENDO: capitulo 3         (CTA brutalist com sombra chapada)
+ *
+ *   | RECENTES |
+ *   I.  arquivo                           (roman + serif italic + path)
+ *   II. arquivo
+ *
+ *   ⁂ Novo arquivo  ·  Trocar pasta       (acoes secundarias)
+ *
+ * Diferenca-chave do design anterior: o projeto deixa de ser "um titulo
+ * em serifa grande" pra virar uma PLACA — metadados em caps lideram, o
+ * nome vem em monumental embaixo. Os recents viram listagem catalogada,
+ * nao chip-list. Estado vazio segue a mesma gramatica.
  */
 export function HomePage() {
   const rootFolder = useAppStore((s) => s.rootFolder);
@@ -59,8 +66,6 @@ export function HomePage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__TAURI_INTERNALS__ !== undefined;
     if (!isTauri) {
-      // Em dev/browser puro nao da pra ler os arquivos do disco — exibe
-      // so o file count, sem palavra. Melhor que esconder a linha inteira.
       setProjectStats({ wordCount: 0, fileCount: allFiles.length });
       return;
     }
@@ -71,11 +76,6 @@ export function HomePage() {
     (async () => {
       try {
         const { readTextFile } = await import("@tauri-apps/plugin-fs");
-        // Paraleliza em chunks de 16 — antes era serie pura (await por
-        // arquivo), o que em projetos com 100 arquivos somava ~5s de
-        // espera ate o numero "calculando…" virar palavras. Chunk de 16
-        // evita disparar 500 IPC simultaneos (Tauri tem queue interna
-        // mas nao queremos saturar).
         const CHUNK = 16;
         let total = 0;
         for (let i = 0; i < allFiles.length; i += CHUNK) {
@@ -89,7 +89,6 @@ export function HomePage() {
                 const trimmed = body.trim();
                 return trimmed ? trimmed.split(/\s+/).length : 0;
               } catch {
-                // Arquivo ilegivel — pula sem quebrar o batch.
                 return 0;
               }
             }),
@@ -110,8 +109,6 @@ export function HomePage() {
     return () => {
       cancelled = true;
     };
-    // Re-roda quando a *lista* muda — o tree em si re-renderiza com refs
-    // novas a cada `refresh()`, entao essa dep cobre create/delete/rename.
   }, [allFiles, setProjectStats]);
 
   const openFreeEditor = () => {
@@ -141,7 +138,7 @@ export function HomePage() {
       style={{ background: "var(--bg-app)" }}
     >
       <div className="min-h-full flex items-center justify-center px-8 py-16">
-        <div className="w-full max-w-md flex flex-col items-center text-center">
+        <div className="w-full max-w-xl flex flex-col items-center text-center">
           <UpdateBanner />
 
           {rootFolder ? (
@@ -194,96 +191,152 @@ function ProjectHero({
 }) {
   return (
     <>
-      {/* Nome do projeto — capa do livro. tracking-tight + serif bold
-          empresta peso editorial sem virar logo. clamp escala no zoom da
-          janela pra nao "explodir" em telas ultrawide. */}
-      <h1
-        className="font-serif font-bold leading-[0.95] tracking-tight mb-3"
-        style={{
-          color: "var(--text-primary)",
-          fontSize: "clamp(2.5rem, 6vw, 4rem)",
-        }}
-      >
-        {folderName}
-      </h1>
-
-      {/* Path completo + stats numa unica linha discreta. Em vez de
-          duas linhas (path em uma, stats em outra) — economiza ruido
-          vertical e mantem tudo numa tira so de "metadata". */}
+      {/* Meta-label acima do titulo: "PROJETO · 3 ARQUIVOS · 12.450 PALAVRAS".
+          Small-caps serif. Funciona como ficha catalografica antes do nome
+          monumental. */}
       <div
-        className="text-[0.78rem] mb-12 max-w-full truncate"
+        className="solon-caps mb-5 flex items-center gap-3"
         style={{ color: "var(--text-muted)" }}
         title={rootFolder}
       >
+        <span>Projeto</span>
+        <span
+          aria-hidden
+          style={{
+            display: "inline-block",
+            width: 4,
+            height: 4,
+            background: "var(--border-strong)",
+            transform: "rotate(45deg)",
+          }}
+        />
         {stats === null ? (
-          <span className="italic">calculando…</span>
+          <span className="italic" style={{ textTransform: "none" }}>
+            calculando…
+          </span>
         ) : stats.fileCount === 0 ? (
-          <span className="italic">pasta vazia</span>
+          <span className="italic" style={{ textTransform: "none" }}>
+            pasta vazia
+          </span>
         ) : (
           <>
+            <span className="tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {stats.fileCount.toLocaleString("pt-BR")}
+            </span>
+            <span style={{ marginLeft: "-0.35em" }}>
+              {stats.fileCount === 1 ? "Arquivo" : "Arquivos"}
+            </span>
             {stats.wordCount > 0 && (
               <>
+                <span
+                  aria-hidden
+                  style={{
+                    display: "inline-block",
+                    width: 4,
+                    height: 4,
+                    background: "var(--border-strong)",
+                    transform: "rotate(45deg)",
+                  }}
+                />
                 <span className="tabular-nums">
                   {stats.wordCount.toLocaleString("pt-BR")}
-                </span>{" "}
-                palavras{" "}
-                <span style={{ color: "var(--text-placeholder)" }}>·</span>{" "}
+                </span>
+                <span style={{ marginLeft: "-0.35em" }}>Palavras</span>
               </>
             )}
-            <span className="tabular-nums">{stats.fileCount}</span>{" "}
-            {stats.fileCount === 1 ? "arquivo" : "arquivos"}
           </>
         )}
       </div>
 
-      {/* CTA primario. Quando ha arquivo aberto: "Continuar lendo X".
-          Quando nao ha (mas tem pasta): "Ir para livre" — usuario
-          escolhe arquivo no explorador la dentro. */}
+      {/* Nome do projeto — monumental. Display class consome --font-display
+          com tracking negativo e line-height 0.92. clamp escala no zoom
+          da janela sem explodir em ultrawide. */}
+      <h1
+        className="solon-display mb-6"
+        style={{ fontSize: "clamp(2.75rem, 7.5vw, 5rem)" }}
+      >
+        {folderName}
+      </h1>
+
+      {/* Ornamento — losango central com filetes grossos. Marca a transicao
+          entre "ficha" e "CTA". Sem isso a hero parece dois blocos
+          empilhados sem juncao. */}
+      <div
+        className="solon-divider-ornate w-full max-w-[18rem] mb-10"
+        aria-hidden
+      >
+        <span style={{ color: "var(--accent)" }}>❦</span>
+      </div>
+
+      {/* CTA brutalist — bloco com sombra chapada que "levanta" no hover.
+          Substitui o link minimalista underline. Texto em serif caps com
+          tracking suave. */}
       <button
         onClick={onContinue}
-        className="group inline-flex items-center gap-2.5 mb-10 transition-opacity hover:opacity-75"
-        style={{ color: "var(--text-primary)" }}
+        className="solon-cta mb-10 group"
+        style={{ maxWidth: "min(92vw, 480px)" }}
+        title={
+          continueLabel
+            ? `Continuar lendo ${continueLabel}`
+            : "Ir para a escrita"
+        }
       >
-        <span
-          className="font-serif text-xl border-b pb-1"
-          style={{ borderColor: "var(--text-primary)" }}
-        >
+        <span style={{ color: "var(--accent)" }} aria-hidden>
+          ⟶
+        </span>
+        <span className="truncate">
           {continueLabel ? (
             <>
-              Continuar lendo{" "}
-              <span className="italic" style={{ color: "var(--text-secondary)" }}>
+              Continuar{" "}
+              <span
+                style={{
+                  fontStyle: "italic",
+                  textTransform: "none",
+                  letterSpacing: 0,
+                  fontWeight: 500,
+                }}
+              >
                 {continueLabel}
               </span>
             </>
           ) : (
-            "Ir para livre"
+            "Ir para a escrita"
           )}
         </span>
-        <ArrowRight
-          size={16}
-          className="transition-transform group-hover:translate-x-1"
-        />
       </button>
 
-      {/* Acoes secundarias minusculas — uma linha so, separadas por bullet.
-          Pra "Novo arquivo" e "Trocar pasta" o user que precisa muito; o
-          fluxo principal e o CTA acima. */}
-      <nav
-        className="flex items-center gap-2 text-[0.78rem]"
-        style={{ color: "var(--text-muted)" }}
-      >
+      {/* Acoes secundarias — small-caps serif, separadas por losango.
+          Mesmo vocabulario da meta-label de cima pra fechar a hierarquia. */}
+      <nav className="solon-caps flex items-center gap-3">
         <button
           onClick={onNewFile}
-          className="hover:underline underline-offset-4 transition-colors"
-          style={{ color: "var(--text-secondary)" }}
+          className="transition-colors hover:underline underline-offset-[6px]"
+          style={{
+            color: "var(--text-secondary)",
+            background: "transparent",
+            textDecorationThickness: "1.5px",
+          }}
         >
           Novo arquivo
         </button>
-        <span style={{ color: "var(--text-placeholder)" }}>·</span>
+        <span
+          aria-hidden
+          style={{
+            display: "inline-block",
+            width: 4,
+            height: 4,
+            background: "var(--border-strong)",
+            transform: "rotate(45deg)",
+          }}
+        />
         <button
           onClick={onOpenFolder}
-          className="hover:underline underline-offset-4 transition-colors"
-          style={{ color: "var(--text-secondary)" }}
+          className="transition-colors hover:underline underline-offset-[6px]"
+          style={{
+            color: "var(--text-secondary)",
+            background: "transparent",
+            textDecorationThickness: "1.5px",
+          }}
         >
           Trocar pasta
         </button>
@@ -295,48 +348,46 @@ function ProjectHero({
 function EmptyHero({ onOpenFolder }: { onOpenFolder: () => void }) {
   return (
     <>
+      <div
+        className="solon-caps mb-5"
+        style={{ color: "var(--text-muted)" }}
+      >
+        Solon — Editor de Escrita
+      </div>
       <h1
-        className="font-serif font-bold leading-[0.95] tracking-tight mb-4"
-        style={{
-          color: "var(--text-primary)",
-          fontSize: "clamp(2.5rem, 6vw, 4rem)",
-        }}
+        className="solon-display mb-6"
+        style={{ fontSize: "clamp(2.75rem, 7.5vw, 5rem)" }}
       >
         Bem-vindo
       </h1>
+      <div
+        className="solon-divider-ornate w-full max-w-[18rem] mb-10"
+        aria-hidden
+      >
+        <span style={{ color: "var(--accent)" }}>❦</span>
+      </div>
       <p
         className="font-serif italic text-base mb-10 leading-relaxed"
-        style={{ color: "var(--text-muted)", maxWidth: "28ch" }}
+        style={{ color: "var(--text-muted)", maxWidth: "34ch" }}
       >
-        Comece abrindo uma pasta — Solon trata cada arquivo como uma cena.
+        Cada arquivo é uma cena. Cada pasta, um livro. Comece abrindo um
+        diretório de trabalho.
       </p>
-      <button
-        onClick={onOpenFolder}
-        className="group inline-flex items-center gap-2.5 transition-opacity hover:opacity-75"
-        style={{ color: "var(--text-primary)" }}
-      >
-        <FolderOpen size={16} />
-        <span
-          className="font-serif text-xl border-b pb-1"
-          style={{ borderColor: "var(--text-primary)" }}
-        >
-          Abrir pasta de trabalho
-        </span>
-        <ArrowRight
-          size={16}
-          className="transition-transform group-hover:translate-x-1"
-        />
+      <button onClick={onOpenFolder} className="solon-cta">
+        <FolderOpen size={16} aria-hidden />
+        <span>Abrir pasta</span>
+        <ArrowRight size={16} aria-hidden />
       </button>
     </>
   );
 }
 
 /**
- * Lista discreta dos últimos arquivos abertos. So' aparece quando ha
- * 1+ recents — em projeto novo, fica oculta. Filtra entries cujo path
- * nao começa com o rootFolder atual (recents de projetos anteriores
- * nao deveriam vazar pra um projeto diferente). Cap visual em 5 entries
- * mesmo que a store guarde ate 8 — Home prefere respiro.
+ * Lista catalografica dos ultimos arquivos abertos. Recents agora vem
+ * em formato editorial: plaqueta de seção + linhas numeradas em romanos
+ * + nome em serif italic. Filtra entries cujo path nao começa com o
+ * rootFolder atual (recents de projetos anteriores nao deveriam vazar
+ * pra um projeto diferente). Cap visual em 5 entries.
  */
 function RecentsList({
   files,
@@ -357,24 +408,26 @@ function RecentsList({
   if (scoped.length === 0) return null;
 
   return (
-    <div className="mt-12 w-full max-w-md">
-      <div
-        className="text-[0.65rem] uppercase tracking-widest mb-2.5"
-        style={{ color: "var(--text-placeholder)" }}
-      >
-        Recentes
+    <div className="mt-16 w-full max-w-md">
+      {/* Plaqueta de secao centralizada. Mesma plaqueta usada nos painéis
+          do chrome — vocabulario consistente. */}
+      <div className="flex justify-center mb-5">
+        <span className="solon-plaque">Recentes</span>
       </div>
-      <ul className="space-y-0.5">
-        {scoped.map((f) => {
+
+      <ul className="space-y-px">
+        {scoped.map((f, idx) => {
           const display = f.name.replace(/\.(md|txt)$/i, "");
           return (
             <li key={f.path}>
               <button
                 onClick={() => onOpen(f.path, f.name)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors hover:bg-opacity-50"
+                className="w-full flex items-center gap-4 px-3 py-2.5 text-left transition-colors"
                 style={{
                   background: "transparent",
                   color: "var(--text-secondary)",
+                  borderTop: idx === 0 ? "1px solid var(--border)" : "none",
+                  borderBottom: "1px solid var(--border)",
                 }}
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.background = "var(--bg-hover)")
@@ -384,11 +437,31 @@ function RecentsList({
                 }
                 title={f.path}
               >
-                <FileText
-                  size={12}
-                  style={{ color: "var(--text-placeholder)", flexShrink: 0 }}
-                />
-                <span className="truncate text-[0.78rem]">{display}</span>
+                <span
+                  className="solon-roman flex-shrink-0"
+                  style={{ width: "2.25rem", textAlign: "right" }}
+                  aria-hidden
+                >
+                  {toRoman(idx + 1)}.
+                </span>
+                <span
+                  className="truncate flex-1"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "0.95rem",
+                    fontStyle: "italic",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {display}
+                </span>
+                <span
+                  className="solon-caps--sm flex-shrink-0"
+                  style={{ color: "var(--text-placeholder)" }}
+                  aria-hidden
+                >
+                  ⟶
+                </span>
               </button>
             </li>
           );
@@ -396,6 +469,28 @@ function RecentsList({
       </ul>
     </div>
   );
+}
+
+/**
+ * Conversao decimal → algarismo romano. Limite implicito de ~10 itens
+ * (lista de Recents tem cap em 5 visual). Sem dependencia externa.
+ */
+function toRoman(n: number): string {
+  const table: [number, string][] = [
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
+  ];
+  let out = "";
+  for (const [v, s] of table) {
+    while (n >= v) {
+      out += s;
+      n -= v;
+    }
+  }
+  return out;
 }
 
 function flattenFiles(nodes: FileNode[]): FileNode[] {
