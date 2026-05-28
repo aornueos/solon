@@ -231,59 +231,87 @@ export default function App() {
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key === "\\") {
+      // AltGr (Alt direito) em layouts internacionais — Windows reporta
+      // como `Ctrl+Alt`. Em pt-BR ABNT2 (Portugal) AltGr+W produz "?",
+      // AltGr+Q produz "@", etc. Sem cuidado, os bindings Ctrl+letra
+      // abaixo disparariam erroneamente quando o user so' queria digitar
+      // o caractere especial — fechando aba, abrindo paleta, etc.
+      //
+      // Estrategia: shortcuts que dependem da TECLA-CARACTERE (e nao da
+      // posicao fisica da letra) ficam ANTES do bailout, porque o key
+      // ja' veio traduzido pela layout — "?" e "/" sao validos vindos de
+      // AltGr e fazem sentido como invocacao explicita. Em seguida, os
+      // Ctrl+Alt+X explicitos do app (history/inspector). DEPOIS, um
+      // early-return mata qualquer outro Ctrl+Alt+letra restante.
+      // (`ctrl` ja' definido no topo deste handler.)
+
+      // Ctrl+/ e Ctrl+? — cheatsheet. Aceita altKey porque na layout
+      // pt-PT o usuario pressiona Ctrl+Alt+W pra produzir Ctrl+? (a
+      // tecla fisica W gera "?" via AltGr). Sem essa precedencia, o
+      // bailout abaixo bloqueava a cheatsheet.
+      if (ctrl && (e.key === "/" || e.key === "?")) {
+        e.preventDefault();
+        openShortcuts();
+        return;
+      }
+      // Ctrl+Alt+H / Ctrl+Alt+I — atalhos explicitos do app. Tem que
+      // rodar mesmo com altKey, antes do bailout.
+      if (ctrl && e.altKey && e.key.toLowerCase() === "h") {
+        e.preventDefault();
+        openLocalHistory();
+        return;
+      }
+      if (ctrl && e.altKey && e.key.toLowerCase() === "i") {
+        e.preventDefault();
+        toggleInspector();
+        return;
+      }
+      // Qualquer outro Ctrl+Alt+letra cai fora — protege contra AltGr
+      // de layouts internacionais (AltGr+W="?" em pt-PT, etc) atingindo
+      // Ctrl+W (close tab), Ctrl+T (scratchpad), Ctrl+K (paleta), etc.
+      if (ctrl && e.altKey) {
+        return;
+      }
+
+      if (ctrl && e.key === "\\") {
         e.preventDefault();
         toggleSidebar();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === "j") {
+      if (ctrl && e.key === "j") {
         e.preventDefault();
         toggleOutline();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      if (ctrl && e.key.toLowerCase() === "k") {
         e.preventDefault();
         openCommandPalette();
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f") {
+      if (ctrl && e.shiftKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
         openGlobalSearch();
       }
-      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "h") {
-        e.preventDefault();
-        openLocalHistory();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "i") {
-        e.preventDefault();
-        toggleInspector();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === "1") {
+      if (ctrl && e.key === "1") {
         e.preventDefault();
         setEditorPageLayout("fluid");
         setActiveView("editor");
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === "2") {
+      if (ctrl && e.key === "2") {
         e.preventDefault();
         setActiveView("canvas");
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === "3") {
+      if (ctrl && e.key === "3") {
         e.preventDefault();
         setActiveView("home");
       }
       // F11 — tratado no listener de capture acima pra evitar que editores
       // (TipTap/prosemirror) consumam o evento. Veja useEffect anterior.
       // Ctrl+, abre preferencias — convencao de macOS/VSCode/Obsidian.
-      if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+      if (ctrl && e.key === ",") {
         e.preventDefault();
         openSettings();
       }
-      // Ctrl+/ abre cheatsheet de atalhos. Padrao herdado de
-      // Slack/GitHub/Notion (US keyboards). `e.key === "/"` cobre
-      // o caso normal; em layouts pt-BR ABNT2, "?" tambem casa como
-      // alternativa pq o "/" exige Shift+Q. Mantemos ambos pra cobrir
-      // os dois casos sem ergonomia ruim.
-      if ((e.ctrlKey || e.metaKey) && (e.key === "/" || e.key === "?")) {
-        e.preventDefault();
-        openShortcuts();
-      }
+      // (Ctrl+/ e Ctrl+? sao tratados acima — antes do bailout do
+      // AltGr — pra que continuem funcionando em layouts onde "?" exige
+      // AltGr+W.)
       // Ctrl+Shift+E abre o dialog de export (PDF/DOCX) — convencao
       // herdada de editores de texto que tem "Export" no menu Arquivo.
       if (

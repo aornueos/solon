@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { Sidebar } from "../Sidebar/Sidebar";
 import { Outline } from "../Outline/Outline";
@@ -85,6 +85,22 @@ export function AppLayout() {
   const showTitlebar = !readingMode;
   const showStatusBar = !readingMode;
   const showTabBar = !inHome && !readingMode;
+
+  // Focus mode: titlebar + tabbar + statusbar viram hover-only via CSS
+  // (atributo `data-solon-focus-chrome` no <html>). Sem isso o usuario
+  // ainda via 3 faixas de chrome em volta da pagina; com isso, fica
+  // realmente so' o documento, com as ferramentas a um pixel de
+  // distancia (mesma tecnica do .solon-editor-toolbar--hover).
+  //
+  // Reading mode tem precedencia: la' o chrome some via display:none
+  // (modo mais agressivo), entao nao acumular focus em cima.
+  useEffect(() => {
+    const enable = focusMode && !readingMode && !inHome;
+    document.documentElement.toggleAttribute("data-solon-focus-chrome", enable);
+    return () => {
+      document.documentElement.removeAttribute("data-solon-focus-chrome");
+    };
+  }, [focusMode, readingMode, inHome]);
   const showSplit = !inHome && !readingMode && splitPane.kind !== "none";
 
   const renderCurrentView = () =>

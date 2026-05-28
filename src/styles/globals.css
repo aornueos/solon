@@ -740,6 +740,45 @@
     display: none !important;
   }
 
+  /* Focus mode — chrome de topo (Titlebar + TabBar) e StatusBar viram
+     hover-only. Mantemos opacity em vez de display:none pra preservar
+     o layout: a folha do editor nao "salta" quando o usuario passa o
+     mouse perto da borda. Mesma tecnica do .solon-editor-toolbar--hover.
+     Reading mode (data-solon-fullscreen) ja' some com display:none —
+     e' o modo mais agressivo e tem precedencia.
+
+     Titlebar + TabBar revelam JUNTOS via :has() — sem isso, mover o
+     mouse entre as duas faixas fazia uma sumir enquanto a outra
+     aparecia (piscando). Como ambas vivem dentro de .solon-app-shell,
+     a regra observa hover/focus em qualquer das duas pra mostrar as
+     duas simultaneamente. StatusBar e' independente (bottom, hover
+     proprio).
+
+     Pointer-events ficam ativos mesmo invisivel (opacity 0 nao desliga
+     interacao) — clicar "no escuro" no canto superior ainda alterna
+     temas, abre settings, etc. Util pra power-users. */
+  html[data-solon-focus-chrome] .solon-titlebar,
+  html[data-solon-focus-chrome] [role="tablist"],
+  html[data-solon-focus-chrome] .solon-statusbar {
+    opacity: 0;
+    filter: saturate(0.7);
+    transition: opacity 220ms ease, filter 220ms ease;
+  }
+
+  html[data-solon-focus-chrome] .solon-app-shell:has(.solon-titlebar:hover) .solon-titlebar,
+  html[data-solon-focus-chrome] .solon-app-shell:has(.solon-titlebar:hover) [role="tablist"],
+  html[data-solon-focus-chrome] .solon-app-shell:has([role="tablist"]:hover) .solon-titlebar,
+  html[data-solon-focus-chrome] .solon-app-shell:has([role="tablist"]:hover) [role="tablist"],
+  html[data-solon-focus-chrome] .solon-app-shell:has(.solon-titlebar:focus-within) .solon-titlebar,
+  html[data-solon-focus-chrome] .solon-app-shell:has(.solon-titlebar:focus-within) [role="tablist"],
+  html[data-solon-focus-chrome] .solon-app-shell:has([role="tablist"]:focus-within) .solon-titlebar,
+  html[data-solon-focus-chrome] .solon-app-shell:has([role="tablist"]:focus-within) [role="tablist"],
+  html[data-solon-focus-chrome] .solon-statusbar:hover,
+  html[data-solon-focus-chrome] .solon-statusbar:focus-within {
+    opacity: 1;
+    filter: saturate(1);
+  }
+
   button,
   input,
   textarea,
