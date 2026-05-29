@@ -192,7 +192,7 @@ export function Sidebar() {
       className="flex flex-col h-full"
       style={{
         background: "var(--bg-panel-2)",
-        borderRight: "2px solid var(--border-strong)",
+        borderRight: "1px solid var(--border-subtle)",
       }}
     >
       {/* Header — plaqueta `| ARQUIVOS |` com filete grosso embaixo.
@@ -208,19 +208,19 @@ export function Sidebar() {
                 onClick={openCommandPalette}
                 title="Buscar notas e pastas (Ctrl+K)"
               >
-                <Search size={13} />
+                <Search size={11} />
               </HeaderBtn>
               <HeaderBtn
                 onClick={() => handleNewFile(rootFolder)}
                 title="Novo arquivo"
               >
-                <FilePlus size={13} />
+                <FilePlus size={11} />
               </HeaderBtn>
               <HeaderBtn
                 onClick={() => handleNewFolder(rootFolder)}
                 title="Nova pasta"
               >
-                <FolderPlus size={13} />
+                <FolderPlus size={11} />
               </HeaderBtn>
               <button
                 ref={tagBtnRef}
@@ -228,42 +228,32 @@ export function Sidebar() {
                 title="Filtrar por tag"
                 className="transition-colors flex items-center justify-center"
                 style={{
-                  width: 22,
-                  height: 22,
+                  width: 18,
+                  height: 18,
                   color: activeTagFilter
                     ? "var(--accent)"
                     : "var(--text-muted)",
                   background: tagPopoverOpen ? "var(--bg-hover)" : "transparent",
-                  border:
-                    activeTagFilter || tagPopoverOpen
-                      ? "1px solid var(--accent)"
-                      : "1px solid transparent",
                   borderRadius: 0,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "var(--bg-hover)";
-                  if (!activeTagFilter && !tagPopoverOpen) {
-                    e.currentTarget.style.borderColor = "var(--border-strong)";
-                  }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = tagPopoverOpen
                     ? "var(--bg-hover)"
                     : "transparent";
-                  if (!activeTagFilter && !tagPopoverOpen) {
-                    e.currentTarget.style.borderColor = "transparent";
-                  }
                 }}
               >
-                <TagIcon size={13} />
+                <TagIcon size={11} />
               </button>
               <HeaderBtn onClick={() => refresh()} title="Atualizar">
-                <RefreshCw size={13} />
+                <RefreshCw size={11} />
               </HeaderBtn>
             </>
           )}
           <HeaderBtn onClick={openFolder} title="Abrir pasta">
-            <FolderOpen size={13} />
+            <FolderOpen size={11} />
           </HeaderBtn>
         </div>
       </div>
@@ -417,6 +407,9 @@ function HeaderBtn({
   onClick: () => void;
   title: string;
 }) {
+  // 18x18 pra caber a plaqueta `| ARQUIVOS |` na largura padrao do
+  // sidebar (200px) sem truncar. Hover preenche com bg-hover sem borda
+  // pra ficar mais discreto (chrome interno deve respirar).
   return (
     <button
       onClick={onClick}
@@ -424,22 +417,19 @@ function HeaderBtn({
       className="transition-colors flex items-center justify-center"
       title={title}
       style={{
-        width: 22,
-        height: 22,
+        width: 18,
+        height: 18,
         color: "var(--text-muted)",
         background: "transparent",
-        border: "1px solid transparent",
         borderRadius: 0,
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
         (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
-        (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)";
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLElement).style.background = "transparent";
         (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
-        (e.currentTarget as HTMLElement).style.borderColor = "transparent";
       }}
     >
       {children}
@@ -754,7 +744,6 @@ function FileTreeRow({
         "flex items-center gap-1.5 py-[3px] pr-2 mx-0 group relative",
         "transition-colors text-[0.8125rem]",
         node.type === "folder" ? "cursor-default" : "cursor-pointer",
-        isActive && "font-medium",
       )}
       style={{
         // Padding-left = (depth*14) + 8 base + 3 pra abrir espaco da
@@ -767,17 +756,21 @@ function FileTreeRow({
         // Faixa accent 3px na borda esquerda quando arquivo ativo —
         // marca catalogica clara, mesma gramatica do CommandPalette
         // / ContextMenu. Pastas nao tem (so' arquivo "ativo" tem
-        // sentido como selecao).
+        // sentido como selecao). Isso JA' indica o ativo sem precisar
+        // de font-weight bold (que poluiria a leitura da arvore).
         borderLeft:
           node.type === "file" && isActive
             ? "3px solid var(--accent)"
             : "3px solid transparent",
-        // Pasta em serif italic (estilo capitulo de livro);
-        // arquivo continua Inter pra legibilidade em densidade alta.
+        // Pasta em serif italic (estilo capitulo de livro) com weight
+        // normal — antes 600 dava cara "shouting" demais; o italico
+        // ja' carrega o tom editorial. Arquivo continua Inter weight
+        // normal pra legibilidade em densidade alta (e nem bold quando
+        // ativo, pra nao competir com a faixa accent).
         fontFamily:
           node.type === "folder" ? "var(--font-display)" : undefined,
         fontStyle: node.type === "folder" ? "italic" : undefined,
-        fontWeight: node.type === "folder" ? 600 : undefined,
+        fontWeight: node.type === "folder" ? 400 : undefined,
         // Item sendo arrastado fica meio-transparente como feedback.
         opacity: dragPath === node.path ? 0.4 : 1,
         // Indicador visual de drop: linha fina no topo do alvo,

@@ -643,6 +643,47 @@
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.7);
 }
 
+/* Sangue — visceral, fresco. Diferenca do Vinho (borgonha/wine): aqui
+   nao tem o tom marrom-burgundy. Bg quase preto com tinta de sangue
+   coagulado; accent vermelho puro #c81630 (sangue arterial fresco),
+   accent-2 #ea4858 (clareado pra estados hover). Sucesso em oliva
+   muted pra criar contraste sem competir com o accent. */
+[data-paper="sangue"] {
+  --bg-app: #0c0408;
+  --bg-panel: #14060c;
+  --bg-panel-2: #20080f;
+  --bg-hover: #2e0e1a;
+  --bg-active: #3e1422;
+  --bg-selected: #261018;
+  --bg-inverse: #ecd0d0;
+  --bg-code: #18080e;
+  --text-primary: #ecd0d0;
+  --text-secondary: #c89898;
+  --text-muted: #946868;
+  --text-placeholder: #623838;
+  --text-inverse: #0c0408;
+  --border: #2a0e16;
+  --border-subtle: #18080e;
+  --border-strong: #4e1c22;
+  --accent: #c81630;
+  --accent-2: #ea4858;
+  --accent-soft: rgba(200, 22, 48, 0.18);
+  --danger: #ff6868;
+  --success: #9aa860;
+  --text-selection-bg: rgba(200, 22, 48, 0.26);
+  --heading-rule: #ea4858;
+  --folder-color: #a85060;
+  --folder-color-open: #c81630;
+  --dot-grid: #1c0a12;
+  --marquee-fill: rgba(200, 22, 48, 0.1);
+  --marquee-stroke: rgba(200, 22, 48, 0.7);
+  --selection-ring: rgba(200, 22, 48, 0.6);
+  --canvas-text-auto: #ecd0d0;
+  --canvas-text-placeholder: rgba(236, 208, 208, 0.38);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.55);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.7);
+}
+
 [data-paper="esmeralda"] {
   --bg-app: #0c1208;
   --bg-panel: #131c10;
@@ -747,16 +788,17 @@
      Reading mode (data-solon-fullscreen) ja' some com display:none —
      e' o modo mais agressivo e tem precedencia.
 
-     Titlebar + TabBar revelam JUNTOS via :has() — sem isso, mover o
-     mouse entre as duas faixas fazia uma sumir enquanto a outra
-     aparecia (piscando). Como ambas vivem dentro de .solon-app-shell,
-     a regra observa hover/focus em qualquer das duas pra mostrar as
-     duas simultaneamente. StatusBar e' independente (bottom, hover
-     proprio).
+     Revelacao via ATRIBUTO (data-solon-top-revealed / hover na statusbar)
+     em vez de :has(:hover). O :has(:hover) forcava o Chromium a rastrear
+     invalidacao de hover na arvore inteira em CADA pointermove (footgun
+     de performance documentado) — causava stutter no canvas e no editor
+     mesmo FORA do focus mode, pois a regra existe sempre na stylesheet.
+     Agora o AppLayout faz hover-intent em JS e seta o atributo; CSS so'
+     reage ao atributo (custo zero de invalidacao continua).
 
-     Pointer-events ficam ativos mesmo invisivel (opacity 0 nao desliga
-     interacao) — clicar "no escuro" no canto superior ainda alterna
-     temas, abre settings, etc. Util pra power-users. */
+     Titlebar + TabBar revelam JUNTOS (o JS coordena via hover-intent com
+     pequeno delay) pra nao piscar ao mover o mouse entre as duas faixas.
+     StatusBar e' independente — hover proprio simples (barato). */
   html[data-solon-focus-chrome] .solon-titlebar,
   html[data-solon-focus-chrome] [role="tablist"],
   html[data-solon-focus-chrome] .solon-statusbar {
@@ -765,14 +807,8 @@
     transition: opacity 220ms ease, filter 220ms ease;
   }
 
-  html[data-solon-focus-chrome] .solon-app-shell:has(.solon-titlebar:hover) .solon-titlebar,
-  html[data-solon-focus-chrome] .solon-app-shell:has(.solon-titlebar:hover) [role="tablist"],
-  html[data-solon-focus-chrome] .solon-app-shell:has([role="tablist"]:hover) .solon-titlebar,
-  html[data-solon-focus-chrome] .solon-app-shell:has([role="tablist"]:hover) [role="tablist"],
-  html[data-solon-focus-chrome] .solon-app-shell:has(.solon-titlebar:focus-within) .solon-titlebar,
-  html[data-solon-focus-chrome] .solon-app-shell:has(.solon-titlebar:focus-within) [role="tablist"],
-  html[data-solon-focus-chrome] .solon-app-shell:has([role="tablist"]:focus-within) .solon-titlebar,
-  html[data-solon-focus-chrome] .solon-app-shell:has([role="tablist"]:focus-within) [role="tablist"],
+  html[data-solon-focus-chrome][data-solon-top-revealed] .solon-titlebar,
+  html[data-solon-focus-chrome][data-solon-top-revealed] [role="tablist"],
   html[data-solon-focus-chrome] .solon-statusbar:hover,
   html[data-solon-focus-chrome] .solon-statusbar:focus-within {
     opacity: 1;
@@ -829,8 +865,11 @@
   ::-webkit-scrollbar-corner {
     background: var(--bg-panel-2);
   }
-  /* Firefox */
-  * { scrollbar-color: var(--border-strong) var(--bg-panel-2); }
+  /* Firefox fallback — scoped a html (herda pros filhos). Evitamos o
+     seletor universal `*` que forcava recomputo de estilo por-elemento
+     em toda a arvore (custo desnecessario; o app roda no WebView2 =
+     Chromium, que ja' usa ::-webkit-scrollbar acima). */
+  html { scrollbar-color: var(--border-strong) var(--bg-panel-2); }
 }
 
 /* ─────────────────────────────────────────
@@ -849,12 +888,15 @@
   font-family: var(--font-display);
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: var(--tracking-caps);
+  /* Tracking apertado (caps-tight 0.14em em vez de caps 0.22em) pra
+     caber em paineis estreitos (Sidebar/Outline 200px) sem truncar.
+     A serifa display ja' carrega elegancia mesmo sem espacamento largo. */
+  letter-spacing: var(--tracking-caps-tight);
   text-transform: uppercase;
   color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
-  gap: 0.5em;
+  gap: 0.45em;
   line-height: 1;
 }
 .solon-plaque::before,
@@ -867,6 +909,7 @@
 }
 .solon-plaque--lg {
   font-size: 0.82rem;
+  /* Em dialogs (.lg) ha' espaco — abre o tracking pra mais elegancia. */
   letter-spacing: var(--tracking-caps);
 }
 .solon-plaque--lg::before,
@@ -879,7 +922,11 @@
    inteiro do header pra que o filete atravesse o painel inteiro,
    nao so' embaixo das letras. */
 .solon-plaque-bar {
-  border-bottom: 2px solid var(--border-strong);
+  /* Filete fino sob o header do painel. Antes 2px strong — com 3 paineis
+     visiveis (Sidebar/Outline/Inspector) viravam 3 linhas grossas
+     competindo com a pagina. A plaqueta em si (texto + pipes) carrega a
+     identidade; a linha so' precisa separar. */
+  border-bottom: 1px solid var(--border);
 }
 
 /* Divisor ornado central com losango — pra HomePage e separadores
@@ -1043,7 +1090,10 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.9rem 1.15rem;
-  border-bottom: 2px solid var(--border-strong);
+  /* Filete interno fino — a borda 2px do .solon-dialog ja' delimita o
+     modal por fora. Empilhar mais 2px aqui dava look de "moldura dentro
+     de moldura" e roubava atencao do conteudo. */
+  border-bottom: 1px solid var(--border);
 }
 
 .solon-dialog-title {
@@ -1090,7 +1140,7 @@
   justify-content: flex-end;
   gap: 0.6rem;
   padding: 0.85rem 1.15rem;
-  border-top: 2px solid var(--border-strong);
+  border-top: 1px solid var(--border);
 }
 .solon-btn {
   font-family: var(--font-display);
@@ -1168,7 +1218,8 @@
 [data-paper="vinho"],
 [data-paper="boreal"],
 [data-paper="brasa"],
-[data-paper="esmeralda"] {
+[data-paper="esmeralda"],
+[data-paper="sangue"] {
   color-scheme: dark;
 }
 [data-paper="amanhecer"],
@@ -1361,6 +1412,12 @@ select:focus-visible {
   --editor-paper-text: #f0d8d2;
   --editor-paper-text-muted: #c8aaa3;
   --editor-paper-text-placeholder: #685550;
+}
+[data-paper="sangue"] {
+  --editor-paper-bg: #14060c;
+  --editor-paper-text: #ecd0d0;
+  --editor-paper-text-muted: #c89898;
+  --editor-paper-text-placeholder: #623838;
 }
 [data-paper="esmeralda"] {
   --editor-paper-bg: #131c10;

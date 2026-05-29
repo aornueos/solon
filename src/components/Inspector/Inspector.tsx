@@ -62,7 +62,7 @@ export function Inspector() {
 
   const shellStyle: React.CSSProperties = {
     background: "var(--bg-panel-2)",
-    borderLeft: "2px solid var(--border-strong)",
+    borderLeft: "1px solid var(--border-subtle)",
   };
 
   if (!activeFilePath) {

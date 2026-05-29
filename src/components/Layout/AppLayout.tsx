@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { Sidebar } from "../Sidebar/Sidebar";
 import { Outline } from "../Outline/Outline";
@@ -94,13 +94,59 @@ export function AppLayout() {
   //
   // Reading mode tem precedencia: la' o chrome some via display:none
   // (modo mais agressivo), entao nao acumular focus em cima.
+  const focusChromeOn = focusMode && !readingMode && !inHome;
   useEffect(() => {
-    const enable = focusMode && !readingMode && !inHome;
-    document.documentElement.toggleAttribute("data-solon-focus-chrome", enable);
+    document.documentElement.toggleAttribute(
+      "data-solon-focus-chrome",
+      focusChromeOn,
+    );
     return () => {
       document.documentElement.removeAttribute("data-solon-focus-chrome");
     };
-  }, [focusMode, readingMode, inHome]);
+  }, [focusChromeOn]);
+
+  // Hover-intent pra revelar Titlebar + TabBar JUNTOS no focus mode.
+  // Em JS (toggle de atributo) em vez de CSS :has(:hover) — o :has(:hover)
+  // forcava o Chromium a rastrear invalidacao de hover na arvore inteira
+  // a cada pointermove, gerando stutter no canvas/editor. Aqui o custo e'
+  // so' nos enter/leave das duas faixas.
+  //
+  // O delay de 90ms no leave evita o flicker quando o mouse cruza a
+  // fronteira entre Titlebar e TabBar (mouseleave de uma dispara antes do
+  // mouseenter da outra); re-entrar cancela o hide pendente.
+  const topRevealTimer = useRef<number | null>(null);
+  const revealTop = useCallback(() => {
+    if (topRevealTimer.current != null) {
+      window.clearTimeout(topRevealTimer.current);
+      topRevealTimer.current = null;
+    }
+    document.documentElement.setAttribute("data-solon-top-revealed", "");
+  }, []);
+  const hideTopDeferred = useCallback(() => {
+    if (topRevealTimer.current != null) window.clearTimeout(topRevealTimer.current);
+    topRevealTimer.current = window.setTimeout(() => {
+      document.documentElement.removeAttribute("data-solon-top-revealed");
+      topRevealTimer.current = null;
+    }, 90);
+  }, []);
+  // Limpa o atributo ao sair do focus mode (senao ficaria "revelado"
+  // preso se o modo desligar com o mouse em cima).
+  useEffect(() => {
+    if (!focusChromeOn) {
+      if (topRevealTimer.current != null) {
+        window.clearTimeout(topRevealTimer.current);
+        topRevealTimer.current = null;
+      }
+      document.documentElement.removeAttribute("data-solon-top-revealed");
+    }
+  }, [focusChromeOn]);
+
+  // Handlers so' "ligam" quando focus mode esta ativo — fora dele, passar
+  // o mouse no topo nao deve fazer nada (chrome ja' esta visivel).
+  const topHoverProps = focusChromeOn
+    ? { onMouseEnter: revealTop, onMouseLeave: hideTopDeferred }
+    : {};
+
   const showSplit = !inHome && !readingMode && splitPane.kind !== "none";
 
   const renderCurrentView = () =>
@@ -171,7 +217,11 @@ export function AppLayout() {
         overflow: "hidden",
       }}
     >
-      {showTitlebar && <Titlebar />}
+      {showTitlebar && (
+        <div {...topHoverProps} className="flex-shrink-0">
+          <Titlebar />
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Coluna esquerda: Sidebar e (opcional) Outline dockado à esquerda.
@@ -227,7 +277,11 @@ export function AppLayout() {
               user pediu pra ela ficar aberta porque navegar entre abas
               e parte do fluxo de escrita; eh menos chrome do que tirar
               a navegacao. */}
-          {showTabBar && <TabBar />}
+          {showTabBar && (
+            <div {...topHoverProps} className="flex-shrink-0">
+              <TabBar />
+            </div>
+          )}
           <div className="relative flex-1 min-h-0 overflow-hidden">
             <Suspense fallback={<ViewLoading />}>
               {showSplit ? (

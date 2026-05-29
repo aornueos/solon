@@ -31,7 +31,7 @@ export function Outline() {
       className="flex flex-col h-full"
       style={{
         background: "var(--bg-panel-2)",
-        borderLeft: "2px solid var(--border-strong)",
+        borderLeft: "1px solid var(--border-subtle)",
       }}
     >
       {/* Header — plaqueta `| ÍNDICE |`. Mesma gramatica da Sidebar. */}

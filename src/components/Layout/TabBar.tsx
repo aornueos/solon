@@ -224,7 +224,7 @@ export function TabBar() {
       className="flex items-stretch overflow-x-auto overflow-y-hidden flex-shrink-0"
       style={{
         background: "var(--bg-panel-2)",
-        borderBottom: "2px solid var(--border-strong)",
+        borderBottom: "1px solid var(--border-subtle)",
         // Altura fixa ajuda a previne layout shift quando a TabBar nasce/
         // morre (fixa = 34px = padding 6px × 2 + content ~22px).
         minHeight: 34,
@@ -419,13 +419,12 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
         borderTop: isActive
           ? "3px solid var(--accent)"
           : `1px solid ${dropTarget ? "var(--accent)" : "var(--border)"}`,
-        // marginBottom -2 cobre a borda inferior pesada da TabBar com a
-        // propria aba ativa (criando sensacao "esta aba e' a folha"). -1
-        // pras inativas pra alinhar.
+        // marginBottom -1 cobre a borda inferior 1px da TabBar com a propria
+        // aba ativa (criando sensacao "esta aba e' a folha").
         borderBottom: isActive
-          ? "2px solid var(--bg-app)"
+          ? "1px solid var(--bg-app)"
           : `1px solid ${dropTarget ? "var(--accent)" : "var(--border)"}`,
-        marginBottom: "-2px",
+        marginBottom: "-1px",
         borderRadius: 0,
       }}
       title={fullName}

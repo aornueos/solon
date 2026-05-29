@@ -305,11 +305,13 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
     >
       {missing ? (
         <div
-          className="w-full h-full flex items-center justify-center italic text-xs rounded"
+          className="w-full h-full flex items-center justify-center italic text-xs"
           style={{
             color: "var(--danger)",
             background: "var(--bg-panel-2)",
-            border: "1px dashed var(--danger)",
+            border: "1.5px dashed var(--danger)",
+            borderRadius: 0,
+            fontFamily: "var(--font-display)",
           }}
         >
           Imagem não encontrada
@@ -319,34 +321,37 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
           src={url}
           alt=""
           draggable={false}
-          className="w-full h-full object-contain rounded shadow-sm select-none"
-          style={
-            isSelected
+          className="w-full h-full object-contain select-none"
+          style={{
+            borderRadius: 0,
+            boxShadow: "var(--shadow-flat-sm)",
+            ...(isSelected
               ? { outline: "2px solid var(--accent)" }
               : isInGroup
               ? { outline: "2px dashed var(--selection-ring)" }
-              : undefined
-          }
+              : null),
+          }}
         />
       ) : (
         <div
-          className="w-full h-full rounded animate-pulse"
-          style={{ background: "var(--bg-hover)" }}
+          className="w-full h-full animate-pulse"
+          style={{ background: "var(--bg-hover)", borderRadius: 0 }}
         />
       )}
 
       {isSelected && (
         <div
           data-image-action
-          className="absolute flex gap-0.5 rounded px-1 py-0.5"
+          className="absolute flex gap-0.5 px-1 py-0.5"
           style={{
             top: -28 / viewport.zoom,
             left: 0,
             transform: `scale(${1 / viewport.zoom})`,
             transformOrigin: "top left",
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
-            boxShadow: "var(--shadow-sm)",
+            border: "1.5px solid var(--border-strong)",
+            borderRadius: 0,
+            boxShadow: "var(--shadow-flat-sm)",
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -356,7 +361,7 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
               e.stopPropagation();
               removeImage(image.id);
             }}
-            className="p-1 rounded transition-colors"
+            className="p-1 transition-colors"
             style={{ color: "var(--text-muted)" }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLElement).style.background = "var(--danger)";

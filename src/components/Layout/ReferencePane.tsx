@@ -61,7 +61,7 @@ export function ReferencePane({
         className="h-10 flex items-center gap-3 px-3.5 flex-shrink-0"
         style={{
           background: "var(--bg-panel-2)",
-          borderBottom: "2px solid var(--border-strong)",
+          borderBottom: "1px solid var(--border-subtle)",
           color: "var(--text-secondary)",
         }}
       >
