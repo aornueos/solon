@@ -3651,7 +3651,7 @@ dependencies = [
 
 [[package]]
 name = "solon"
-version = "0.9.27"
+version = "0.9.30"
 dependencies = [
  "once_cell",
  "serde",

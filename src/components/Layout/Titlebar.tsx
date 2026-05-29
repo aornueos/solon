@@ -325,7 +325,7 @@ export function Titlebar() {
       className="solon-titlebar flex items-center h-9 select-none"
       style={{
         background: "var(--bg-panel-2)",
-        borderBottom: "2px solid var(--border-strong)",
+        borderBottom: "1px solid var(--border-subtle)",
       }}
       data-tauri-drag-region
       onDoubleClick={onTitlebarDoubleClick}

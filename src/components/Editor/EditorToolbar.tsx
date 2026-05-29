@@ -201,7 +201,7 @@ export function EditorToolbar({ editor }: Props) {
       )}
       onContextMenu={onToolbarContextMenu}
       style={{
-        borderBottom: "2px solid var(--border-strong)",
+        borderBottom: "1px solid var(--border-subtle)",
         background: "var(--bg-panel-2)",
       }}
     >

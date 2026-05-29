@@ -132,6 +132,22 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     }
   }, [editing]);
 
+  // Auto-grow do textarea pela altura REAL do DOM. A altura da caixa
+  // (boxHeight) vem de uma aproximacao canvas2d (textRect), mas o wrap
+  // efetivo do textarea diverge (fonte web Lora, kerning, padding). Quando
+  // a aproximacao subestimava, o textarea (overflow) rolava o conteudo pra
+  // fora conforme o usuario digitava — o texto "ia apagando". Medindo o
+  // scrollHeight real e fixando a altura, nunca clipa. Roda em layout
+  // effect (antes do paint) pra nao piscar. Depende de tudo que muda o
+  // layout do texto.
+  useLayoutEffect(() => {
+    if (!editing) return;
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, [editing, draftText, text.size, text.bold, text.italic, boxWidth]);
+
   useEffect(() => {
     if (!editing) setDraftText(text.text);
   }, [editing, text.text]);
@@ -510,7 +526,10 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     left: text.x,
     top: text.y,
     width: boxWidth,
-    height: boxHeight,
+    // Durante a edicao a altura segue o textarea auto-grow (height:auto +
+    // minHeight). Fora da edicao usa a boxHeight medida. Isso impede que
+    // uma caixa fixa curta corte o texto enquanto digita.
+    height: editing ? "auto" : boxHeight,
     minWidth: 60,
     minHeight: Math.max(28, text.size * 1.35),
     overflow: "visible",
@@ -596,6 +615,11 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
           placeholder="Digite..."
           style={{
             ...contentStyle,
+            // height:auto + overflow:hidden deixam o auto-grow (layout
+            // effect) ditar a altura pelo scrollHeight real — sem isso o
+            // overflow rolava o texto pra fora durante a digitacao.
+            height: "auto",
+            overflow: "hidden",
             border: hasVisibleText
               ? "1px solid transparent"
               : "1px dashed var(--selection-ring)",
@@ -651,13 +675,14 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       {isSelected && !editing && toolbarPos && createPortal(
         <div
           data-text-action
-          className="fixed z-[70] flex items-center gap-0.5 rounded px-1 py-0.5"
+          className="fixed z-[70] flex items-center gap-0.5 px-1 py-0.5"
           style={{
             left: toolbarPos.left,
             top: toolbarPos.top,
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
-            boxShadow: "var(--shadow-sm)",
+            border: "1.5px solid var(--border-strong)",
+            borderRadius: 0,
+            boxShadow: "var(--shadow-flat-sm)",
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -775,11 +800,16 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
                       updateText(text.id, { size: s });
                       setOpenMenu(null);
                     }}
-                    className="px-2 py-0.5 text-[10px] rounded transition-colors"
+                    className="px-2 py-0.5 text-[10px] transition-colors tabular-nums"
                     style={{
                       background:
-                        text.size === s ? "var(--bg-hover)" : "transparent",
-                      color: "var(--text-secondary)",
+                        text.size === s ? "var(--accent-soft)" : "transparent",
+                      color: text.size === s ? "var(--accent)" : "var(--text-secondary)",
+                      border: text.size === s
+                        ? "1px solid var(--accent)"
+                        : "1px solid var(--border-strong)",
+                      borderRadius: 0,
+                      fontFamily: "var(--font-mono)",
                     }}
                   >
                     {s}
@@ -1034,11 +1064,12 @@ function Divider() {
 function Popover({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="absolute top-full left-0 mt-1 flex gap-1 rounded px-1.5 py-1 z-30"
+      className="absolute top-full left-0 mt-1 flex gap-1 px-1.5 py-1 z-30"
       style={{
         background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
-        boxShadow: "var(--shadow-sm)",
+        border: "1.5px solid var(--border-strong)",
+        borderRadius: 0,
+        boxShadow: "var(--shadow-flat-sm)",
       }}
     >
       {children}
@@ -1080,8 +1111,8 @@ function TinyBtn({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="p-1 rounded transition-colors"
-      style={{ background: bg, color: fg }}
+      className="p-1 transition-colors"
+      style={{ background: bg, color: fg, borderRadius: 0 }}
     >
       {children}
     </button>

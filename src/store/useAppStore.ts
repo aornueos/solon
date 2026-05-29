@@ -64,7 +64,8 @@ export type EditorPaper =
   | "vinho"
   | "boreal"
   | "brasa"
-  | "esmeralda";
+  | "esmeralda"
+  | "sangue";
 
 export type EditorPaperTone = "light" | "dark";
 
@@ -829,6 +830,7 @@ export const EDITOR_PAPERS: ReadonlyArray<{
   { value: "boreal", label: "Boreal", hint: "Violeta-ciano aurora", tone: "dark" },
   { value: "brasa", label: "Brasa", hint: "Crepúsculo morno", tone: "dark" },
   { value: "esmeralda", label: "Esmeralda", hint: "Verde-neon contra preto", tone: "dark" },
+  { value: "sangue", label: "Sangue", hint: "Vermelho visceral, quase preto", tone: "dark" },
 ];
 
 export const CANVAS_GRID_SIZES = [16, 24, 32, 48] as const;

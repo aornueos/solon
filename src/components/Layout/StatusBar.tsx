@@ -27,7 +27,7 @@ export function StatusBar() {
       aria-live="polite"
       style={{
         background: "var(--bg-panel-2)",
-        borderTop: "2px solid var(--border-strong)",
+        borderTop: "1px solid var(--border-subtle)",
         color: "var(--text-muted)",
         fontFamily: "var(--font-display)",
         fontSize: "0.7rem",

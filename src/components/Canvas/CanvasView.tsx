@@ -815,14 +815,7 @@ export function CanvasView() {
       role="application"
       aria-label="Canvas do Solon"
       className="canvas-surface relative w-full h-full overflow-hidden select-none"
-      style={{
-        cursor: bgCursor,
-        backgroundImage: canvasGridEnabled
-          ? "radial-gradient(circle at 1px 1px, var(--dot-grid) 1px, transparent 1px)"
-          : "none",
-        backgroundSize: `${canvasGridSize * viewport.zoom}px ${canvasGridSize * viewport.zoom}px`,
-        backgroundPosition: `${viewport.x}px ${viewport.y}px`,
-      }}
+      style={{ cursor: bgCursor }}
     >
       {!activeFilePath && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
@@ -866,6 +859,29 @@ export function CanvasView() {
           height: 0,
         }}
       >
+        {/* Dot-grid DENTRO do mundo (move/escala via o transform do pai =
+            compositor, sem repaint). Antes ficava no .canvas-surface com
+            background-position atualizado a cada frame de pan — repintava
+            o radial-gradient fullscreen 60x/s, causando o stutter. Agora
+            e' uma layer estatica gigante; o pan e' so' translate na GPU.
+            O quadrado cobre +-100k unidades de mundo (suficiente pra
+            qualquer projeto real). */}
+        {canvasGridEnabled && (
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: -100000,
+              top: -100000,
+              width: 200000,
+              height: 200000,
+              backgroundImage:
+                "radial-gradient(circle at 1px 1px, var(--dot-grid) 1px, transparent 1px)",
+              backgroundSize: `${canvasGridSize}px ${canvasGridSize}px`,
+              pointerEvents: "none",
+            }}
+          />
+        )}
         {/* z-order: strokes → images → cards → arrows → floating texts.
             Arrows ficam *acima* dos cards (estilo Miro/Excalidraw). Se o
             arrow ficasse abaixo, cards sobrepostos esconderiam o traço —
