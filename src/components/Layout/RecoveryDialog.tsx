@@ -75,7 +75,7 @@ export function RecoveryDialog() {
               style={{ color: "var(--accent-2)", marginTop: 2, flexShrink: 0 }}
             />
             <div className="flex-1 min-w-0">
-              <span className="solon-plaque solon-plaque--lg">Rascunhos</span>
+              <span className="solon-dialog-title">Rascunhos</span>
               <p className="solon-dialog-subtitle mt-1.5">
                 {drafts.length === 1
                   ? "Um arquivo com edições que não chegaram a ser salvas."
@@ -106,7 +106,7 @@ export function RecoveryDialog() {
                     className="truncate"
                     title={draft.path}
                     style={{
-                      fontFamily: "var(--font-display)",
+                      fontFamily: "var(--font-ui)",
                       fontSize: "0.92rem",
                       fontWeight: 600,
                     }}
@@ -124,7 +124,7 @@ export function RecoveryDialog() {
                       className="text-[0.78rem] mt-2 line-clamp-2"
                       style={{
                         color: "var(--text-secondary)",
-                        fontFamily: "var(--font-display)",
+                        fontFamily: "var(--font-ui)",
                         fontStyle: "italic",
                       }}
                     >

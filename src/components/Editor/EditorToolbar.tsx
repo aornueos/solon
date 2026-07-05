@@ -303,9 +303,8 @@ function ToolBtn({
   onClick: () => void;
   active?: boolean;
 }) {
-  // Botao brutalist: cantos retos, borda visivel no estado ativo (em vez
-  // de fundo cinza). Ativo = borda accent + fundo accent-soft. Pequeno
-  // (28×28) pra que a fileira inteira da toolbar nao infle.
+  // Botao minimalista: cantos suaves, tint accent suave quando ativo
+  // (sem borda dura). 28×28 pra nao inflar a fileira da toolbar.
   return (
     <button
       onMouseDown={(e) => {
@@ -319,24 +318,19 @@ function ToolBtn({
       style={{
         width: 28,
         height: 28,
-        borderRadius: 0,
+        borderRadius: "var(--radius-sm)",
         background: active ? "var(--accent-soft)" : "transparent",
         color: active ? "var(--accent)" : "var(--text-muted)",
-        border: active
-          ? "1.5px solid var(--accent)"
-          : "1.5px solid transparent",
       }}
       onMouseEnter={(e) => {
         if (active) return;
         (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
         (e.currentTarget as HTMLElement).style.color = "var(--text-primary)";
-        (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)";
       }}
       onMouseLeave={(e) => {
         if (active) return;
         (e.currentTarget as HTMLElement).style.background = "transparent";
         (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
-        (e.currentTarget as HTMLElement).style.borderColor = "transparent";
       }}
     >
       {children}
@@ -361,7 +355,7 @@ function GlyphLabel({
     <span
       style={{
         display: "inline-block",
-        fontFamily: "var(--font-display)",
+        fontFamily: "var(--font-ui)",
         fontSize: "0.92rem",
         lineHeight: 1,
         minWidth: 16,
@@ -424,9 +418,9 @@ function HighlightPicker({ editor }: { editor: Editor }) {
           className="absolute left-0 top-full mt-1 z-20 py-2 px-2 flex flex-col gap-1.5"
           style={{
             background: "var(--bg-panel)",
-            border: "2px solid var(--border-strong)",
-            borderRadius: 0,
-            boxShadow: "var(--shadow-flat-sm)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            boxShadow: "var(--shadow-md)",
           }}
         >
           <div className="flex gap-1">
@@ -444,13 +438,12 @@ function HighlightPicker({ editor }: { editor: Editor }) {
                   setOpen(false);
                 }}
                 className={clsx(
-                  "w-6 h-6 transition-transform hover:scale-110",
+                  "w-6 h-6 transition-transform hover:scale-110 rounded-full",
                   currentColor === c.value && "ring-2 ring-offset-1",
                 )}
                 style={{
                   background: c.value,
-                  border: "1.5px solid var(--border-strong)",
-                  borderRadius: 0,
+                  border: "1px solid var(--border)",
                 }}
               />
             ))}
@@ -499,9 +492,9 @@ function TableMenu({
       className="absolute left-0 top-full mt-1 z-20 py-1 min-w-[210px]"
       style={{
         background: "var(--bg-panel)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat-sm)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
+        boxShadow: "var(--shadow-md)",
       }}
       onMouseLeave={onClose}
     >
@@ -601,13 +594,11 @@ function MenuItem({
 }
 
 function Divider() {
-  // Divider mais alto e em cor border-strong pra ficar visivel sobre o
-  // bg-panel-2 da toolbar — combina com o vocabulario de bordas grossas
-  // do resto do chrome novo.
+  // Divisor hairline curto e discreto.
   return (
     <div
-      className="w-px h-5 mx-1.5"
-      style={{ background: "var(--border-strong)", opacity: 0.6 }}
+      className="w-px h-4 mx-1.5"
+      style={{ background: "var(--border-subtle)" }}
     />
   );
 }

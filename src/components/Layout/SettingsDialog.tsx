@@ -264,7 +264,7 @@ export function SettingsDialog() {
         <div className="solon-dialog-header">
           <div className="min-w-0">
             <h2 id="settings-title" className="solon-dialog-title">
-              <span className="solon-plaque solon-plaque--lg">Ajustes</span>
+              Ajustes
             </h2>
             <p className="solon-dialog-subtitle">
               Preferências de escrita, interface e projeto.
@@ -706,8 +706,8 @@ function DictionaryPanel({
     <div
       className="p-3 flex flex-col gap-2"
       style={{
-        border: "1.5px solid var(--border-strong)",
-        borderRadius: 0,
+        border: "1px solid var(--border-subtle)",
+        borderRadius: "var(--radius)",
         background: "color-mix(in srgb, var(--bg-panel) 70%, transparent)",
       }}
     >
@@ -715,7 +715,7 @@ function DictionaryPanel({
         <div>
           <div
             style={{
-              fontFamily: "var(--font-display)",
+              fontFamily: "var(--font-ui)",
               fontSize: "0.84rem",
               fontWeight: 600,
             }}
@@ -726,7 +726,7 @@ function DictionaryPanel({
             className="italic"
             style={{
               color: "var(--text-muted)",
-              fontFamily: "var(--font-display)",
+              fontFamily: "var(--font-ui)",
               fontSize: "0.72rem",
             }}
           >
@@ -769,16 +769,16 @@ function Section({
   description?: string;
   children: React.ReactNode;
 }) {
-  // Section vira um "card brutalist" leve — borda 2px, sem rounded, sombra
-  // chapada compacta. Header usa plaqueta serif pra casar com os paineis.
+  // Section = card minimalista: hairline, cantos suaves, sem sombra
+  // (cards estaticos dentro do dialog nao precisam elevacao). Header com
+  // label small-caps discreto.
   return (
     <section
       className="p-4 flex flex-col gap-3"
       style={{
         background: "var(--bg-panel-2)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat-sm)",
+        border: "1px solid var(--border-subtle)",
+        borderRadius: "var(--radius)",
       }}
     >
       <div>
@@ -790,7 +790,7 @@ function Section({
             className="text-[0.74rem] mt-1.5 leading-snug"
             style={{
               color: "var(--text-muted)",
-              fontFamily: "var(--font-display)",
+              fontFamily: "var(--font-ui)",
               fontStyle: "italic",
             }}
           >
@@ -819,7 +819,7 @@ function Row({
       className="px-3 py-2.5"
       style={{
         background: "color-mix(in srgb, var(--bg-panel) 64%, transparent)",
-        borderLeft: "2px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
       }}
     >
       <div className="flex items-center justify-between gap-3">
@@ -831,7 +831,7 @@ function Row({
           )}
           <span
             className="text-[0.82rem] truncate"
-            style={{ fontFamily: "var(--font-display)", fontWeight: 500 }}
+            style={{ fontFamily: "var(--font-ui)", fontWeight: 500 }}
           >
             {label}
           </span>
@@ -890,10 +890,10 @@ function RangeRow({
         <button
           title="Restaurar 100%"
           onClick={onReset}
-          className="px-1.5 py-0.5 tabular-nums"
+          className="px-2 py-0.5 tabular-nums"
           style={{
-            border: "1.5px solid var(--border-strong)",
-            borderRadius: 0,
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
             color: "var(--text-muted)",
             fontFamily: "var(--font-mono)",
             fontSize: "0.66rem",
@@ -924,10 +924,10 @@ function SelectControl<T extends string>({
       style={{
         background: "var(--bg-panel)",
         color: "var(--text-primary)",
-        border: "1.5px solid var(--border-strong)",
-        borderRadius: 0,
-        fontFamily: "var(--font-display)",
-        fontSize: "0.78rem",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
+        fontFamily: "var(--font-ui)",
+        fontSize: "0.8rem",
       }}
     >
       {options.map((opt) => (
@@ -948,8 +948,8 @@ function Toggle({
   onChange: (v: boolean) => void;
   label: string;
 }) {
-  // Toggle brutalist: caixa 16px quadrada com ✓ accent quando ligado, em
-  // vez de switch redondo. Mesma gramatica do Toggle do CanvasSidePanel.
+  // Switch arredondado minimalista: track pill + knob deslizante, accent
+  // quando ligado. Limpo e familiar.
   return (
     <button
       role="switch"
@@ -959,26 +959,33 @@ function Toggle({
       className="inline-flex items-center gap-2"
     >
       <span
-        className="inline-flex items-center justify-center"
+        className="relative inline-block transition-colors"
         style={{
-          width: 16,
-          height: 16,
-          background: checked ? "var(--accent)" : "transparent",
-          border: `1.5px solid ${checked ? "var(--accent)" : "var(--border-strong)"}`,
-          borderRadius: 0,
-          color: "var(--text-inverse)",
-          fontSize: 11,
-          lineHeight: 1,
-          fontWeight: 700,
+          width: 30,
+          height: 17,
+          borderRadius: "var(--radius-pill)",
+          background: checked ? "var(--accent)" : "var(--border-strong)",
         }}
         aria-hidden
       >
-        {checked ? "✓" : ""}
+        <span
+          className="absolute transition-transform"
+          style={{
+            top: 2,
+            left: 2,
+            width: 13,
+            height: 13,
+            borderRadius: "var(--radius-pill)",
+            background: "var(--bg-panel)",
+            transform: checked ? "translateX(13px)" : "translateX(0)",
+            boxShadow: "var(--shadow-sm)",
+          }}
+        />
       </span>
       <span
         style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "0.78rem",
+          fontFamily: "var(--font-ui)",
+          fontSize: "0.8rem",
           color: checked ? "var(--text-primary)" : "var(--text-muted)",
         }}
       >

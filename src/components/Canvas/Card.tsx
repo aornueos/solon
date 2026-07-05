@@ -308,17 +308,18 @@ export const Card = memo(function Card({ card }: Props) {
         width: card.w,
         height: card.h,
         background: color,
-        // Borda 2px brutalist + borda-esquerda accent quando scene (status
-        // color) ou ainda mais grossa quando selecionado. Sombra chapada
-        // pra que cards pareçam "fichas físicas sobre a mesa".
+        // Hairline 1px, cantos suaves, sombra macia. Cena ganha uma faixa
+        // accent fina (3px) com a cor do status na borda esquerda; resto
+        // hairline. Selecionado = borda accent + sombra um pouco mais
+        // presente.
         borderLeft: isScene
-          ? `4px solid ${statusBorder}`
-          : `2px solid ${isSelected ? "var(--accent)" : "var(--border-strong)"}`,
-        borderTop: `2px solid ${isSelected ? "var(--accent)" : "var(--border-strong)"}`,
-        borderRight: `2px solid ${isSelected ? "var(--accent)" : "var(--border-strong)"}`,
-        borderBottom: `2px solid ${isSelected ? "var(--accent)" : "var(--border-strong)"}`,
-        borderRadius: 0,
-        boxShadow: isSelected ? "var(--shadow-flat)" : "var(--shadow-flat-sm)",
+          ? `3px solid ${statusBorder}`
+          : `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
+        borderTop: `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
+        borderRight: `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
+        borderBottom: `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
+        borderRadius: "var(--radius)",
+        boxShadow: isSelected ? "var(--shadow-md)" : "var(--shadow-sm)",
         ...ringStyle,
       }}
       data-canvas-entity-id={card.id}
@@ -456,9 +457,9 @@ export const Card = memo(function Card({ card }: Props) {
           className="absolute -top-8 left-14 flex gap-1 px-1.5 py-1 z-10"
           style={{
             background: "var(--bg-panel)",
-            border: "2px solid var(--border-strong)",
-            borderRadius: 0,
-            boxShadow: "var(--shadow-flat-sm)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            boxShadow: "var(--shadow-md)",
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -665,9 +666,9 @@ function ActionBtn({
       style={{
         background: bg,
         color: fg,
-        border: `1.5px solid ${bd}`,
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat-sm)",
+        border: `1px solid ${bd}`,
+        borderRadius: "var(--radius-sm)",
+        boxShadow: "var(--shadow-sm)",
       }}
     >
       {children}
@@ -718,7 +719,7 @@ function SceneBody({
               background: `${status.color}22`,
               color: status.color,
               border: `1px solid ${status.color}55`,
-              borderRadius: 0,
+              borderRadius: "var(--radius-pill)",
             }}
           >
             {status.label}

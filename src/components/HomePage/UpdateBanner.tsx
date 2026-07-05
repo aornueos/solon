@@ -100,19 +100,19 @@ function BannerShell({
   trailing?: React.ReactNode;
   progress?: number;
 }) {
-  // Banner virou bloco brutalist alinhado com a HomePage nova. Borda
-  // pesada 2px + sombra chapada que levanta no hover quando interativo
-  // (downloading nao tem hover — mostra progress bar 2px no bottom).
+  // Bloco hairline (1px) com cantos suaves e sombra macia; quando
+  // interativo, levanta levemente no hover (translateY + shadow-md).
+  // Downloading nao tem hover — mostra progress bar 2px no bottom.
   const interactive = !!onClick;
   const inner = (
     <div
-      className="relative flex items-center gap-3 px-4 py-3 w-full transition-all"
+      className="relative flex items-center gap-3 px-4 py-3 w-full transition-all overflow-hidden"
       style={{
         background: "var(--bg-panel)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
         color: "var(--text-secondary)",
-        boxShadow: "var(--shadow-flat-sm)",
+        boxShadow: "var(--shadow-sm)",
       }}
     >
       <span
@@ -125,7 +125,7 @@ function BannerShell({
       <span
         className="flex-1 truncate"
         style={{
-          fontFamily: "var(--font-display)",
+          fontFamily: "var(--font-ui)",
           fontSize: "0.92rem",
           fontStyle: "italic",
         }}
@@ -142,14 +142,12 @@ function BannerShell({
           <ArrowRight size={12} />
         </span>
       )}
-      {/* Barra de progresso 2px no bottom border quando baixando — mais
-          grossa que antes pra ficar visivel com a borda nova. */}
+      {/* Barra de progresso fina na base quando baixando. */}
       {typeof progress === "number" && (
         <div
           aria-hidden
-          className="absolute left-0 transition-all"
+          className="absolute left-0 bottom-0 transition-all"
           style={{
-            bottom: -2,
             height: 2,
             width: `${Math.round(progress * 100)}%`,
             background: "var(--accent)",
@@ -171,15 +169,17 @@ function BannerShell({
       onMouseEnter={(e) => {
         const el = e.currentTarget.firstChild as HTMLElement;
         if (el) {
-          el.style.transform = "translate(-1px, -1px)";
-          el.style.boxShadow = "3px 3px 0 var(--border-strong)";
+          el.style.transform = "translateY(-1px)";
+          el.style.boxShadow = "var(--shadow-md)";
+          el.style.borderColor = "var(--border-strong)";
         }
       }}
       onMouseLeave={(e) => {
         const el = e.currentTarget.firstChild as HTMLElement;
         if (el) {
           el.style.transform = "";
-          el.style.boxShadow = "var(--shadow-flat-sm)";
+          el.style.boxShadow = "var(--shadow-sm)";
+          el.style.borderColor = "var(--border)";
         }
       }}
     >

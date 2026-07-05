@@ -309,9 +309,9 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
           style={{
             color: "var(--danger)",
             background: "var(--bg-panel-2)",
-            border: "1.5px dashed var(--danger)",
-            borderRadius: 0,
-            fontFamily: "var(--font-display)",
+            border: "1px dashed var(--danger)",
+            borderRadius: "var(--radius)",
+            fontFamily: "var(--font-ui)",
           }}
         >
           Imagem não encontrada
@@ -323,8 +323,8 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
           draggable={false}
           className="w-full h-full object-contain select-none"
           style={{
-            borderRadius: 0,
-            boxShadow: "var(--shadow-flat-sm)",
+            borderRadius: "var(--radius-sm)",
+            boxShadow: "var(--shadow-sm)",
             ...(isSelected
               ? { outline: "2px solid var(--accent)" }
               : isInGroup
@@ -335,7 +335,7 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
       ) : (
         <div
           className="w-full h-full animate-pulse"
-          style={{ background: "var(--bg-hover)", borderRadius: 0 }}
+          style={{ background: "var(--bg-hover)", borderRadius: "var(--radius-sm)" }}
         />
       )}
 
@@ -349,9 +349,9 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
             transform: `scale(${1 / viewport.zoom})`,
             transformOrigin: "top left",
             background: "var(--bg-panel)",
-            border: "1.5px solid var(--border-strong)",
-            borderRadius: 0,
-            boxShadow: "var(--shadow-flat-sm)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            boxShadow: "var(--shadow-sm)",
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >

@@ -242,9 +242,9 @@ export function CanvasSidePanel() {
         style={{
           ...floatingStyle,
           background: "var(--bg-panel)",
-          border: "2px solid var(--border-strong)",
-          borderRadius: 0,
-          boxShadow: "var(--shadow-flat-sm)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius)",
+          boxShadow: "var(--shadow-md)",
           color: "var(--text-secondary)",
         }}
       >
@@ -263,15 +263,15 @@ export function CanvasSidePanel() {
         ...floatingStyle,
         width: PANEL_W,
         background: "var(--bg-panel)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat-sm)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--shadow-md)",
         color: "var(--text-primary)",
       }}
     >
       <div
         className="flex items-center justify-between gap-2 -mx-3 -mt-3 px-3 py-2"
-        style={{ borderBottom: "2px solid var(--border-strong)" }}
+        style={{ borderBottom: "1px solid var(--border-subtle)" }}
       >
         <button
           onMouseDown={(e) => startPanelDrag(e)}
@@ -280,8 +280,7 @@ export function CanvasSidePanel() {
           className="h-7 w-7 flex items-center justify-center transition-colors cursor-grab active:cursor-grabbing"
           style={{
             color: "var(--text-muted)",
-            border: "1px solid var(--border-strong)",
-            borderRadius: 0,
+            borderRadius: "var(--radius-sm)",
           }}
         >
           <GripVertical size={14} />
@@ -332,8 +331,7 @@ export function CanvasSidePanel() {
           style={{
             background: "var(--bg-hover)",
             color: "var(--text-primary)",
-            border: "1.5px solid var(--border-strong)",
-            borderRadius: 0,
+            borderRadius: "var(--radius-sm)",
             fontFamily: "var(--font-mono)",
             fontSize: "0.72rem",
           }}
@@ -485,9 +483,9 @@ function SmallChoice({
         background: active ? "var(--accent-soft)" : "transparent",
         color: active ? "var(--accent)" : "var(--text-muted)",
         border: active
-          ? "1.5px solid var(--accent)"
-          : "1.5px solid var(--border-strong)",
-        borderRadius: 0,
+          ? "1px solid var(--accent)"
+          : "1px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
         fontFamily: "var(--font-mono)",
         fontSize: "0.7rem",
       }}
@@ -517,8 +515,8 @@ function IconChoice({
       style={{
         background: "transparent",
         color: danger ? "var(--danger)" : "var(--text-secondary)",
-        border: "1.5px solid var(--border-strong)",
-        borderRadius: 0,
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = danger
@@ -549,8 +547,8 @@ function Toggle({
   label: string;
   icon?: React.ReactNode;
 }) {
-  // Toggle brutalist: caixa quadrada com ✓ quando ativo, em vez do
-  // switch-track redondo. Mantem familia visual do app.
+  // Switch arredondado minimalista (igual ao Settings) — track pill +
+  // knob deslizante, accent quando ligado.
   return (
     <button
       role="switch"
@@ -559,26 +557,33 @@ function Toggle({
       className="inline-flex items-center gap-1.5"
       style={{
         color: checked ? "var(--text-primary)" : "var(--text-muted)",
-        fontFamily: "var(--font-display)",
+        fontFamily: "var(--font-ui)",
         fontSize: "0.74rem",
       }}
     >
       {icon}
       <span
-        className="inline-flex items-center justify-center"
+        className="relative inline-block transition-colors"
         style={{
-          width: 14,
-          height: 14,
-          background: checked ? "var(--accent)" : "transparent",
-          border: `1.5px solid ${checked ? "var(--accent)" : "var(--border-strong)"}`,
-          borderRadius: 0,
-          color: "var(--text-inverse)",
-          fontSize: 10,
-          lineHeight: 1,
+          width: 26,
+          height: 15,
+          borderRadius: "var(--radius-pill)",
+          background: checked ? "var(--accent)" : "var(--border-strong)",
         }}
         aria-hidden
       >
-        {checked ? "✓" : ""}
+        <span
+          className="absolute transition-transform"
+          style={{
+            top: 2,
+            left: 2,
+            width: 11,
+            height: 11,
+            borderRadius: "var(--radius-pill)",
+            background: "var(--bg-panel)",
+            transform: checked ? "translateX(11px)" : "translateX(0)",
+          }}
+        />
       </span>
       {label}
     </button>

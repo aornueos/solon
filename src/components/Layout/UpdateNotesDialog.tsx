@@ -117,9 +117,8 @@ export function UpdateNotesDialog() {
         aria-modal="true"
         className="solon-dialog w-full max-w-xl flex flex-col max-h-[80vh]"
       >
-        {/* Header — "PROJETO · METADATA" no estilo da HomePage: meta-label
-            em solon-caps em cima, versao em display monumental embaixo.
-            Cria coerencia com a hero do app. */}
+        {/* Header no estilo da HomePage: meta-label em solon-caps em cima,
+            versao em display grande (Inter) embaixo. Coerencia com a hero. */}
         <div className="solon-dialog-header items-start">
           <div className="min-w-0">
             <div className="solon-caps mb-1.5">
@@ -127,7 +126,7 @@ export function UpdateNotesDialog() {
             </div>
             <h2
               style={{
-                fontFamily: "var(--font-display)",
+                fontFamily: "var(--font-ui)",
                 fontSize: "1.85rem",
                 fontWeight: 700,
                 lineHeight: 1,
@@ -169,7 +168,7 @@ export function UpdateNotesDialog() {
               className="italic"
               style={{
                 color: "var(--text-muted)",
-                fontFamily: "var(--font-display)",
+                fontFamily: "var(--font-ui)",
               }}
             >
               Sem notas de lançamento.
@@ -180,7 +179,7 @@ export function UpdateNotesDialog() {
         {/* Footer: progresso + acoes */}
         <div
           className="px-5 py-3.5"
-          style={{ borderTop: "2px solid var(--border-strong)" }}
+          style={{ borderTop: "1px solid var(--border-subtle)" }}
         >
           {downloading && (
             <div className="mb-3">
@@ -198,10 +197,10 @@ export function UpdateNotesDialog() {
                 </span>
               </div>
               <div
-                className="h-[3px] overflow-hidden"
+                className="h-1 overflow-hidden"
                 style={{
                   background: "var(--bg-hover)",
-                  border: "1px solid var(--border-strong)",
+                  borderRadius: "var(--radius-pill)",
                 }}
               >
                 <div
@@ -238,7 +237,7 @@ export function UpdateNotesDialog() {
                 className="self-center italic"
                 style={{
                   color: "var(--text-muted)",
-                  fontFamily: "var(--font-display)",
+                  fontFamily: "var(--font-ui)",
                   fontSize: "0.8rem",
                 }}
               >

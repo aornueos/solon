@@ -29,7 +29,7 @@ export function StatusBar() {
         background: "var(--bg-panel-2)",
         borderTop: "1px solid var(--border-subtle)",
         color: "var(--text-muted)",
-        fontFamily: "var(--font-display)",
+        fontFamily: "var(--font-ui)",
         fontSize: "0.7rem",
       }}
     >
@@ -87,10 +87,10 @@ export function StatusBar() {
                   palavras
                 </span>
                 <div
-                  className="w-20 h-[3px] overflow-hidden"
+                  className="w-20 h-1 overflow-hidden"
                   style={{
                     background: "var(--bg-hover)",
-                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-pill)",
                   }}
                 >
                   <div
@@ -131,16 +131,17 @@ export function StatusBar() {
  * "vocabulario editorial" pelo app inteiro.
  */
 function Lozenge() {
+  // Separador discreto — pequeno ponto redondo calmo (era losango).
   return (
     <span
       aria-hidden
       style={{
         display: "inline-block",
-        width: 3.5,
-        height: 3.5,
-        background: "var(--border-strong)",
-        transform: "rotate(45deg)",
-        opacity: 0.7,
+        width: 3,
+        height: 3,
+        borderRadius: "var(--radius-pill)",
+        background: "var(--text-placeholder)",
+        opacity: 0.6,
       }}
     />
   );

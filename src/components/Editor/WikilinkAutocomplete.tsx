@@ -151,20 +151,18 @@ export function WikilinkAutocomplete({ editor }: Props) {
         minWidth: 220,
         maxWidth: 340,
         background: "var(--bg-panel)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat-sm)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
+        boxShadow: "var(--shadow-md)",
         color: "var(--text-primary)",
+        padding: "4px",
       }}
       onMouseDown={(e) => e.preventDefault()}
     >
-      <div
-        className="px-2.5 py-1.5"
-        style={{ borderBottom: "2px solid var(--border-strong)" }}
-      >
+      <div className="px-2 py-1">
         <span className="solon-caps--sm">Wikilink → arquivo</span>
       </div>
-      <ul className="py-1 max-h-[40vh] overflow-y-auto">
+      <ul className="max-h-[40vh] overflow-y-auto">
         {results.map((f, idx) => {
           const display = f.name.replace(/\.(md|txt)$/i, "");
           const isActive = idx === activeIdx;
@@ -177,13 +175,11 @@ export function WikilinkAutocomplete({ editor }: Props) {
                   insertWikilink(editor, state, f.name);
                   setState(null);
                 }}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors"
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-left transition-colors"
                 style={{
-                  background: isActive ? "var(--bg-hover)" : "transparent",
+                  background: isActive ? "var(--accent-soft)" : "transparent",
                   color: isActive ? "var(--accent)" : "var(--text-primary)",
-                  borderLeft: isActive
-                    ? "3px solid var(--accent)"
-                    : "3px solid transparent",
+                  borderRadius: "var(--radius-sm)",
                 }}
               >
                 <FileText
@@ -193,7 +189,7 @@ export function WikilinkAutocomplete({ editor }: Props) {
                 <span
                   className="truncate"
                   style={{
-                    fontFamily: "var(--font-display)",
+                    fontFamily: "var(--font-ui)",
                     fontSize: "0.82rem",
                     fontStyle: isActive ? "normal" : "italic",
                     fontWeight: isActive ? 600 : 500,

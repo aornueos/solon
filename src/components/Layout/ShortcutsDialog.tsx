@@ -118,9 +118,7 @@ export function ShortcutsDialog({ open, onClose }: Props) {
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="solon-dialog-header">
-          {/* Plaqueta em vez de h2 plain — coerencia com headers dos painéis
-              (Sidebar/Outline/Inspector usam .solon-plaque). */}
-          <span className="solon-plaque solon-plaque--lg">Atalhos</span>
+          <span className="solon-dialog-title">Atalhos</span>
           <button
             onClick={onClose}
             aria-label="Fechar"
@@ -142,9 +140,8 @@ export function ShortcutsDialog({ open, onClose }: Props) {
 }
 
 function ShortcutGroupBlock({ group }: { group: ShortcutGroup }) {
-  // Cada grupo vira uma "secao" com plaqueta menor — escala fractal
-  // do header do dialog. Itens em serif italic + kbd brutalista (borda
-  // pesada, sem rounded, mono).
+  // Grupo com label small-caps discreto. Itens em texto normal, kbd
+  // suave (hairline, cantos arredondados, mono).
   return (
     <section>
       <div className="mb-3">
@@ -158,8 +155,6 @@ function ShortcutGroupBlock({ group }: { group: ShortcutGroup }) {
           >
             <span
               style={{
-                fontFamily: "var(--font-display)",
-                fontStyle: "italic",
                 fontSize: "0.82rem",
                 color: "var(--text-secondary)",
               }}
@@ -171,9 +166,9 @@ function ShortcutGroupBlock({ group }: { group: ShortcutGroup }) {
               style={{
                 fontFamily: "var(--font-mono)",
                 background: "var(--bg-panel-2)",
-                color: "var(--text-primary)",
-                border: "1.5px solid var(--border-strong)",
-                borderRadius: 0,
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-xs)",
                 letterSpacing: "0.02em",
               }}
             >

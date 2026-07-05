@@ -195,8 +195,8 @@ export function Sidebar() {
         borderRight: "1px solid var(--border-subtle)",
       }}
     >
-      {/* Header — plaqueta `| ARQUIVOS |` com filete grosso embaixo.
-          Substitui o label em Inter uppercase por placa de biblioteca. */}
+      {/* Header — label "Arquivos" em small-caps discreto (.solon-plaque)
+          com hairline sutil embaixo (.solon-plaque-bar). */}
       <div
         className="flex items-center justify-between px-3.5 py-3 solon-plaque-bar"
       >
@@ -234,7 +234,7 @@ export function Sidebar() {
                     ? "var(--accent)"
                     : "var(--text-muted)",
                   background: tagPopoverOpen ? "var(--bg-hover)" : "transparent",
-                  borderRadius: 0,
+                  borderRadius: "var(--radius-sm)",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "var(--bg-hover)";
@@ -314,7 +314,7 @@ export function Sidebar() {
               className="italic leading-relaxed"
               style={{
                 color: "var(--text-placeholder)",
-                fontFamily: "var(--font-display)",
+                fontFamily: "var(--font-ui)",
                 fontSize: "0.82rem",
               }}
             >
@@ -407,7 +407,7 @@ function HeaderBtn({
   onClick: () => void;
   title: string;
 }) {
-  // 18x18 pra caber a plaqueta `| ARQUIVOS |` na largura padrao do
+  // 18x18 pra caber o label "Arquivos" + acoes na largura padrao do
   // sidebar (200px) sem truncar. Hover preenche com bg-hover sem borda
   // pra ficar mais discreto (chrome interno deve respirar).
   return (
@@ -421,7 +421,7 @@ function HeaderBtn({
         height: 18,
         color: "var(--text-muted)",
         background: "transparent",
-        borderRadius: 0,
+        borderRadius: "var(--radius-sm)",
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
@@ -537,7 +537,11 @@ function FileTreeRow({
           dragging = true;
           suppressClickRef.current = true;
           onDragStart(node.path);
-          document.body.style.cursor = "default";
+          // Cursor "grabbing" enquanto arrasta a pasta — feedback visual de
+          // que ela esta sendo movida. Arquivo usa drag nativo (ghost image
+          // automatico); pasta usa pointer-drag manual, entao o cursor e' a
+          // unica pista alem do row em opacity 0.4 + highlight do alvo.
+          document.body.style.cursor = "grabbing";
         }
 
         ev.preventDefault();
@@ -741,42 +745,34 @@ function FileTreeRow({
       aria-selected={node.type === "file" ? isActive : undefined}
       aria-expanded={node.type === "folder" ? node.expanded : undefined}
       className={clsx(
-        "flex items-center gap-1.5 py-[3px] pr-2 mx-0 group relative",
+        "flex items-center gap-1.5 py-[3px] pr-2 mx-1.5 group relative",
         "transition-colors text-[0.8125rem]",
         node.type === "folder" ? "cursor-default" : "cursor-pointer",
       )}
       style={{
-        // Padding-left = (depth*14) + 8 base + 3 pra abrir espaco da
-        // faixa accent vertical no item ativo (acomoda a borda lateral
-        // sem deslocar o conteudo quando torna-se ativo).
-        paddingLeft: `${8 + depth * 14}px`,
+        paddingLeft: `${6 + depth * 14}px`,
         background: bg,
         color: fg,
-        borderRadius: 0,
-        // Faixa accent 3px na borda esquerda quando arquivo ativo —
-        // marca catalogica clara, mesma gramatica do CommandPalette
-        // / ContextMenu. Pastas nao tem (so' arquivo "ativo" tem
-        // sentido como selecao). Isso JA' indica o ativo sem precisar
-        // de font-weight bold (que poluiria a leitura da arvore).
-        borderLeft:
-          node.type === "file" && isActive
-            ? "3px solid var(--accent)"
-            : "3px solid transparent",
-        // Pasta em serif italic (estilo capitulo de livro) com weight
-        // normal — antes 600 dava cara "shouting" demais; o italico
-        // ja' carrega o tom editorial. Arquivo continua Inter weight
-        // normal pra legibilidade em densidade alta (e nem bold quando
-        // ativo, pra nao competir com a faixa accent).
-        fontFamily:
-          node.type === "folder" ? "var(--font-display)" : undefined,
-        fontStyle: node.type === "folder" ? "italic" : undefined,
-        fontWeight: node.type === "folder" ? 400 : undefined,
+        // Highlight em pill inset (cantos suaves). Arquivo ativo ganha um
+        // marcador accent fino na borda esquerda via inset box-shadow
+        // (definido junto do drop-indicator abaixo) — calmo, combina com
+        // o arredondamento (sem faixa grossa).
+        borderRadius: "var(--radius-sm)",
+        // Toda a lateral em Inter upright (pastas E arquivos), sem italico.
+        // A distincao pasta/arquivo vem do icone (folder colorido vs file
+        // muted) e da cor do texto (text-primary vs text-secondary), nao do
+        // estilo da fonte.
+        fontFamily: "var(--font-ui)",
+        fontWeight: 400,
         // Item sendo arrastado fica meio-transparente como feedback.
         opacity: dragPath === node.path ? 0.4 : 1,
-        // Indicador visual de drop: linha fina no topo do alvo,
-        // sinaliza "vai entrar antes deste item".
+        // boxShadow combina: marcador accent esquerdo (arquivo ativo) +
+        // indicador de drop (linha fina no topo do alvo). Drop tem
+        // prioridade quando ativo pra dar feedback claro.
         boxShadow: showDropIndicator
           ? "inset 0 2px 0 0 var(--accent)"
+          : node.type === "file" && isActive
+          ? "inset 2px 0 0 0 var(--accent)"
           : undefined,
       }}
     >
@@ -1068,11 +1064,11 @@ function ContextMenu({
         left: menu.x,
         top: menu.y,
         background: "var(--bg-panel)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat-sm)",
-        fontFamily: "var(--font-display)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
+        boxShadow: "var(--shadow-md)",
         fontSize: "0.82rem",
+        padding: "4px",
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -1118,8 +1114,8 @@ function ContextMenuItem({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors"
-      style={{ background: bg, color: fg }}
+      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors"
+      style={{ background: bg, color: fg, borderRadius: "var(--radius-sm)" }}
     >
       <span style={{ color: "var(--text-muted)" }}>{icon}</span>
       {label}
@@ -1183,6 +1179,7 @@ function FilteredFileList({
               style={{
                 background: isActive ? "var(--bg-hover)" : "transparent",
                 color: isActive ? "var(--accent)" : "var(--text-primary)",
+                fontFamily: "var(--font-ui)",
               }}
               onMouseEnter={(e) => {
                 if (!isActive)

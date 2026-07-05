@@ -81,7 +81,7 @@ export function Inspector() {
             className="leading-relaxed italic"
             style={{
               color: "var(--text-placeholder)",
-              fontFamily: "var(--font-display)",
+              fontFamily: "var(--font-ui)",
               fontSize: "0.82rem",
             }}
           >
@@ -108,7 +108,7 @@ export function Inspector() {
       />
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
-        {/* Nome da cena */}
+        {/* Nome da cena — Inter, mesma familia da Sidebar/Outline. */}
         <div
           className="text-[0.78rem] font-semibold truncate"
           style={{ color: "var(--text-primary)" }}
@@ -160,7 +160,7 @@ export function Inspector() {
             }
             placeholder="Resumo em 1–2 frases do que acontece nesta cena."
             rows={3}
-            className="w-full resize-none px-2 py-1.5 text-[0.78rem] outline-none leading-relaxed"
+            className="w-full resize-none px-2 py-1.5 text-[0.78rem] outline-none leading-relaxed rounded-md"
             style={{
               background: "var(--bg-panel)",
               border: "1px solid var(--border)",
@@ -190,7 +190,7 @@ export function Inspector() {
                 });
               }}
               placeholder="0"
-              className="w-24 px-2 py-1 text-[0.78rem] outline-none"
+              className="w-24 px-2 py-1 text-[0.78rem] outline-none rounded-md"
               style={{
                 background: "var(--bg-panel)",
                 border: "1px solid var(--border)",
@@ -213,10 +213,10 @@ export function Inspector() {
           {target > 0 && (
             <div className="mt-2 space-y-1">
               <div
-                className="h-[4px] overflow-hidden"
+                className="h-1.5 overflow-hidden"
                 style={{
                   background: "var(--bg-hover)",
-                  border: "1px solid var(--border-strong)",
+                  borderRadius: "var(--radius-pill)",
                 }}
               >
                 <div
@@ -339,9 +339,8 @@ function Header({
   const [hovered, setHovered] = useState(false);
   return (
     <div className="flex items-center justify-between px-3.5 py-3 solon-plaque-bar">
-      {/* Plaqueta `| CENA |` — placa de ficha catalografica. Mesma
-          gramatica de Sidebar/Outline; o conteudo abaixo (campos do
-          frontmatter) e' literalmente uma ficha. */}
+      {/* Label "Cena" em small-caps. Mesma gramatica de Sidebar/Outline;
+          o conteudo abaixo (campos do frontmatter) e' a ficha da cena. */}
       <span className="solon-plaque">Cena</span>
       <div className="flex items-center gap-1">
         <button
@@ -379,11 +378,9 @@ function Field({
   label: string;
   children: React.ReactNode;
 }) {
-  // Field vira "etiqueta de ficha catalografica". Label em serif small-caps
-  // (.solon-caps--sm) ao inves de Inter uppercase pra casar com a plaqueta
+  // Label do campo em small-caps (.solon-caps--sm) pra casar com o label
   // do header. O campo abaixo (input/textarea) continua estilizado pelos
-  // estilos de cada componente — visualmente, a ficha do Inspector inteira
-  // parece um cartao de catalogo de biblioteca antiga.
+  // estilos de cada componente.
   return (
     <div className="space-y-1.5">
       <div className="solon-caps--sm">{label}</div>
@@ -407,7 +404,7 @@ function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-2 py-1 text-[0.78rem] outline-none"
+      className="w-full px-2 py-1 text-[0.78rem] outline-none rounded-md"
       style={{
         background: "var(--bg-panel)",
         border: "1px solid var(--border)",
@@ -540,7 +537,7 @@ function TagsEditor({
           }
         }}
         placeholder="Adicionar tag + Enter"
-        className="w-full px-2 py-1 text-[0.75rem] outline-none"
+        className="w-full px-2 py-1 text-[0.75rem] outline-none rounded-md"
         style={{
           background: "var(--bg-panel)",
           border: "1px solid var(--border)",

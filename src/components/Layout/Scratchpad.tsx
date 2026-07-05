@@ -73,9 +73,9 @@ export function Scratchpad() {
       className="fixed right-5 bottom-8 z-[130] w-[min(520px,calc(100vw-40px))] overflow-hidden"
       style={{
         background: "var(--bg-panel)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--shadow-md)",
       }}
     >
       <div className="solon-dialog-header" style={{ padding: "0.6rem 0.85rem" }}>

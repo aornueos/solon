@@ -34,7 +34,7 @@ export function Outline() {
         borderLeft: "1px solid var(--border-subtle)",
       }}
     >
-      {/* Header — plaqueta `| ÍNDICE |`. Mesma gramatica da Sidebar. */}
+      {/* Header — label "Índice" em small-caps. Mesma gramatica da Sidebar. */}
       <div className="px-3.5 py-3 solon-plaque-bar">
         <span className="solon-plaque">Índice</span>
       </div>
@@ -50,7 +50,7 @@ export function Outline() {
               className="leading-relaxed italic"
               style={{
                 color: "var(--text-placeholder)",
-                fontFamily: "var(--font-display)",
+                fontFamily: "var(--font-ui)",
                 fontSize: "0.82rem",
               }}
             >
@@ -188,6 +188,9 @@ function HeadingRow({
           color: COLOR[heading.level] ?? "var(--text-secondary)",
           opacity: isDragSource ? 0.4 : 1,
           cursor: "grab",
+          // Inter — mesma familia da Sidebar (painel oposto). Os dois paineis
+          // laterais compartilham header, gramatica e fonte.
+          fontFamily: "var(--font-ui)",
         }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}

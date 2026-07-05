@@ -100,7 +100,7 @@ export function DialogLayer() {
               className="mt-2.5 text-[0.82rem] leading-relaxed"
               style={{
                 color: "var(--text-secondary)",
-                fontFamily: "var(--font-display)",
+                fontFamily: "var(--font-ui)",
               }}
             >
               {dialog.message}

@@ -309,11 +309,11 @@ export function AppLayout() {
               <div
                 className="absolute top-3 bottom-3 right-3 w-[45%] pointer-events-none flex items-center justify-center"
                 style={{
-                  border: "2px dashed var(--accent)",
-                  background: "color-mix(in srgb, var(--accent) 14%, transparent)",
+                  border: "1.5px dashed var(--accent)",
+                  background: "color-mix(in srgb, var(--accent) 12%, transparent)",
                   color: "var(--text-primary)",
-                  borderRadius: 0,
-                  fontFamily: "var(--font-display)",
+                  borderRadius: "var(--radius-lg)",
+                  fontFamily: "var(--font-ui)",
                   fontSize: "0.82rem",
                   fontStyle: "italic",
                 }}
@@ -386,14 +386,14 @@ export function AppLayout() {
           className="fixed top-3 right-3 z-[90] flex items-center gap-1.5 px-3 py-1.5 transition-opacity"
           style={{
             background: "var(--bg-panel)",
-            border: "2px solid var(--accent)",
-            borderRadius: 0,
+            border: "1px solid var(--accent)",
+            borderRadius: "var(--radius-pill)",
             color: "var(--text-primary)",
             opacity: 0.85,
-            boxShadow: "var(--shadow-flat-sm)",
-            fontFamily: "var(--font-display)",
+            boxShadow: "var(--shadow-md)",
+            fontFamily: "var(--font-ui)",
             fontSize: "0.78rem",
-            letterSpacing: "0.04em",
+            letterSpacing: "0.02em",
           }}
           onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.opacity = "1")}
           onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.opacity = "0.85")}
@@ -452,9 +452,9 @@ function FloatingInspector() {
         width: rect.width,
         height: rect.height,
         background: "var(--bg-panel-2)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--shadow-md)",
       }}
     >
       <Inspector />
@@ -511,9 +511,9 @@ function FloatingOutline() {
         width: rect.width,
         height: rect.height,
         background: "var(--bg-panel-2)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--shadow-md)",
       }}
     >
       <Outline />

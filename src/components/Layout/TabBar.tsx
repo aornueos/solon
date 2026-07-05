@@ -230,7 +230,7 @@ export function TabBar() {
         minHeight: 34,
         scrollbarWidth: "thin",
         padding: "4px 8px 0",
-        gap: 0,
+        gap: 2,
       }}
       role="tablist"
       aria-label="Arquivos abertos"
@@ -407,25 +407,22 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
         padding: "5px 9px",
         minWidth: 110,
         maxWidth: 240,
-        fontSize: "0.8rem",
-        fontFamily: "var(--font-display)",
-        // Aba ativa = fundo do conteudo (bg-app) + borda-top GROSSA accent
-        // (look de lombada de livro com fita de marcador). Inativas saem
-        // do bg-panel-2 com borda sutil em volta.
-        background: isActive ? "var(--bg-app)" : "color-mix(in srgb, var(--bg-panel) 45%, transparent)",
+        fontSize: "0.82rem",
+        fontFamily: "var(--font-ui)",
+        // Aba ativa "lifta" com o fundo da pagina (bg-app) e cantos
+        // arredondados no topo — sem molduras. Inativas: transparentes,
+        // texto muted. drop-target so' tonifica suavemente.
+        background: isActive
+          ? "var(--bg-app)"
+          : dropTarget
+          ? "var(--accent-soft)"
+          : "transparent",
         color: isActive ? "var(--text-primary)" : "var(--text-muted)",
-        borderLeft: `1px solid ${dropTarget ? "var(--accent)" : "var(--border)"}`,
-        borderRight: `1px solid ${dropTarget ? "var(--accent)" : "var(--border)"}`,
-        borderTop: isActive
-          ? "3px solid var(--accent)"
-          : `1px solid ${dropTarget ? "var(--accent)" : "var(--border)"}`,
-        // marginBottom -1 cobre a borda inferior 1px da TabBar com a propria
-        // aba ativa (criando sensacao "esta aba e' a folha").
-        borderBottom: isActive
-          ? "1px solid var(--bg-app)"
-          : `1px solid ${dropTarget ? "var(--accent)" : "var(--border)"}`,
+        // Marcador accent fino so' na ativa (2px arredondado embaixo, como
+        // um sublinhado de selecao calmo). marginBottom -1 cola na folha.
+        boxShadow: isActive ? "inset 0 -2px 0 0 var(--accent)" : undefined,
         marginBottom: "-1px",
-        borderRadius: 0,
+        borderRadius: "var(--radius-sm) var(--radius-sm) 0 0",
       }}
       title={fullName}
     >
@@ -452,7 +449,10 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
       <span
         className="truncate flex-1"
         style={{
-          fontWeight: isActive ? 600 : 400,
+          // Sem bold: ativa e inativa em weight normal. A distincao vem
+          // do estilo (ativa reta, inativa italica) + cor/fundo/underline
+          // accent — nao mais do peso da fonte.
+          fontWeight: 400,
           fontStyle: isActive ? "normal" : "italic",
           letterSpacing: isActive ? "0.01em" : 0,
         }}

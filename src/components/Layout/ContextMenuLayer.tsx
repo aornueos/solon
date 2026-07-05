@@ -144,10 +144,11 @@ export function ContextMenuLayer() {
           // off-screen no primeiro frame.
           opacity: pos ? 1 : 0,
           background: "var(--bg-panel)",
-          border: "2px solid var(--border-strong)",
-          borderRadius: 0,
-          boxShadow: "var(--shadow-flat-sm)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius)",
+          boxShadow: "var(--shadow-md)",
           color: "var(--text-primary)",
+          padding: "4px",
         }}
       >
         {menu.items.map((item, i) => {
@@ -157,7 +158,7 @@ export function ContextMenuLayer() {
                 key={`sep-${i}`}
                 role="separator"
                 className="my-1 h-px"
-                style={{ background: "var(--border-strong)", opacity: 0.5 }}
+                style={{ background: "var(--border-subtle)" }}
               />
             );
           }
@@ -216,22 +217,23 @@ function ContextMenuItemView({
       }}
       onClick={onSelect}
       disabled={item.disabled}
-      className="w-full flex items-center gap-3 px-3 py-1.5 text-left transition-colors"
+      className="w-full flex items-center gap-3 px-2.5 py-1.5 text-left transition-colors"
       style={{
-        background: focused ? "var(--bg-hover)" : "transparent",
+        background: focused
+          ? item.danger
+            ? "var(--bg-hover)"
+            : "var(--accent-soft)"
+          : "transparent",
         color: item.disabled
           ? "var(--text-placeholder)"
           : item.danger
           ? "var(--danger)"
+          : focused
+          ? "var(--accent)"
           : "var(--text-primary)",
         cursor: item.disabled ? "not-allowed" : "pointer",
-        fontFamily: "var(--font-display)",
         fontSize: "0.84rem",
-        // Borda accent na lateral quando focused — eco do CommandPalette
-        // pra coerencia entre menus.
-        borderLeft: focused
-          ? "3px solid var(--accent)"
-          : "3px solid transparent",
+        borderRadius: "var(--radius-sm)",
       }}
     >
       {/* Slot fixo de 14px pra icon ou check — alinha colunas mesmo
@@ -253,8 +255,8 @@ function ContextMenuItemView({
           style={{
             color: "var(--text-muted)",
             fontFamily: "var(--font-mono)",
-            border: "1px solid var(--border-strong)",
-            borderRadius: 0,
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-xs)",
             background: "var(--bg-panel-2)",
           }}
         >
