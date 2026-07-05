@@ -782,7 +782,11 @@
     color: var(--text-primary);
     font-family: "Inter", system-ui, sans-serif;
     text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: subpixel-antialiased;
+    /* `antialiased` (grayscale) em vez de `subpixel-antialiased`: no webview
+       Chromium do Tauri, subpixel fica pesado/borrado — especialmente em tema
+       escuro e em superficies com `zoom`/transform (canvas). Grayscale AA
+       renderiza o texto limpo e nitido em todos os temas. */
+    -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
   }

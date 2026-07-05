@@ -414,7 +414,7 @@ export function Titlebar() {
         <ViewTab
           onClick={openFluidEditor}
           active={activeView === "editor" && editorPageLayout === "fluid"}
-          title="Livre (Ctrl+1)"
+          title="Livre"
         >
           <FileText size={12} />
           <span className="text-[0.7rem]">Livre</span>
@@ -430,7 +430,7 @@ export function Titlebar() {
         <ViewTab
           onClick={() => setActiveView("canvas")}
           active={activeView === "canvas"}
-          title="Canvas (Ctrl+2)"
+          title="Canvas"
         >
           <LayoutGrid size={12} />
           <span className="text-[0.7rem]">Canvas</span>

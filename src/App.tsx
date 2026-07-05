@@ -36,7 +36,6 @@ export default function App() {
   const toggleOutline = useAppStore((s) => s.toggleOutline);
   const toggleInspector = useAppStore((s) => s.toggleInspector);
   const setActiveView = useAppStore((s) => s.setActiveView);
-  const setEditorPageLayout = useAppStore((s) => s.setEditorPageLayout);
   const setUpdateStatus = useAppStore((s) => s.setUpdateStatus);
   const openSettings = useAppStore((s) => s.openSettings);
   const openCommandPalette = useAppStore((s) => s.openCommandPalette);
@@ -289,18 +288,21 @@ export default function App() {
         e.preventDefault();
         openGlobalSearch();
       }
-      if (ctrl && e.key === "1") {
+      // Ctrl+1..8 ativa a N-esima aba aberta; Ctrl+9 vai pra ULTIMA aba
+      // (convencao de browser: Chrome/Firefox). Sem aba naquela posicao =
+      // no-op. Ativar tambem tira da Home pro editor, igual clicar na aba.
+      if (ctrl && !e.shiftKey && e.key >= "1" && e.key <= "9") {
+        const { openTabs, activeFilePath, activeView } = useAppStore.getState();
+        if (openTabs.length === 0) return;
+        const idx = e.key === "9" ? openTabs.length - 1 : Number(e.key) - 1;
+        const tab = openTabs[idx];
+        if (!tab) return;
         e.preventDefault();
-        setEditorPageLayout("fluid");
-        setActiveView("editor");
-      }
-      if (ctrl && e.key === "2") {
-        e.preventDefault();
-        setActiveView("canvas");
-      }
-      if (ctrl && e.key === "3") {
-        e.preventDefault();
-        setActiveView("home");
+        if (tab.path !== activeFilePath) {
+          void openFile(tab.path, tab.name, { tab: "preserve" });
+        }
+        if (activeView === "home") setActiveView("editor");
+        return;
       }
       // F11 — tratado no listener de capture acima pra evitar que editores
       // (TipTap/prosemirror) consumam o evento. Veja useEffect anterior.
@@ -433,7 +435,6 @@ export default function App() {
     toggleOutline,
     toggleInspector,
     setActiveView,
-    setEditorPageLayout,
     openSettings,
     openCommandPalette,
     openGlobalSearch,

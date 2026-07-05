@@ -102,6 +102,13 @@ export function CanvasView() {
     h: number;
   } | null>(null);
 
+  // Ref pro retangulo do marquee — posicionamos ele imperativamente durante
+  // o arrasto (escrita direta no DOM) em vez de setState por frame. Isso
+  // evita re-render da CanvasView inteira (e de todos os cards/setas/tracos)
+  // a cada pointermove — era a causa do stutter. O state `marquee` acima so'
+  // controla mount/unmount do elemento; a geometria vive no DOM.
+  const marqueeRef = useRef<HTMLDivElement | null>(null);
+
   const snap = (value: number) =>
     canvasSnapToGrid
       ? Math.round(value / canvasGridSize) * canvasGridSize
@@ -594,24 +601,9 @@ export function CanvasView() {
     const rect = el.getBoundingClientRect();
     const startX = e.clientX - rect.left;
     const startY = e.clientY - rect.top;
+    // Monta o retangulo (0x0). A partir daqui NAO tocamos mais o state
+    // durante o arrasto — a geometria e' escrita direto no DOM via ref.
     setMarquee({ x: startX, y: startY, w: 0, h: 0 });
-    let marqueeFrame: number | null = null;
-    let pendingMarquee: typeof marquee = null;
-    const flushMarquee = () => {
-      marqueeFrame = null;
-      if (!pendingMarquee) return;
-      setMarquee(pendingMarquee);
-      pendingMarquee = null;
-    };
-    const scheduleMarquee = (next: NonNullable<typeof marquee>) => {
-      pendingMarquee = next;
-      if (marqueeFrame == null) marqueeFrame = requestAnimationFrame(flushMarquee);
-    };
-    const clearMarqueeFrame = () => {
-      if (marqueeFrame != null) cancelAnimationFrame(marqueeFrame);
-      marqueeFrame = null;
-      pendingMarquee = null;
-    };
 
     startDrag({
       onMove: (ev) => {
@@ -619,10 +611,17 @@ export function CanvasView() {
         const y = Math.min(startY, ev.clientY - rect.top);
         const w = Math.abs(ev.clientX - rect.left - startX);
         const h = Math.abs(ev.clientY - rect.top - startY);
-        scheduleMarquee({ x, y, w, h });
+        // Escrita imperativa: sem setState, sem re-render da arvore. O
+        // browser coalesce as mudancas de style ate' o proximo paint.
+        const node = marqueeRef.current;
+        if (node) {
+          node.style.left = `${x}px`;
+          node.style.top = `${y}px`;
+          node.style.width = `${w}px`;
+          node.style.height = `${h}px`;
+        }
       },
       onEnd: (ev) => {
-        clearMarqueeFrame();
         const endX = ev.clientX - rect.left;
         const endY = ev.clientY - rect.top;
         const x0 = Math.min(startX, endX);
@@ -699,7 +698,6 @@ export function CanvasView() {
         selectMany(ids, ids[0] ?? null);
       },
       onCancel: () => {
-        clearMarqueeFrame();
         setMarquee(null);
       },
     });
@@ -913,6 +911,7 @@ export function CanvasView() {
 
       {marquee && (
         <div
+          ref={marqueeRef}
           className="absolute pointer-events-none"
           style={{
             left: marquee.x,

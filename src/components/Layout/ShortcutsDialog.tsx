@@ -20,9 +20,6 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "Ctrl + Shift + F", label: "Buscar no projeto" },
       { keys: "Ctrl + F", label: "Buscar na nota" },
       { keys: "Ctrl + Alt + H", label: "Histórico local" },
-      { keys: "Ctrl + 1", label: "Ir para livre" },
-      { keys: "Ctrl + 2", label: "Ir para canvas" },
-      { keys: "Ctrl + 3", label: "Ir para início" },
     ],
   },
   {
@@ -33,6 +30,7 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "Ctrl + W", label: "Fechar aba ativa" },
       { keys: "Ctrl + Tab", label: "Próxima aba" },
       { keys: "Ctrl + Shift + Tab", label: "Aba anterior" },
+      { keys: "Ctrl + 1…9", label: "Ir para aba N (9 = última)" },
       { keys: "Ctrl + Shift + T", label: "Reabrir última aba fechada" },
       { keys: "Botão do meio", label: "Fechar aba ou abrir nota em segundo plano" },
     ],
