@@ -6,28 +6,26 @@ import { parseDocument } from "../../lib/frontmatter";
 import { UpdateBanner } from "./UpdateBanner";
 
 /**
- * Landing — versao "biblioteca antiga". Layout editorial centrado num
- * eixo vertical com hierarquia brutal:
+ * Landing editorial centrada num eixo vertical (Quiet Editorial):
  *
- *   PROJETO · METADADOS                  (small-caps serif)
- *   ────────────────                      (filete grosso)
+ *   PROJETO · METADADOS                  (small-caps)
+ *   ─────────────────                     (hairline sutil)
  *
- *   NOME DO PROJETO                       (display serif gigante)
+ *   NOME DO PROJETO                       (display serif grande)
  *
- *   ─────  ❦  ─────                       (ornamento)
+ *   ─────  ❦  ─────                       (ornamento hairline)
  *
- *   ⟶ CONTINUAR LENDO: capitulo 3         (CTA brutalist com sombra chapada)
+ *   ⟶ Continuar {arquivo}                 (CTA pill hairline)
  *
- *   | RECENTES |
+ *   RECENTES
  *   I.  arquivo                           (roman + serif italic + path)
  *   II. arquivo
  *
- *   ⁂ Novo arquivo  ·  Trocar pasta       (acoes secundarias)
+ *   Novo arquivo  ·  Trocar pasta         (acoes secundarias)
  *
- * Diferenca-chave do design anterior: o projeto deixa de ser "um titulo
- * em serifa grande" pra virar uma PLACA — metadados em caps lideram, o
- * nome vem em monumental embaixo. Os recents viram listagem catalogada,
- * nao chip-list. Estado vazio segue a mesma gramatica.
+ * Metadados em caps lideram; o nome vem em display serif embaixo. Os
+ * recents sao listagem numerada em romanos. Estado vazio segue a mesma
+ * gramatica.
  */
 export function HomePage() {
   const rootFolder = useAppStore((s) => s.rootFolder);
@@ -192,8 +190,7 @@ function ProjectHero({
   return (
     <>
       {/* Meta-label acima do titulo: "PROJETO · 3 ARQUIVOS · 12.450 PALAVRAS".
-          Small-caps serif. Funciona como ficha catalografica antes do nome
-          monumental. */}
+          Small-caps (.solon-caps, Inter). Ficha de metadados antes do nome. */}
       <div
         className="solon-caps mb-5 flex items-center gap-3"
         style={{ color: "var(--text-muted)" }}
@@ -206,8 +203,8 @@ function ProjectHero({
             display: "inline-block",
             width: 4,
             height: 4,
-            background: "var(--border-strong)",
-            transform: "rotate(45deg)",
+            background: "var(--text-placeholder)",
+            borderRadius: "var(--radius-pill)",
           }}
         />
         {stats === null ? (
@@ -234,8 +231,8 @@ function ProjectHero({
                     display: "inline-block",
                     width: 4,
                     height: 4,
-                    background: "var(--border-strong)",
-                    transform: "rotate(45deg)",
+                    background: "var(--text-placeholder)",
+                    borderRadius: "var(--radius-pill)",
                   }}
                 />
                 <span className="tabular-nums">
@@ -248,9 +245,9 @@ function ProjectHero({
         )}
       </div>
 
-      {/* Nome do projeto — monumental. Display class consome --font-display
-          com tracking negativo e line-height 0.92. clamp escala no zoom
-          da janela sem explodir em ultrawide. */}
+      {/* Nome do projeto em display serif (.solon-display) — consome
+          --font-display com tracking negativo. clamp escala no zoom da
+          janela sem explodir em ultrawide. */}
       <h1
         className="solon-display mb-6"
         style={{ fontSize: "clamp(2.75rem, 7.5vw, 5rem)" }}
@@ -258,7 +255,7 @@ function ProjectHero({
         {folderName}
       </h1>
 
-      {/* Ornamento — losango central com filetes grossos. Marca a transicao
+      {/* Ornamento — ❦ central entre hairlines suaves. Marca a transicao
           entre "ficha" e "CTA". Sem isso a hero parece dois blocos
           empilhados sem juncao. */}
       <div
@@ -268,9 +265,8 @@ function ProjectHero({
         <span style={{ color: "var(--accent)" }}>❦</span>
       </div>
 
-      {/* CTA brutalist — bloco com sombra chapada que "levanta" no hover.
-          Substitui o link minimalista underline. Texto em serif caps com
-          tracking suave. */}
+      {/* CTA editorial (.solon-cta) — pill hairline que preenche
+          suavemente no hover. Texto em serif, sem caps gritante. */}
       <button
         onClick={onContinue}
         className="solon-cta mb-10 group"
@@ -325,8 +321,8 @@ function ProjectHero({
             display: "inline-block",
             width: 4,
             height: 4,
-            background: "var(--border-strong)",
-            transform: "rotate(45deg)",
+            background: "var(--text-placeholder)",
+            borderRadius: "var(--radius-pill)",
           }}
         />
         <button
@@ -367,7 +363,7 @@ function EmptyHero({ onOpenFolder }: { onOpenFolder: () => void }) {
         <span style={{ color: "var(--accent)" }}>❦</span>
       </div>
       <p
-        className="font-serif italic text-base mb-10 leading-relaxed"
+        className="italic text-base mb-10 leading-relaxed"
         style={{ color: "var(--text-muted)", maxWidth: "34ch" }}
       >
         Cada arquivo é uma cena. Cada pasta, um livro. Comece abrindo um
@@ -422,12 +418,11 @@ function RecentsList({
             <li key={f.path}>
               <button
                 onClick={() => onOpen(f.path, f.name)}
-                className="w-full flex items-center gap-4 px-3 py-2.5 text-left transition-colors"
+                className="group/recent w-full flex items-center gap-3.5 px-3 py-2 text-left transition-colors"
                 style={{
                   background: "transparent",
                   color: "var(--text-secondary)",
-                  borderTop: idx === 0 ? "1px solid var(--border)" : "none",
-                  borderBottom: "1px solid var(--border)",
+                  borderRadius: "var(--radius)",
                 }}
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.background = "var(--bg-hover)")
@@ -439,7 +434,7 @@ function RecentsList({
               >
                 <span
                   className="solon-roman flex-shrink-0"
-                  style={{ width: "2.25rem", textAlign: "right" }}
+                  style={{ width: "2rem", textAlign: "right" }}
                   aria-hidden
                 >
                   {toRoman(idx + 1)}.
@@ -447,7 +442,7 @@ function RecentsList({
                 <span
                   className="truncate flex-1"
                   style={{
-                    fontFamily: "var(--font-display)",
+                    fontFamily: "var(--font-ui)",
                     fontSize: "0.95rem",
                     fontStyle: "italic",
                     color: "var(--text-primary)",
@@ -456,11 +451,11 @@ function RecentsList({
                   {display}
                 </span>
                 <span
-                  className="solon-caps--sm flex-shrink-0"
-                  style={{ color: "var(--text-placeholder)" }}
+                  className="flex-shrink-0 opacity-0 group-hover/recent:opacity-100 transition-opacity"
+                  style={{ color: "var(--text-placeholder)", fontSize: "0.85rem" }}
                   aria-hidden
                 >
-                  ⟶
+                  →
                 </span>
               </button>
             </li>

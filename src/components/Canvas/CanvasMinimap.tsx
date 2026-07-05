@@ -71,9 +71,9 @@ export function CanvasMinimap() {
         width: MINIMAP_W,
         height: MINIMAP_H,
         background: "color-mix(in srgb, var(--bg-panel) 92%, transparent)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat-sm)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
+        boxShadow: "var(--shadow-md)",
       }}
       onPointerDown={onPointerDown}
       onMouseDown={(e) => e.stopPropagation()}

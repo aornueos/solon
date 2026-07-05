@@ -179,14 +179,12 @@ function ThemePicker({
         aria-expanded={open}
         title="Tema visual"
         onClick={() => setOpen((o) => !o)}
-        className="h-6 ml-0.5 px-2 text-[0.7rem] inline-flex items-center gap-1 transition-colors outline-none"
+        className="h-6 ml-0.5 px-2 text-[0.72rem] inline-flex items-center gap-1 transition-colors outline-none"
         style={{
           background: open ? "var(--bg-hover)" : "transparent",
           color: open ? "var(--text-primary)" : "var(--text-secondary)",
-          border: "1.5px solid var(--border-strong)",
-          borderRadius: 0,
-          fontFamily: "var(--font-display)",
-          letterSpacing: "0.04em",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius-sm)",
         }}
       >
         <span>{current?.label ?? "Tema"}</span>
@@ -197,14 +195,14 @@ function ThemePicker({
         <div
           role="listbox"
           aria-label="Temas"
-          className="absolute right-0 mt-1 overflow-hidden z-[60]"
+          className="absolute right-0 mt-1.5 overflow-hidden z-[60]"
           style={{
             top: "100%",
             minWidth: 180,
             background: "var(--bg-panel)",
-            border: "2px solid var(--border-strong)",
-            borderRadius: 0,
-            boxShadow: "var(--shadow-flat-sm)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            boxShadow: "var(--shadow-md)",
             color: "var(--text-primary)",
           }}
         >
@@ -240,10 +238,7 @@ function ThemePicker({
                       style={{
                         background: active ? "var(--accent-soft)" : "transparent",
                         color: active ? "var(--accent)" : "var(--text-secondary)",
-                        fontWeight: active ? 600 : 400,
-                        borderLeft: active
-                          ? "2px solid var(--accent)"
-                          : "2px solid transparent",
+                        fontWeight: active ? 500 : 400,
                       }}
                       onMouseEnter={(e) => {
                         if (!active) {
@@ -330,10 +325,9 @@ export function Titlebar() {
       data-tauri-drag-region
       onDoubleClick={onTitlebarDoubleClick}
     >
-      {/* Wordmark — caps espacadas SOLON (.solon-wordmark consome
-          --font-display + tracking-wordmark 0.32em). Sai do serif
-          lowercase pra ganhar peso de logotipo editorial. */}
-      <div className="px-4 flex items-center gap-3">
+      {/* Wordmark "Solon" — serifa Lora title case (.solon-wordmark).
+          A assinatura literaria e calma do app. */}
+      <div className="px-4 flex items-center gap-2.5">
         <button
           onClick={() => setActiveView("home")}
           onMouseDown={(e) => e.stopPropagation()}
@@ -350,20 +344,13 @@ export function Titlebar() {
         </button>
         {activeFileName && (
           <>
-            {/* Separador editorial — losango pequeno girado, mesma gramatica
-                dos separadores da HomePage e StatusBar. Substitui o "/"
-                neutro por algo coerente com o vocabulario do app. */}
+            {/* Separador discreto — middot editorial calmo. */}
             <span
               aria-hidden
-              style={{
-                display: "inline-block",
-                width: 4,
-                height: 4,
-                background: "var(--border-strong)",
-                transform: "rotate(45deg)",
-                opacity: 0.7,
-              }}
-            />
+              style={{ color: "var(--text-placeholder)", fontSize: "0.8rem" }}
+            >
+              /
+            </span>
             <button
               onClick={() => setActiveView("editor")}
               onMouseDown={(e) => e.stopPropagation()}
@@ -371,7 +358,7 @@ export function Titlebar() {
               aria-label="Ir para escrita"
               className="truncate max-w-[260px] transition-opacity hover:opacity-70"
               style={{
-                fontFamily: "var(--font-display)",
+                fontFamily: "var(--font-ui)",
                 fontSize: "0.82rem",
                 fontStyle: "italic",
                 color: "var(--text-secondary)",
@@ -384,12 +371,11 @@ export function Titlebar() {
             </button>
             {status && (
               <span
-                className="solon-caps--sm px-1.5 py-[3px]"
+                className="solon-caps--sm px-2 py-[3px]"
                 style={{
                   background: `${status.color}1f`,
                   color: status.color,
-                  border: `1px solid ${status.color}55`,
-                  borderRadius: 0,
+                  borderRadius: "var(--radius-pill)",
                   textTransform: "uppercase",
                 }}
                 title={`Status: ${status.label}`}
@@ -400,7 +386,7 @@ export function Titlebar() {
             {sceneMeta.pov && (
               <span
                 style={{
-                  fontFamily: "var(--font-display)",
+                  fontFamily: "var(--font-ui)",
                   fontSize: "0.72rem",
                   fontStyle: "italic",
                   color: "var(--text-muted)",
@@ -416,14 +402,13 @@ export function Titlebar() {
       {/* Espaço arrastável */}
       <div className="flex-1" data-tauri-drag-region />
 
-      {/* Toggle de visão (Livre / Página / Canvas) — borda fina ao inves
-          de fundo solido, cantos retos. Coerencia com a linguagem
-          brutalist do chrome novo. */}
+      {/* Toggle de visão (Livre / Página / Canvas) — pill segmentado
+          suave: fundo leve, cantos arredondados, sem borda dura. */}
       <div
-        className="flex items-center gap-0 p-0 mr-2"
+        className="flex items-center gap-0.5 p-0.5 mr-2"
         style={{
-          border: "1.5px solid var(--border-strong)",
-          background: "var(--bg-panel)",
+          background: "var(--bg-hover)",
+          borderRadius: "var(--radius-pill)",
         }}
       >
         <ViewTab
@@ -624,16 +609,17 @@ function ViewTab({
       style={
         active
           ? {
-              background: "var(--text-primary)",
-              color: "var(--text-inverse)",
+              background: "var(--bg-panel)",
+              color: "var(--text-primary)",
               cursor: "default",
-              borderRadius: 0,
+              borderRadius: "var(--radius-pill)",
+              boxShadow: "var(--shadow-sm)",
             }
           : {
               color: "var(--text-muted)",
               background: "transparent",
               cursor: "default",
-              borderRadius: 0,
+              borderRadius: "var(--radius-pill)",
             }
       }
     >
@@ -653,8 +639,7 @@ function IconBtn({
   active?: boolean;
   title?: string;
 }) {
-  // Botao da Titlebar — cantos retos, borda accent quando ativo (em vez
-  // de fundo cinza). Coerencia com ToolBtn do EditorToolbar.
+  // Botao da Titlebar — cantos suaves, tint accent suave quando ativo.
   return (
     <button
       onClick={onClick}
@@ -663,25 +648,22 @@ function IconBtn({
       aria-pressed={active}
       className="transition-colors flex items-center justify-center"
       style={{
-        width: 26,
-        height: 24,
+        width: 28,
+        height: 26,
         color: active ? "var(--accent)" : "var(--text-placeholder)",
         background: active ? "var(--accent-soft)" : "transparent",
-        border: active ? "1px solid var(--accent)" : "1px solid transparent",
-        borderRadius: 0,
+        borderRadius: "var(--radius-sm)",
         cursor: "default",
       }}
       onMouseEnter={(e) => {
         if (active) return;
         (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)";
         (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-        (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)";
       }}
       onMouseLeave={(e) => {
         if (active) return;
         (e.currentTarget as HTMLElement).style.color = "var(--text-placeholder)";
         (e.currentTarget as HTMLElement).style.background = "transparent";
-        (e.currentTarget as HTMLElement).style.borderColor = "transparent";
       }}
     >
       {children}

@@ -680,9 +680,9 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
             left: toolbarPos.left,
             top: toolbarPos.top,
             background: "var(--bg-panel)",
-            border: "1.5px solid var(--border-strong)",
-            borderRadius: 0,
-            boxShadow: "var(--shadow-flat-sm)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            boxShadow: "var(--shadow-sm)",
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -808,7 +808,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
                       border: text.size === s
                         ? "1px solid var(--accent)"
                         : "1px solid var(--border-strong)",
-                      borderRadius: 0,
+                      borderRadius: "var(--radius-sm)",
                       fontFamily: "var(--font-mono)",
                     }}
                   >
@@ -1067,9 +1067,9 @@ function Popover({ children }: { children: React.ReactNode }) {
       className="absolute top-full left-0 mt-1 flex gap-1 px-1.5 py-1 z-30"
       style={{
         background: "var(--bg-panel)",
-        border: "1.5px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat-sm)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
+        boxShadow: "var(--shadow-md)",
       }}
     >
       {children}
@@ -1112,7 +1112,7 @@ function TinyBtn({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="p-1 transition-colors"
-      style={{ background: bg, color: fg, borderRadius: 0 }}
+      style={{ background: bg, color: fg, borderRadius: "var(--radius-sm)" }}
     >
       {children}
     </button>

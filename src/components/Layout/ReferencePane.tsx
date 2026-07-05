@@ -70,7 +70,7 @@ export function ReferencePane({
           className="truncate flex-1"
           title={path}
           style={{
-            fontFamily: "var(--font-display)",
+            fontFamily: "var(--font-ui)",
             fontStyle: "italic",
             fontSize: "0.85rem",
             color: "var(--text-primary)",

@@ -824,10 +824,10 @@ export function CanvasView() {
             style={{
               color: "var(--text-secondary)",
               background: "var(--bg-panel)",
-              border: "2px solid var(--border-strong)",
-              borderRadius: 0,
-              boxShadow: "var(--shadow-flat-sm)",
-              fontFamily: "var(--font-display)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              boxShadow: "var(--shadow-md)",
+              fontFamily: "var(--font-ui)",
               fontSize: "0.9rem",
               fontStyle: "italic",
             }}
@@ -934,11 +934,11 @@ export function CanvasView() {
             left: Math.min(emptyLinkMenu.screenX + 10, window.innerWidth - 180),
             top: Math.min(emptyLinkMenu.screenY + 10, window.innerHeight - 110),
             background: "var(--bg-panel)",
-            border: "2px solid var(--border-strong)",
-            borderRadius: 0,
-            boxShadow: "var(--shadow-flat-sm)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            boxShadow: "var(--shadow-md)",
             color: "var(--text-primary)",
-            fontFamily: "var(--font-display)",
+            fontFamily: "var(--font-ui)",
           }}
           onMouseDown={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
@@ -996,10 +996,10 @@ export function CanvasView() {
           style={{
             background: "var(--bg-inverse)",
             color: "var(--text-inverse)",
-            border: "2px solid var(--bg-inverse)",
-            borderRadius: 0,
-            boxShadow: "var(--shadow-flat-sm)",
-            fontFamily: "var(--font-display)",
+            border: "1px solid var(--bg-inverse)",
+            borderRadius: "var(--radius-pill)",
+            boxShadow: "var(--shadow-md)",
+            fontFamily: "var(--font-ui)",
             fontSize: "0.78rem",
             fontStyle: "italic",
           }}
@@ -1016,10 +1016,10 @@ export function CanvasView() {
           style={{
             background: "var(--danger)",
             color: "var(--text-inverse)",
-            border: "2px solid var(--danger)",
-            borderRadius: 0,
-            boxShadow: "var(--shadow-flat-sm)",
-            fontFamily: "var(--font-display)",
+            border: "1px solid var(--danger)",
+            borderRadius: "var(--radius-pill)",
+            boxShadow: "var(--shadow-md)",
+            fontFamily: "var(--font-ui)",
             fontSize: "0.78rem",
             fontStyle: "italic",
           }}

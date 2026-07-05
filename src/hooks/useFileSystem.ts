@@ -523,7 +523,15 @@ export function useFileSystem() {
         assertInsideProject(rootFolder, oldPath, "Origem");
         assertInsideProject(rootFolder, newPath, "Destino");
         if (!isFolder) assertProjectNotePath(rootFolder, newPath, "Arquivo");
-        if (await exists(newPath)) {
+        // Em FS case-insensitive (Windows/macOS default), exists(newPath)
+        // retorna true pro PROPRIO arquivo quando so' a caixa muda ("um
+        // nota" → "Um Nota"). Sem esse guard o rename de caixa era barrado
+        // com "Ja' existe um item com esse nome". rename() direto de caixa
+        // funciona nessas plataformas — o guard so' evita o falso conflito.
+        const isCaseOnlyRename =
+          normalizedPath(oldPath).toLowerCase() ===
+          normalizedPath(newPath).toLowerCase();
+        if (!isCaseOnlyRename && (await exists(newPath))) {
           useAppStore
             .getState()
             .pushToast("error", "Já existe um item com esse nome.");

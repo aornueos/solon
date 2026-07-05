@@ -93,7 +93,7 @@ export function LocalHistoryDialog() {
         <div className="solon-dialog-header">
           <div className="flex items-center gap-2.5">
             <Clock size={15} style={{ color: "var(--accent)" }} />
-            <span className="solon-plaque solon-plaque--lg">Histórico</span>
+            <span className="solon-dialog-title">Histórico</span>
           </div>
           <button onClick={close} aria-label="Fechar" className="solon-dialog-close">
             <X size={14} />
@@ -103,14 +103,14 @@ export function LocalHistoryDialog() {
         <div className="grid grid-cols-[260px_1fr] min-h-[420px]">
           <div
             className="overflow-y-auto p-2"
-            style={{ borderRight: "2px solid var(--border-strong)" }}
+            style={{ borderRight: "1px solid var(--border-subtle)" }}
           >
             {loading ? (
               <div
                 className="px-2 py-6 text-center italic"
                 style={{
                   color: "var(--text-muted)",
-                  fontFamily: "var(--font-display)",
+                  fontFamily: "var(--font-ui)",
                   fontSize: "0.82rem",
                 }}
               >
@@ -121,7 +121,7 @@ export function LocalHistoryDialog() {
                 className="px-2 py-6 text-center italic"
                 style={{
                   color: "var(--text-muted)",
-                  fontFamily: "var(--font-display)",
+                  fontFamily: "var(--font-ui)",
                   fontSize: "0.82rem",
                 }}
               >
@@ -136,18 +136,15 @@ export function LocalHistoryDialog() {
                     onClick={() => setSelected(item)}
                     className="w-full text-left px-2.5 py-2 mb-0.5 transition-colors"
                     style={{
-                      background: active ? "var(--bg-hover)" : "transparent",
-                      color: "var(--text-primary)",
-                      borderLeft: active
-                        ? "3px solid var(--accent)"
-                        : "3px solid transparent",
-                      borderRadius: 0,
+                      background: active ? "var(--accent-soft)" : "transparent",
+                      color: active ? "var(--accent)" : "var(--text-primary)",
+                      borderRadius: "var(--radius-sm)",
                     }}
                   >
                     <span
                       className="block"
                       style={{
-                        fontFamily: "var(--font-display)",
+                        fontFamily: "var(--font-ui)",
                         fontSize: "0.82rem",
                         fontWeight: active ? 600 : 500,
                       }}
@@ -176,7 +173,7 @@ export function LocalHistoryDialog() {
                 <h3
                   className="truncate mt-0.5"
                   style={{
-                    fontFamily: "var(--font-display)",
+                    fontFamily: "var(--font-ui)",
                     fontSize: "1.15rem",
                     fontWeight: 700,
                     letterSpacing: "-0.01em",
@@ -189,7 +186,7 @@ export function LocalHistoryDialog() {
                     className="mt-0.5"
                     style={{
                       color: "var(--text-muted)",
-                      fontFamily: "var(--font-display)",
+                      fontFamily: "var(--font-ui)",
                       fontStyle: "italic",
                       fontSize: "0.78rem",
                     }}
@@ -211,10 +208,10 @@ export function LocalHistoryDialog() {
               className="flex-1 overflow-y-auto p-4 leading-relaxed whitespace-pre-wrap"
               style={{
                 background: "var(--bg-app)",
-                border: "2px solid var(--border-strong)",
-                borderRadius: 0,
+                border: "1px solid var(--border-subtle)",
+                borderRadius: "var(--radius)",
                 color: "var(--text-secondary)",
-                fontFamily: "var(--font-display)",
+                fontFamily: "var(--font-ui)",
                 fontSize: "0.92rem",
               }}
             >

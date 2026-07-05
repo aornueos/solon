@@ -94,7 +94,7 @@ export function WorkspaceHealthDialog() {
           <div className="flex items-center gap-2.5 min-w-0">
             <ShieldCheck size={16} style={{ color: "var(--accent)" }} />
             <div className="min-w-0">
-              <span className="solon-plaque solon-plaque--lg">Diagnóstico</span>
+              <span className="solon-dialog-title">Diagnóstico</span>
               <p className="solon-dialog-subtitle truncate">
                 {report
                   ? `${report.scannedFiles} notas verificadas`
@@ -123,7 +123,7 @@ export function WorkspaceHealthDialog() {
 
         <div
           className="grid grid-cols-3 gap-3 px-5 py-3.5"
-          style={{ borderBottom: "2px solid var(--border-strong)" }}
+          style={{ borderBottom: "1px solid var(--border-subtle)" }}
         >
           <Metric label="Erros" value={counts.error} tone="error" />
           <Metric label="Avisos" value={counts.warning} tone="warning" />
@@ -140,7 +140,7 @@ export function WorkspaceHealthDialog() {
               </span>
               <p
                 style={{
-                  fontFamily: "var(--font-display)",
+                  fontFamily: "var(--font-ui)",
                   fontSize: "0.95rem",
                   fontWeight: 600,
                 }}
@@ -151,7 +151,7 @@ export function WorkspaceHealthDialog() {
                 className="italic"
                 style={{
                   color: "var(--text-muted)",
-                  fontFamily: "var(--font-display)",
+                  fontFamily: "var(--font-ui)",
                   fontSize: "0.8rem",
                 }}
               >
@@ -163,18 +163,17 @@ export function WorkspaceHealthDialog() {
               <button
                 key={issue.id}
                 onClick={() => void openIssue(issue)}
-                className="w-full px-5 py-2.5 text-left flex items-start gap-3 transition-colors"
+                className="w-full px-4 mx-1 py-2 text-left flex items-start gap-3 transition-colors"
                 style={{
                   color: "var(--text-primary)",
-                  borderLeft: "3px solid transparent",
+                  borderRadius: "var(--radius-sm)",
+                  width: "calc(100% - 0.5rem)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.borderLeftColor = "var(--accent)";
+                  e.currentTarget.style.background = "var(--accent-soft)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.borderLeftColor = "transparent";
                 }}
               >
                 <IssueIcon severity={issue.severity} />
@@ -182,7 +181,7 @@ export function WorkspaceHealthDialog() {
                   <span className="flex items-center gap-2">
                     <span
                       style={{
-                        fontFamily: "var(--font-display)",
+                        fontFamily: "var(--font-ui)",
                         fontSize: "0.88rem",
                         fontWeight: 600,
                       }}
@@ -197,7 +196,7 @@ export function WorkspaceHealthDialog() {
                     className="block truncate italic"
                     style={{
                       color: "var(--text-secondary)",
-                      fontFamily: "var(--font-display)",
+                      fontFamily: "var(--font-ui)",
                       fontSize: "0.76rem",
                     }}
                   >
@@ -241,9 +240,9 @@ function Metric({
       className="px-3 py-2"
       style={{
         background: "var(--bg-panel-2)",
-        border: "1.5px solid var(--border-strong)",
-        borderRadius: 0,
-        borderLeftWidth: 4,
+        border: "1px solid var(--border-subtle)",
+        borderRadius: "var(--radius)",
+        borderLeftWidth: 2,
         borderLeftColor: color,
       }}
     >
@@ -252,7 +251,7 @@ function Metric({
         className="tabular-nums"
         style={{
           color,
-          fontFamily: "var(--font-display)",
+          fontFamily: "var(--font-ui)",
           fontSize: "1.4rem",
           fontWeight: 700,
           letterSpacing: "-0.02em",
@@ -276,7 +275,7 @@ function Empty({ text }: { text: string }) {
       className="px-5 py-10 text-center italic"
       style={{
         color: "var(--text-muted)",
-        fontFamily: "var(--font-display)",
+        fontFamily: "var(--font-ui)",
         fontSize: "0.82rem",
       }}
     >

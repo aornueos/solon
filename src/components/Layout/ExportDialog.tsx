@@ -130,7 +130,7 @@ export function ExportDialog() {
         <div className="solon-dialog-header shrink-0">
           <div className="inline-flex items-center gap-2.5">
             <FileDown size={15} style={{ color: "var(--accent)" }} />
-            <span className="solon-plaque solon-plaque--lg">
+            <span className="solon-dialog-title">
               {format === "docx" ? "Manuscrito" : "Exportar PDF"}
             </span>
           </div>

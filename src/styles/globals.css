@@ -721,24 +721,41 @@
 }
 
 /* ─────────────────────────────────────────
-   Design tokens — Dark Academia + Brutalist (0.9.26)
-   Tokens derivados que herdam dos tokens de tema (--border-strong,
-   --bg-panel, etc) ja' definidos por paper variant. Centralizar aqui
-   evita repetir borda-pesada/sombra-chapada/serifa-display em cada
-   componente — todo chrome novo consome essas vars e segue cada tema
-   automaticamente.
+   Design tokens — Quiet Editorial (0.9.31)
+   Minimalismo com presenca. A personalidade vive na TIPOGRAFIA (serifa
+   Lora editorial) e no RESPIRO, nao em molduras. Hairlines de 1px usadas
+   com parcimonia, cantos suaves consistentes, sombras macias e difusas
+   so' em superficies flutuantes. Nada de bordas grossas, cantos 90° ou
+   sombras chapadas — o foco e' a pagina.
+
+   Os tokens herdam dos tokens de tema (--border, --bg-panel, etc) ja'
+   definidos por paper variant — trocar tema repinta tudo sozinho.
 ───────────────────────────────────────── */
 :root {
-  --border-heavy: 2px solid var(--border-strong);
-  --border-medium: 1.5px solid var(--border);
-  --shadow-flat: 3px 3px 0 var(--border-strong);
-  --shadow-flat-sm: 2px 2px 0 var(--border-strong);
+  /* Cantos suaves consistentes. Tudo arredondado; nada de 90°. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius: 9px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
   --font-display: "Lora", "EB Garamond", Georgia, serif;
   --font-ui: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --tracking-caps: 0.22em;
-  --tracking-caps-tight: 0.14em;
-  --tracking-wordmark: 0.32em;
+  --tracking-label: 0.09em;
+
+  /* Compat: muitos componentes ainda referenciam estes tokens inline
+     (heranca do design brutalist anterior). Redefinidos aqui pra
+     hairline/soft — assim toda referencia inline vira minimalista
+     SEM precisar tocar cada arquivo. As sombras chapadas (offset solido)
+     viram sombras macias difusas dos tokens de tema. */
+  --border-heavy: 1px solid var(--border);
+  --border-medium: 1px solid var(--border-subtle);
+  --shadow-flat: var(--shadow-md);
+  --shadow-flat-sm: var(--shadow-sm);
+  /* Sombra pra superficies flutuantes (dialogs, popovers) — um pouco
+     mais presente que shadow-md mas ainda macia e difusa. */
+  --shadow-pop: var(--shadow-md);
 }
 
 @layer base {
@@ -846,97 +863,67 @@
     }
   }
 
-  /* Scrollbars brutalist: 9px (largura industrial), thumb em
-     border-strong com bordas retas (border-radius 0). Hover engrossa
-     pra accent. Coerente com o vocabulario de bordas pesadas do app. */
-  ::-webkit-scrollbar { width: 9px; height: 9px; }
-  ::-webkit-scrollbar-track {
-    background: var(--bg-panel-2);
-    border-left: 1px solid var(--border);
-  }
+  /* Scrollbars discretas: finas, thumb arredondado e suave, track
+     transparente. Some no descanso visual; aparece so' quando precisa. */
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
     background: var(--border-strong);
-    border-radius: 0;
-    border: 1px solid var(--bg-panel-2);
+    border-radius: var(--radius-pill);
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--accent);
+    background: var(--text-muted);
+    background-clip: padding-box;
   }
-  ::-webkit-scrollbar-corner {
-    background: var(--bg-panel-2);
-  }
-  /* Firefox fallback — scoped a html (herda pros filhos). Evitamos o
-     seletor universal `*` que forcava recomputo de estilo por-elemento
-     em toda a arvore (custo desnecessario; o app roda no WebView2 =
-     Chromium, que ja' usa ::-webkit-scrollbar acima). */
-  html { scrollbar-color: var(--border-strong) var(--bg-panel-2); }
+  ::-webkit-scrollbar-corner { background: transparent; }
+  /* Firefox fallback — scoped a html (herda). Evita o seletor universal
+     `*` que forcava recomputo por-elemento. */
+  html { scrollbar-color: var(--border-strong) transparent; }
 }
 
 /* ─────────────────────────────────────────
-   Chrome editorial — plaquetas, ornamentos, blocos brutalistas
+   Chrome editorial — Quiet Editorial
    Vocabulario visual compartilhado entre Sidebar/Outline/Inspector/
-   HomePage/StatusBar/Dialogs. Cada utility consome tokens de tema:
-   trocar paper variant repinta tudo sem tocar nos componentes.
+   HomePage/StatusBar/Dialogs. A personalidade vem da serifa Lora nos
+   titulos e do respiro; labels sao discretos. Cada utility consome
+   tokens de tema — trocar paper variant repinta tudo sozinho.
 ───────────────────────────────────────── */
 
-/* Plaqueta `| TITULO |` — placa de biblioteca antiga. Serifa display
-   em small-caps com pipes em ::before/::after (filete vertical 1px na
-   altura do x-height). Usado nos headers de Sidebar/Outline/Inspector
-   e em dialogs. Combina com .solon-plaque-bar pra ganhar filete grosso
-   embaixo. */
+/* Label de secao — small-caps Inter discreto. Substitui a antiga
+   "plaqueta" com pipes/filete grosso. Usado nos headers de Sidebar/
+   Outline/Inspector e em dialogs. Calmo: a hierarquia vem do peso e
+   do espacamento, nao de molduras. */
 .solon-plaque {
-  font-family: var(--font-display);
-  font-size: 0.72rem;
+  font-family: var(--font-ui);
+  font-size: 0.66rem;
   font-weight: 600;
-  /* Tracking apertado (caps-tight 0.14em em vez de caps 0.22em) pra
-     caber em paineis estreitos (Sidebar/Outline 200px) sem truncar.
-     A serifa display ja' carrega elegancia mesmo sem espacamento largo. */
-  letter-spacing: var(--tracking-caps-tight);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   gap: 0.45em;
   line-height: 1;
 }
-.solon-plaque::before,
-.solon-plaque::after {
-  content: "";
-  display: block;
-  width: 1.5px;
-  height: 0.85em;
-  background: var(--border-strong);
-}
 .solon-plaque--lg {
-  font-size: 0.82rem;
-  /* Em dialogs (.lg) ha' espaco — abre o tracking pra mais elegancia. */
-  letter-spacing: var(--tracking-caps);
-}
-.solon-plaque--lg::before,
-.solon-plaque--lg::after {
-  width: 2px;
-  height: 0.95em;
+  font-size: 0.72rem;
 }
 
-/* Wrapper que da' filete grosso embaixo da plaqueta. Aplicar no row
-   inteiro do header pra que o filete atravesse o painel inteiro,
-   nao so' embaixo das letras. */
+/* Header de painel — hairline sutil embaixo. */
 .solon-plaque-bar {
-  /* Filete fino sob o header do painel. Antes 2px strong — com 3 paineis
-     visiveis (Sidebar/Outline/Inspector) viravam 3 linhas grossas
-     competindo com a pagina. A plaqueta em si (texto + pipes) carrega a
-     identidade; a linha so' precisa separar. */
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-/* Divisor ornado central com losango — pra HomePage e separadores
-   de cena fora do editor. Mais quente que <hr>. */
+/* Divisor ornado central com losango/❦ — HomePage e separadores fora
+   do editor. Filetes hairline bem suaves; a personalidade e' o glifo. */
 .solon-divider-ornate {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  color: var(--text-muted);
-  font-size: 0.7rem;
+  gap: 0.85rem;
+  color: var(--text-placeholder);
+  font-size: 0.78rem;
   line-height: 1;
   user-select: none;
 }
@@ -945,143 +932,130 @@
   content: "";
   flex: 1;
   height: 1px;
-  background: var(--border-strong);
+  background: var(--border-subtle);
 }
 
-/* Display serif gigante — HomePage hero e cabec,alhos de dialog peso
-   editorial. line-height 0.92 e tracking negativo simulam capa de livro.
-   Responsive font-size via clamp para nao explodir em ultrawide. */
+/* Display serif — HomePage hero e titulos editoriais. Lora carrega a
+   alma literaria do app. Peso 600 (nao 700) e tracking levemente
+   negativo: presente mas sem gritar. */
 .solon-display {
   font-family: var(--font-display);
-  font-weight: 700;
-  line-height: 0.92;
-  letter-spacing: -0.035em;
+  font-weight: 600;
+  line-height: 0.98;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
 }
 
-/* Label serif compacto em small-caps. Quente; substitui Inter uppercase
-   em metadados editoriais. Pra metadados de codigo continua o mono. */
+/* Label small-caps compacto — metadados editoriais. Inter discreto. */
 .solon-caps {
-  font-family: var(--font-display);
-  font-size: 0.66rem;
+  font-family: var(--font-ui);
+  font-size: 0.64rem;
   font-weight: 600;
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   color: var(--text-muted);
 }
 .solon-caps--sm {
-  font-size: 0.6rem;
-  letter-spacing: var(--tracking-caps);
+  font-size: 0.58rem;
+  letter-spacing: var(--tracking-label);
 }
 
-/* Wordmark "SOLON" — caps espacadas. Titlebar e dialogs. */
+/* Wordmark "Solon" — serifa Lora em title case. A assinatura do app:
+   warm, literaria, calma. Sem caps gritante nem tracking exagerado. */
 .solon-wordmark {
   font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: var(--tracking-wordmark);
-  text-transform: uppercase;
-  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-size: 1.02rem;
   color: var(--text-primary);
 }
 
-/* Numeracao romana editorial — recents na HomePage, itens enumerados.
-   Mono pra alinhamento tabular + tracking pra dar respiro. */
+/* Numeracao editorial — recents na HomePage. Serifa italica leve em
+   vez de mono "tecnico"; combina com o tom literario. */
 .solon-roman {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
+  font-family: var(--font-ui);
+  font-style: italic;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
   font-feature-settings: "tnum" 1;
   color: var(--text-placeholder);
-  text-transform: uppercase;
 }
 
-/* Bloco brutalista — 90° corners, borda 2px solid, sombra chapada.
-   Pra cards na HomePage (Recents, hero), dialog cards, popovers
-   importantes. Sombra usa --border-strong (mesma cor da borda) pra
-   ter look de carimbo/imprensa, nao de elevacao. */
+/* Bloco/card minimalista — hairline, cantos suaves, sombra macia
+   opcional. Substitui o bloco brutalist. */
 .solon-block {
-  border: 2px solid var(--border-strong);
+  border: 1px solid var(--border);
   background: var(--bg-panel);
-  border-radius: 0;
+  border-radius: var(--radius);
   position: relative;
 }
 .solon-block--shadow {
-  box-shadow: var(--shadow-flat);
+  box-shadow: var(--shadow-md);
 }
 .solon-block--shadow-sm {
-  box-shadow: var(--shadow-flat-sm);
+  box-shadow: var(--shadow-sm);
 }
 .solon-block--lift {
-  transition: transform 140ms ease, box-shadow 140ms ease;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
 .solon-block--lift:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 var(--border-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
 }
 .solon-block--lift:active {
-  transform: translate(1px, 1px);
-  box-shadow: 1px 1px 0 var(--border-strong);
+  transform: translateY(0);
 }
 
-/* Linha "marginalia" — notas laterais editoriais. Aplicado em StatusBar
-   pra dar look de margem de livro: small-caps, separadores em losango
-   suave. */
+/* Marginalia — notas laterais editoriais (StatusBar). Italica serif. */
 .solon-marginalia {
-  font-family: var(--font-display);
-  font-size: 0.68rem;
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
   font-style: italic;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   color: var(--text-muted);
 }
 
-/* Botao "ler" / CTA editorial — borda pesada, hover preenche em accent
-   suave. Substitui CTAs minimalistas em HomePage e dialogs. */
+/* CTA editorial — botao de leitura na HomePage/dialogs. Serifa, cantos
+   suaves, hairline que preenche suavemente no hover. Sem sombra chapada
+   nem caps. Elegante e calmo. */
 .solon-cta {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.92rem;
-  letter-spacing: var(--tracking-caps-tight);
-  text-transform: uppercase;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 1rem;
+  letter-spacing: 0;
   display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.7rem 1.25rem;
-  border: 2px solid var(--text-primary);
+  gap: 0.7rem;
+  padding: 0.6rem 1.3rem;
+  border: 1px solid var(--border-strong);
   background: transparent;
   color: var(--text-primary);
-  border-radius: 0;
+  border-radius: var(--radius-pill);
   cursor: default;
-  transition: background 140ms ease, color 140ms ease, transform 140ms ease,
-    box-shadow 140ms ease;
-  box-shadow: var(--shadow-flat);
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 .solon-cta:hover {
   background: var(--text-primary);
   color: var(--text-inverse);
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 var(--border-strong);
-}
-.solon-cta:active {
-  transform: translate(1px, 1px);
-  box-shadow: 1px 1px 0 var(--border-strong);
+  border-color: var(--text-primary);
 }
 
 /* ─────────────────────────────────────────
-   Dialogs e overlays — vocabulario brutalist compartilhado
-   Substituem rounded-lg/shadow-xl espalhados em SettingsDialog,
-   ShortcutsDialog, ExportDialog, DialogLayer (prompt/confirm), etc.
-   Cada dialog so' precisa trocar as classes — sem repetir estilo.
+   Dialogs e overlays — Quiet Editorial
+   Cantos suaves, hairlines, sombra macia. Cada dialog so' troca classes.
 ───────────────────────────────────────── */
 .solon-dialog-overlay {
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(2px);
 }
 
 .solon-dialog {
   background: var(--bg-panel);
-  border: 2px solid var(--border-strong);
+  border: 1px solid var(--border);
   color: var(--text-primary);
-  box-shadow: var(--shadow-flat);
-  border-radius: 0;
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
 }
 
 .solon-dialog-header {
@@ -1089,24 +1063,21 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.9rem 1.15rem;
-  /* Filete interno fino — a borda 2px do .solon-dialog ja' delimita o
-     modal por fora. Empilhar mais 2px aqui dava look de "moldura dentro
-     de moldura" e roubava atencao do conteudo. */
-  border-bottom: 1px solid var(--border);
+  padding: 0.95rem 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .solon-dialog-title {
-  font-family: var(--font-display);
-  font-size: 1rem;
-  font-weight: 700;
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 
 .solon-dialog-subtitle {
-  font-family: var(--font-display);
-  font-size: 0.74rem;
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
   font-style: italic;
   color: var(--text-muted);
   margin-top: 0.2rem;
@@ -1118,38 +1089,37 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid var(--border-strong);
+  border: none;
   background: transparent;
   color: var(--text-muted);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   cursor: default;
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+  transition: background 140ms ease, color 140ms ease;
   flex-shrink: 0;
 }
 .solon-dialog-close:hover {
-  background: var(--danger);
-  color: var(--text-inverse);
-  border-color: var(--danger);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-/* Botoes de dialog — primario (accent/danger preenchido) e ghost (borda).
-   Substituem rounded/filter-brightness por borda pesada + hover preenchido.
-   Pareados em .solon-dialog-actions com gap consistente. */
 .solon-dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.6rem;
-  padding: 0.85rem 1.15rem;
-  border-top: 1px solid var(--border);
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--border-subtle);
 }
+
+/* Botoes — cantos suaves, hairline. Primario preenche em accent (soft),
+   ghost so' hairline, danger so' tonifica no hover (nao grita por padrao). */
 .solon-btn {
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0;
   padding: 0.45rem 0.95rem;
-  border-radius: 0;
-  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
   background: transparent;
   color: var(--text-secondary);
   cursor: default;
@@ -1158,43 +1128,46 @@
 .solon-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 .solon-btn--primary {
-  border-color: var(--text-primary);
-  background: var(--text-primary);
+  border-color: var(--accent);
+  background: var(--accent);
   color: var(--text-inverse);
 }
 .solon-btn--primary:hover {
-  background: transparent;
-  color: var(--text-primary);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-inverse);
+  filter: brightness(1.08);
 }
 .solon-btn--danger {
-  border-color: var(--danger);
-  background: var(--danger);
-  color: var(--text-inverse);
-}
-.solon-btn--danger:hover {
+  border-color: var(--border);
   background: transparent;
   color: var(--danger);
 }
+.solon-btn--danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--text-inverse);
+}
 
-/* Inputs em dialogs — borda pesada brutalist em vez de rounded + ring sutil.
-   Aplica em prompt/confirm e formularios. */
+/* Inputs — cantos suaves, hairline, focus = borda accent + ring macio. */
 .solon-input {
   width: 100%;
   padding: 0.55rem 0.75rem;
   font-family: var(--font-ui);
   font-size: 0.85rem;
   background: var(--bg-app);
-  border: 1.5px solid var(--border-strong);
-  border-radius: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   outline: none;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 .solon-input:focus {
   border-color: var(--accent);
-  box-shadow: 2px 2px 0 var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 /* ─────────────────────────────────────────
@@ -1836,13 +1809,13 @@ select:focus-visible {
    no dialog sem virar parede de texto.
 ───────────────────────────────────────── */
 .update-notes {
-  font-family: 'Lora', 'EB Garamond', Georgia, serif;
+  font-family: 'Inter', system-ui, sans-serif;
   font-size: 0.95rem;
   line-height: 1.65;
   color: var(--text-secondary);
 }
 .update-notes h1, .update-notes h2, .update-notes h3 {
-  font-family: 'Lora', 'EB Garamond', Georgia, serif;
+  font-family: 'Inter', system-ui, sans-serif;
   color: var(--text-primary);
   font-weight: 700;
   letter-spacing: -0.01em;

@@ -117,7 +117,7 @@ export function GlobalSearchDialog() {
             className="flex-1 bg-transparent outline-none"
             style={{
               color: "var(--text-primary)",
-              fontFamily: "var(--font-display)",
+              fontFamily: "var(--font-ui)",
               fontSize: "1rem",
               letterSpacing: "-0.005em",
             }}
@@ -128,7 +128,7 @@ export function GlobalSearchDialog() {
         </div>
         <div
           className="max-h-[460px] overflow-y-auto py-1"
-          style={{ borderTop: "2px solid var(--border-strong)" }}
+          style={{ borderTop: "1px solid var(--border-subtle)" }}
         >
           {query.trim().length < 1 ? (
             <Empty text="Digite para buscar notas, pastas e conteúdo." />
@@ -141,18 +141,17 @@ export function GlobalSearchDialog() {
               <button
                 key={`${result.path}:${result.line}:${index}`}
                 onClick={() => void go(result)}
-                className="w-full flex items-start gap-3 px-4 py-2.5 text-left transition-colors"
+                className="w-full flex items-start gap-3 px-3 mx-1.5 py-2 text-left transition-colors"
                 style={{
                   color: "var(--text-primary)",
-                  borderLeft: "3px solid transparent",
+                  borderRadius: "var(--radius-sm)",
+                  width: "calc(100% - 0.75rem)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.borderLeftColor = "var(--accent)";
+                  e.currentTarget.style.background = "var(--accent-soft)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.borderLeftColor = "transparent";
                 }}
               >
                 {result.kind === "folder" ? (
@@ -165,7 +164,7 @@ export function GlobalSearchDialog() {
                     <span
                       className="truncate"
                       style={{
-                        fontFamily: "var(--font-display)",
+                        fontFamily: "var(--font-ui)",
                         fontSize: "0.88rem",
                         fontWeight: 600,
                       }}
@@ -185,7 +184,7 @@ export function GlobalSearchDialog() {
                     className="block text-[0.76rem] truncate italic"
                     style={{
                       color: "var(--text-secondary)",
-                      fontFamily: "var(--font-display)",
+                      fontFamily: "var(--font-ui)",
                     }}
                   >
                     {result.snippet}
@@ -206,7 +205,7 @@ function Empty({ text }: { text: string }) {
       className="px-4 py-8 text-center"
       style={{
         color: "var(--text-muted)",
-        fontFamily: "var(--font-display)",
+        fontFamily: "var(--font-ui)",
         fontStyle: "italic",
         fontSize: "0.82rem",
       }}

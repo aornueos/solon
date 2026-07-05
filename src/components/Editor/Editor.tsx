@@ -860,7 +860,7 @@ export function Editor() {
                     editorPaper === "default"
                       ? "var(--text-placeholder)"
                       : "var(--editor-paper-text-placeholder)",
-                  fontFamily: "var(--font-display)",
+                  fontFamily: "var(--font-ui)",
                   fontSize: "1.05rem",
                   lineHeight: 1.6,
                   maxWidth: "42ch",

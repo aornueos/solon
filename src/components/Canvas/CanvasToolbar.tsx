@@ -115,9 +115,9 @@ export function CanvasToolbar() {
       className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 px-2 py-1.5"
       style={{
         background: "var(--bg-panel)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat-sm)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--shadow-md)",
       }}
     >
       {CANVAS_TOOL_ORDER.map((canvasTool, index) => {
@@ -264,18 +264,14 @@ function Btn({
       className="flex items-center gap-1 px-2 py-1 transition-colors"
       style={{
         color: "var(--text-secondary)",
-        border: "1px solid transparent",
-        borderRadius: 0,
-        fontFamily: "var(--font-display)",
+        borderRadius: "var(--radius-sm)",
         fontSize: "0.78rem",
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-        (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)";
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLElement).style.background = "transparent";
-        (e.currentTarget as HTMLElement).style.borderColor = "transparent";
       }}
     >
       {children}
@@ -304,18 +300,15 @@ function ToolBtn({
       style={{
         background: active ? "var(--accent-soft)" : "transparent",
         color: active ? "var(--accent)" : "var(--text-secondary)",
-        border: active ? "1px solid var(--accent)" : "1px solid transparent",
-        borderRadius: 0,
+        borderRadius: "var(--radius-sm)",
       }}
       onMouseEnter={(e) => {
         if (active) return;
         (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-        (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)";
       }}
       onMouseLeave={(e) => {
         if (active) return;
         (e.currentTarget as HTMLElement).style.background = "transparent";
-        (e.currentTarget as HTMLElement).style.borderColor = "transparent";
       }}
     >
       {children}
@@ -326,8 +319,8 @@ function ToolBtn({
 function Divider() {
   return (
     <div
-      className="w-px h-5 mx-0.5"
-      style={{ background: "var(--border-strong)", opacity: 0.6 }}
+      className="w-px h-4 mx-0.5"
+      style={{ background: "var(--border-subtle)" }}
     />
   );
 }

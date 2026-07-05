@@ -196,9 +196,9 @@ export function FindBar({ editor, open, onClose, initialQuery }: Props) {
       onClick={(e) => e.stopPropagation()}
       style={{
         background: "var(--bg-panel)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat-sm)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
+        boxShadow: "var(--shadow-md)",
         color: "var(--text-primary)",
       }}
     >
@@ -213,7 +213,7 @@ export function FindBar({ editor, open, onClose, initialQuery }: Props) {
           className="bg-transparent outline-none w-[180px]"
           style={{
             color: "var(--text-primary)",
-            fontFamily: "var(--font-display)",
+            fontFamily: "var(--font-ui)",
             fontSize: "0.82rem",
           }}
         />
@@ -271,7 +271,7 @@ export function FindBar({ editor, open, onClose, initialQuery }: Props) {
           className="bg-transparent outline-none w-[180px]"
           style={{
             color: "var(--text-primary)",
-            fontFamily: "var(--font-display)",
+            fontFamily: "var(--font-ui)",
             fontSize: "0.82rem",
           }}
         />
@@ -306,12 +306,11 @@ function IconButton({
       disabled={disabled}
       className="transition-colors disabled:opacity-30 flex items-center justify-center"
       style={{
-        width: 20,
-        height: 20,
+        width: 22,
+        height: 22,
         background: active ? "var(--accent-soft)" : "transparent",
         color: active ? "var(--accent)" : "var(--text-secondary)",
-        border: active ? "1px solid var(--accent)" : "1px solid transparent",
-        borderRadius: 0,
+        borderRadius: "var(--radius-sm)",
       }}
     >
       {children}
@@ -339,14 +338,13 @@ function TextButton({
       disabled={disabled}
       className="px-2 py-0.5 disabled:opacity-35"
       style={{
-        border: "1.5px solid var(--border-strong)",
-        borderRadius: 0,
+        border: active ? "1px solid var(--accent)" : "1px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
         background: active ? "var(--accent-soft)" : "transparent",
         color: active ? "var(--accent)" : "var(--text-secondary)",
-        fontFamily: "var(--font-display)",
         fontSize: "0.72rem",
-        fontWeight: 600,
-        letterSpacing: "0.02em",
+        fontWeight: 500,
+        letterSpacing: "0.01em",
       }}
     >
       {children}

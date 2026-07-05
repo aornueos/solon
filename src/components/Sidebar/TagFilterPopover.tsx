@@ -87,15 +87,15 @@ export function TagFilterPopover({ onClose, anchor }: Props) {
         maxWidth: 280,
         maxHeight: 360,
         background: "var(--bg-panel)",
-        border: "2px solid var(--border-strong)",
-        borderRadius: 0,
-        boxShadow: "var(--shadow-flat-sm)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
+        boxShadow: "var(--shadow-md)",
         color: "var(--text-primary)",
       }}
     >
       <div
         className="px-3 py-2 flex items-center justify-between"
-        style={{ borderBottom: "2px solid var(--border-strong)" }}
+        style={{ borderBottom: "1px solid var(--border-subtle)" }}
       >
         <span className="solon-plaque">Tags</span>
         {activeTagFilter && (

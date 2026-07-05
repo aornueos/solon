@@ -28,9 +28,8 @@ export function ToastLayer() {
   return (
     <div className="fixed bottom-8 right-4 z-50 flex flex-col gap-2 max-w-sm">
       {toasts.map((t) => {
-        // Borda esquerda 4px como faixa de severidade — substitui o
-        // border-left de 3px por algo brutalist. Bordas externas 2px,
-        // sem rounded, sombra chapada.
+        // Faixa de severidade na borda esquerda (2px na cor do tipo);
+        // resto hairline 1px, cantos suaves e sombra macia.
         const severityColor =
           t.kind === "error"
             ? "var(--danger)"
@@ -45,13 +44,12 @@ export function ToastLayer() {
             className="flex items-start gap-2.5 px-3.5 py-2.5 animate-in fade-in slide-in-from-right-4"
             style={{
               background: "var(--bg-panel)",
-              border: "2px solid var(--border-strong)",
-              borderLeftWidth: 4,
+              border: "1px solid var(--border)",
+              borderLeftWidth: 2,
               borderLeftColor: severityColor,
-              borderRadius: 0,
+              borderRadius: "var(--radius)",
               color: "var(--text-primary)",
-              boxShadow: "var(--shadow-flat-sm)",
-              fontFamily: "var(--font-display)",
+              boxShadow: "var(--shadow-md)",
               fontSize: "0.84rem",
               lineHeight: 1.45,
             }}
@@ -74,18 +72,15 @@ export function ToastLayer() {
                 width: 18,
                 height: 18,
                 color: "var(--text-muted)",
-                border: "1px solid transparent",
-                borderRadius: 0,
+                borderRadius: "var(--radius-sm)",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = severityColor;
-                e.currentTarget.style.color = "var(--text-inverse)";
-                e.currentTarget.style.borderColor = severityColor;
+                e.currentTarget.style.background = "var(--bg-hover)";
+                e.currentTarget.style.color = "var(--text-primary)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
                 e.currentTarget.style.color = "var(--text-muted)";
-                e.currentTarget.style.borderColor = "transparent";
               }}
             >
               <X size={11} />

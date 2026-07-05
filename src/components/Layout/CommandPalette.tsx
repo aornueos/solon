@@ -487,7 +487,7 @@ export function CommandPalette() {
             className="flex-1 bg-transparent outline-none"
             style={{
               color: "var(--text-primary)",
-              fontFamily: "var(--font-display)",
+              fontFamily: "var(--font-ui)",
               fontSize: "1rem",
               letterSpacing: "-0.005em",
             }}
@@ -496,22 +496,22 @@ export function CommandPalette() {
             className="text-[0.65rem] px-1.5 py-0.5 tabular-nums"
             style={{
               color: "var(--text-muted)",
-              border: "1.5px solid var(--border-strong)",
+              border: "1px solid var(--border)",
               background: "var(--bg-panel-2)",
               fontFamily: "var(--font-mono)",
-              borderRadius: 0,
+              borderRadius: "var(--radius-xs)",
             }}
           >
             Esc
           </kbd>
         </div>
-        <div style={{ borderTop: "2px solid var(--border-strong)" }}>
+        <div style={{ borderTop: "1px solid var(--border-subtle)" }}>
           {filtered.length === 0 ? (
             <div
               className="px-4 py-6 text-center"
               style={{
                 color: "var(--text-muted)",
-                fontFamily: "var(--font-display)",
+                fontFamily: "var(--font-ui)",
                 fontStyle: "italic",
                 fontSize: "0.82rem",
               }}
@@ -527,15 +527,12 @@ export function CommandPalette() {
                     key={item.id}
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => void run(item)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
+                    className="w-full flex items-center gap-3 px-3 mx-1.5 py-2 text-left transition-colors"
                     style={{
-                      background: active ? "var(--bg-hover)" : "transparent",
-                      color: "var(--text-primary)",
-                      // Faixa accent vertical no item ativo — substitui o
-                      // hover sutil por marca clara de selecao.
-                      borderLeft: active
-                        ? "3px solid var(--accent)"
-                        : "3px solid transparent",
+                      background: active ? "var(--accent-soft)" : "transparent",
+                      color: active ? "var(--accent)" : "var(--text-primary)",
+                      borderRadius: "var(--radius-sm)",
+                      width: "calc(100% - 0.75rem)",
                     }}
                   >
                     <span style={{ color: "var(--text-muted)" }}>{item.icon}</span>
@@ -543,7 +540,7 @@ export function CommandPalette() {
                       <span
                         className="block truncate"
                         style={{
-                          fontFamily: "var(--font-display)",
+                          fontFamily: "var(--font-ui)",
                           fontSize: "0.88rem",
                           fontWeight: active ? 600 : 500,
                         }}
@@ -555,7 +552,7 @@ export function CommandPalette() {
                           className="block text-[0.7rem] truncate italic"
                           style={{
                             color: "var(--text-muted)",
-                            fontFamily: "var(--font-display)",
+                            fontFamily: "var(--font-ui)",
                           }}
                         >
                           {item.hint}
