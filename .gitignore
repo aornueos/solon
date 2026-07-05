@@ -34,6 +34,9 @@ src-tauri/.tauri/
 .vscode/*
 !.vscode/extensions.json
 .idea/
+# Visual Studio — inclui .vs/solon/CopilotIndices/ (indices de IA do
+# Copilot), FileContentIndex e estado de workspace. Nada disso versiona.
+.vs/
 .DS_Store
 Thumbs.db
 
@@ -49,6 +52,8 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
+# arquivos de IA — assistentes/agentes (configs, contexto, indices).
+# Gerados localmente; nao pertencem ao repo.
 .claude/
 .claude*/
 CLAUDE.md
@@ -57,6 +62,16 @@ claude.md
 CLAUDE*.md
 Claude*.md
 claude*.md
+.agents/
+.agents*/
+AGENTS.md
+AGENT.md
+.cursor/
+.cursorrules
+.aider*
+.windsurfrules
+GEMINI.md
+.github/copilot-instructions.md
 
 CHANGELOG.md
 CHANGES.md
