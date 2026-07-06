@@ -34,9 +34,7 @@ const SIDES: {
 export function ConnectionDots({
   entityId,
   isLinkSource,
-  isLinkCandidate,
   linkingFromSide,
-  isSelected,
   onPick,
 }: {
   entityId: string;
@@ -46,7 +44,12 @@ export function ConnectionDots({
   isSelected: boolean;
   onPick: (side: CardSide) => void;
 }) {
-  const alwaysShow = isLinkSource || isLinkCandidate || isSelected;
+  // So' a ORIGEM do link mantem os dots fixos. Candidatos (todos os outros
+  // itens durante um linking) e itens meramente selecionados mostram os dots
+  // apenas no HOVER — senao, com cards/linhas empilhados, os 4 dots de cada
+  // um aparecem juntos e viram uma sopa de bolinhas. Estilo Miro: voce passa
+  // o mouse no alvo e os pontos de conexao dele surgem.
+  const alwaysShow = isLinkSource;
   const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
   const dotSize = 10 / zoom;
   const border = 1.8 / zoom;

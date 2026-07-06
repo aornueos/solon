@@ -1806,6 +1806,21 @@ select:focus-visible {
   opacity: 1;
 }
 
+/* Placeholder do contenteditable de texto do canvas (rich text). `:empty`
+   pega quando nao ha conteudo; o data-placeholder vem do elemento. */
+.canvas-text-input[contenteditable]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--canvas-text-placeholder);
+  pointer-events: none;
+}
+/* Grifo inline via execCommand('hiliteColor') gera span com background —
+   damos um respiro/curva sutil pra nao colar nas letras. */
+.canvas-text-input mark,
+.canvas-text-input span[style*="background"] {
+  border-radius: 2px;
+  padding: 0 0.06em;
+}
+
 /* ─────────────────────────────────────────
    Release notes (UpdateNotesDialog)
    Markdown vindo do `marked` + DOMPurify. Mesma sensibilidade

@@ -251,6 +251,32 @@ export function CanvasView() {
         duplicateSelected();
         return;
       }
+      // Ctrl+C / Ctrl+V — copia/cola blocos do canvas (texto, card, imagem,
+      // traco). So' age fora de edicao de texto (guard `typing` acima ja'
+      // deixa o Ctrl+C/V nativo pra textarea). Ctrl+X = copia + remove.
+      if ((e.key === "c" || e.key === "C") && (e.ctrlKey || e.metaKey)) {
+        const st = useCanvasStore.getState();
+        if (!st.selectedId && st.selectedIds.size === 0) return;
+        e.preventDefault();
+        st.copySelected();
+        return;
+      }
+      if ((e.key === "x" || e.key === "X") && (e.ctrlKey || e.metaKey)) {
+        const st = useCanvasStore.getState();
+        if (!st.selectedId && st.selectedIds.size === 0) return;
+        e.preventDefault();
+        st.copySelected();
+        st.removeSelected();
+        return;
+      }
+      if ((e.key === "v" || e.key === "V") && (e.ctrlKey || e.metaKey)) {
+        // So' preventDefault se colou um bloco interno. Se o clipboard interno
+        // esta vazio, deixamos o evento `paste` nativo rodar (cola imagem do
+        // SO) — preventDefault aqui mataria esse evento.
+        const pasted = useCanvasStore.getState().pasteClipboard();
+        if (pasted) e.preventDefault();
+        return;
+      }
       if (e.ctrlKey || e.metaKey) return; // ignora outros Ctrl+X
 
       const numericTool = CANVAS_TOOL_ORDER[Number(e.key) - 1];
