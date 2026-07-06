@@ -1,5 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import DOMPurify from "dompurify";
 import { CanvasText, DRAW_COLORS } from "../../types/canvas";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { EDITOR_FONT_FAMILIES, useAppStore } from "../../store/useAppStore";
@@ -41,18 +42,58 @@ const HIGHLIGHT_COLORS: { label: string; value: string }[] = [
 const TEXT_SIZES = [12, 14, 18, 24, 32, 48] as const;
 const MIN_TEXT_SIZE = 8;
 const MAX_TEXT_SIZE = 160;
+// Amortece o resize (< 1 = menos sensivel). 0.6 = a caixa muda 60% do
+// movimento do mouse — pedido do usuario (estava "rapido demais").
+const RESIZE_SENSITIVITY = 0.6;
+
+// Rich text inline: so' as tags/estilos que o execCommand produz pra
+// negrito/italico/sublinhado/tachado/grifo/cor. DOMPurify limpa o resto e
+// sanitiza os valores de `style` (sem url()/expressions). Como e' dado local
+// do canvas o risco e' baixo, mas sanitizamos por higiene mesmo assim.
+const RICH_TEXT_SANITIZE = {
+  ALLOWED_TAGS: ["b", "strong", "i", "em", "u", "s", "strike", "mark", "span", "font", "br", "div", "p"],
+  ALLOWED_ATTR: ["style", "color"],
+};
+function sanitizeRichText(html: string): string {
+  return DOMPurify.sanitize(html, RICH_TEXT_SANITIZE);
+}
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+// Conteudo inicial ao ENTRAR em edicao. Se ja' e' rico, usa o html. Senao,
+// converte os flags de BLOCO (bold/italic/underline/grifo) num span inicial —
+// assim um bloco todo negrito nao perde o negrito ao comecar a editar inline.
+// A cor NAO entra (Auto e' theme-aware; baka-la num hex quebraria o tema).
+function buildInitialEditHtml(t: CanvasText): string {
+  if (t.html && t.html.trim()) return t.html;
+  const esc = escapeHtml(t.text).replace(/\n/g, "<br>");
+  const styles: string[] = [];
+  if (t.bold) styles.push("font-weight:700");
+  if (t.italic) styles.push("font-style:italic");
+  if (t.underline) styles.push("text-decoration:underline");
+  if (t.highlight) styles.push(`background-color:${t.highlight}`);
+  return styles.length ? `<span style="${styles.join(";")}">${esc}</span>` : esc;
+}
+// Detecta se o HTML tem alguma marcacao inline de verdade (nao so' texto/br).
+function hasInlineMarkup(html: string): boolean {
+  return /<(b|strong|i|em|u|s|strike|mark|span|font)\b/i.test(html);
+}
 
 type ResizeDir = "n" | "e" | "s" | "w" | "ne" | "nw" | "se" | "sw";
 
+// So' os 4 CANTOS. Cada um resiza a largura (o texto reflui; altura auto).
+// Removidos os handles laterais e/w: eles ficavam no meio das bordas —
+// exatamente em cima dos dots de conexao (bolinha da seta), atrapalhando.
+// Removidos tambem n/s (altura e' automatica). Cantos resizam, laterais
+// conectam — igual Miro.
 const RESIZE_HANDLES: { dir: ResizeDir; cursor: string; title: string }[] = [
-  { dir: "nw", cursor: "nwse-resize", title: "Escalar texto (Ctrl ajusta caixa)" },
-  { dir: "n", cursor: "ns-resize", title: "Escalar texto (Ctrl ajusta altura)" },
-  { dir: "ne", cursor: "nesw-resize", title: "Escalar texto (Ctrl ajusta caixa)" },
-  { dir: "e", cursor: "ew-resize", title: "Escalar texto (Ctrl ajusta largura)" },
-  { dir: "se", cursor: "nwse-resize", title: "Escalar texto (Ctrl ajusta caixa)" },
-  { dir: "s", cursor: "ns-resize", title: "Escalar texto (Ctrl ajusta altura)" },
-  { dir: "sw", cursor: "nesw-resize", title: "Escalar texto (Ctrl ajusta caixa)" },
-  { dir: "w", cursor: "ew-resize", title: "Escalar texto (Ctrl ajusta largura)" },
+  { dir: "nw", cursor: "nwse-resize", title: "Largura — o texto reflui" },
+  { dir: "ne", cursor: "nesw-resize", title: "Largura — o texto reflui" },
+  { dir: "se", cursor: "nwse-resize", title: "Largura — o texto reflui" },
+  { dir: "sw", cursor: "nesw-resize", title: "Largura — o texto reflui" },
 ];
 
 export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props) {
@@ -89,7 +130,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     null,
   );
   const rootRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{
     startX: number;
     startY: number;
@@ -125,28 +166,24 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     Math.round(text.height ?? measuredRect.h),
   );
 
+  // Ao entrar em edicao: injeta o conteudo (html rico ou texto puro) UMA vez,
+  // foca e seleciona tudo. Depois o contenteditable e' uncontrolled — NAO
+  // resetamos innerHTML em re-render (senao apagaria o que o usuario digita);
+  // so' lemos de volta no commit. O auto-grow e' natural (a div cresce com o
+  // conteudo; a caixa ja' tem height:auto).
   useEffect(() => {
-    if (editing && textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.select();
-    }
-  }, [editing]);
-
-  // Auto-grow do textarea pela altura REAL do DOM. A altura da caixa
-  // (boxHeight) vem de uma aproximacao canvas2d (textRect), mas o wrap
-  // efetivo do textarea diverge (fonte web Lora, kerning, padding). Quando
-  // a aproximacao subestimava, o textarea (overflow) rolava o conteudo pra
-  // fora conforme o usuario digitava — o texto "ia apagando". Medindo o
-  // scrollHeight real e fixando a altura, nunca clipa. Roda em layout
-  // effect (antes do paint) pra nao piscar. Depende de tudo que muda o
-  // layout do texto.
-  useLayoutEffect(() => {
     if (!editing) return;
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${ta.scrollHeight}px`;
-  }, [editing, draftText, text.size, text.bold, text.italic, boxWidth]);
+    const el = editRef.current;
+    if (!el) return;
+    el.innerHTML = buildInitialEditHtml(text);
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
 
   useEffect(() => {
     if (!editing) setDraftText(text.text);
@@ -166,7 +203,8 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   }, [openMenu]);
 
   useLayoutEffect(() => {
-    if (!isSelected || editing) {
+    // Mostra a toolbar tambem durante a edicao (pra formatar a selecao inline).
+    if (!isSelected) {
       setToolbarPos(null);
       return;
     }
@@ -360,8 +398,29 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     setEditing(true);
   };
 
-  const commitDraft = (value = draftText) => {
-    updateText(text.id, { text: value });
+  // Le o conteudo do contenteditable e persiste. Se nao ha marcacao inline
+  // (so' texto), NAO guarda html — mantem o bloco no modelo simples/leve.
+  const commitDraft = () => {
+    const el = editRef.current;
+    if (!el) return;
+    const plain = el.textContent ?? "";
+    const html = sanitizeRichText(el.innerHTML);
+    updateText(text.id, {
+      text: plain,
+      html: hasInlineMarkup(html) ? html : undefined,
+    });
+  };
+
+  // Aplica formatacao INLINE na selecao atual do contenteditable (negrito,
+  // grifo, cor de trecho — igual Miro). Roda so' em edicao; o preventDefault
+  // no mousedown do botao (TinyBtn) preserva a selecao/foco. Persiste na hora.
+  const applyInline = (command: string, value?: string) => {
+    const el = editRef.current;
+    if (!el) return;
+    el.focus();
+    document.execCommand("styleWithCSS", false, "true");
+    document.execCommand(command, false, value);
+    commitDraft();
   };
 
   const onResizeMouseDown = (dir: ResizeDir, e: React.MouseEvent) => {
@@ -412,13 +471,16 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       clientY: number,
       boxOnly: boolean,
     ): Partial<CanvasText> => {
-      const dx = (clientX - startX) / viewport.zoom;
-      const dy = (clientY - startY) / viewport.zoom;
+      // Fator de amortecimento: a caixa cresce ~60% do movimento do mouse.
+      // Sem isso (1:1) o resize ficava sensivel demais — muita mudanca com
+      // pouco movimento. O handle nao gruda no cursor, mas o ajuste fica
+      // controlado (feedback do usuario).
+      const dx = ((clientX - startX) / viewport.zoom) * RESIZE_SENSITIVITY;
+      const dy = ((clientY - startY) / viewport.zoom) * RESIZE_SENSITIVITY;
       const minW = boxOnly ? minBoxW : minScaleW;
       const minH = boxOnly ? minBoxH : minScaleH;
 
       let x = orig.x;
-      let y = orig.y;
       let w = orig.w;
       let h = orig.h;
 
@@ -430,7 +492,6 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       }
       if (dir.includes("n")) {
         h = orig.h - dy;
-        y = orig.y + dy;
       }
 
       if (w < minW) {
@@ -438,7 +499,6 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
         w = minW;
       }
       if (h < minH) {
-        if (dir.includes("n")) y = orig.y + orig.h - minH;
         h = minH;
       }
 
@@ -446,11 +506,13 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       h = Math.min(maxH, h);
 
       if (boxOnly) {
+        // So' largura (+ x pros handles do lado esquerdo). Altura fica AUTO:
+        // o texto reflui na nova largura e a caixa se ajusta ao conteudo.
+        // Nao mexemos em y/height nem escalamos a fonte — e' o resize
+        // responsivo (tipo Miro); tamanho da fonte fica na toolbar.
         return {
           x: Math.round(x),
-          y: Math.round(y),
           width: Math.round(w),
-          height: Math.round(h),
         };
       }
 
@@ -489,18 +551,16 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       };
     };
 
+    // Cada handle resiza a CAIXA (largura → o texto reflui), nunca escala a
+    // fonte — resize responsivo tipo Miro. O tamanho da fonte fica no seletor
+    // da toolbar. `computeResizePatch(..., true)` = so' largura; altura auto.
     startDrag({
       onMove: (ev) => {
-        scheduleResize(
-          computeResizePatch(ev.clientX, ev.clientY, ev.ctrlKey || ev.metaKey),
-        );
+        scheduleResize(computeResizePatch(ev.clientX, ev.clientY, true));
       },
       onEnd: (ev) => {
         cancelPendingResize();
-        updateText(
-          text.id,
-          computeResizePatch(ev.clientX, ev.clientY, ev.ctrlKey || ev.metaKey),
-        );
+        updateText(text.id, computeResizePatch(ev.clientX, ev.clientY, true));
       },
       onCancel: () => {
         cancelPendingResize();
@@ -520,18 +580,23 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       ? "var(--canvas-text-auto)"
       : text.color;
   const hasVisibleText = displayText.trim().length > 0;
+  // Bloco rico: a formatacao vive no html inline; os flags de bloco viram
+  // so' o estilo-base (senao dobram — ex.: bold no bloco + <b> inline).
+  const hasHtml = !!(text.html && text.html.trim());
 
   const rootStyle: React.CSSProperties = {
     position: "absolute",
     left: text.x,
     top: text.y,
     width: boxWidth,
-    // Durante a edicao a altura segue o textarea auto-grow (height:auto +
-    // minHeight). Fora da edicao usa a boxHeight medida. Isso impede que
-    // uma caixa fixa curta corte o texto enquanto digita.
-    height: editing ? "auto" : boxHeight,
+    // Altura SEMPRE automatica: a caixa cresce com o conteudo e nunca deixa
+    // o texto vazar/clipar (era o bug do texto transbordando embaixo). O
+    // minHeight garante um piso (fonte + altura resultante de resize de canto).
+    height: "auto",
     minWidth: 60,
-    minHeight: Math.max(28, text.size * 1.35),
+    minHeight: editing
+      ? Math.max(28, text.size * 1.35)
+      : Math.max(28, text.size * 1.35, Math.round(text.height ?? 0)),
     overflow: "visible",
     ...(isSelected
       ? {
@@ -552,9 +617,9 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     boxSizing: "border-box",
     color: renderColor,
     fontSize: text.size,
-    fontWeight: text.bold ? 700 : 500,
-    fontStyle: text.italic ? "italic" : "normal",
-    textDecoration: text.underline ? "underline" : "none",
+    fontWeight: hasHtml ? 500 : text.bold ? 700 : 500,
+    fontStyle: hasHtml ? "normal" : text.italic ? "italic" : "normal",
+    textDecoration: hasHtml ? "none" : text.underline ? "underline" : "none",
     textAlign: text.align ?? "left",
     lineHeight: 1.18,
     fontFamily: canvasTextFont,
@@ -563,9 +628,9 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     wordBreak: "normal",
     overflowWrap: "anywhere",
     overflow: editing ? "auto" : "visible",
-    padding: text.highlight ? "1px 4px" : 0,
-    background: text.highlight || "transparent",
-    borderRadius: text.highlight ? 2 : 0,
+    padding: hasHtml ? 0 : text.highlight ? "1px 4px" : 0,
+    background: hasHtml ? "transparent" : text.highlight || "transparent",
+    borderRadius: hasHtml ? 0 : text.highlight ? 2 : 0,
   };
 
   const renderedLines = displayText.split("\n");
@@ -589,50 +654,51 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       style={rootStyle}
     >
       {editing ? (
-        <textarea
-          ref={textareaRef}
+        <div
+          ref={editRef}
           className="canvas-text-input"
-          value={draftText}
-          onChange={(e) => {
-            const next = e.target.value;
-            setDraftText(next);
-          }}
+          contentEditable
+          suppressContentEditableWarning
+          data-placeholder="Digite..."
+          // Uncontrolled: o conteudo e' injetado uma vez no effect de entrada
+          // em edicao. onInput so' atualiza o draft (medida), nunca reseta o
+          // innerHTML. Selecione um trecho e use a toolbar pra formatar so' ele.
+          onInput={() => setDraftText(editRef.current?.textContent ?? "")}
           onBlur={() => {
             commitDraft();
             setEditing(false);
-            if (!draftText.trim()) removeText(text.id);
+            if (!(editRef.current?.textContent ?? "").trim()) removeText(text.id);
           }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.preventDefault();
-              commitDraft();
-              setEditing(false);
-              if (!draftText.trim()) removeText(text.id);
+              editRef.current?.blur();
+              return;
             }
             e.stopPropagation();
           }}
           onMouseDown={(e) => e.stopPropagation()}
-          placeholder="Digite..."
           style={{
             ...contentStyle,
-            // height:auto + overflow:hidden deixam o auto-grow (layout
-            // effect) ditar a altura pelo scrollHeight real — sem isso o
-            // overflow rolava o texto pra fora durante a digitacao.
+            // Contenteditable cresce sozinho com o conteudo (height auto).
             height: "auto",
-            overflow: "hidden",
+            overflow: "visible",
             border: hasVisibleText
               ? "1px solid transparent"
               : "1px dashed var(--selection-ring)",
-            resize: "none",
             outline: "none",
-            background: text.highlight || "transparent",
+            background: "transparent",
             caretColor: "var(--accent)",
-            minHeight: boxHeight,
+            // Cursor de TEXTO (I-beam) enquanto edita — sobrescreve o
+            // cursor-grab da caixa (que e' pra arrastar o bloco).
+            cursor: "text",
+            minHeight: Math.max(28, text.size * 1.35),
           }}
         />
       ) : (
         <TextPreview
           text={displayText}
+          html={hasHtml ? sanitizeRichText(text.html!) : undefined}
           lines={renderedLines}
           list={text.list}
           link={text.link}
@@ -657,7 +723,11 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
         />
       )}
 
-      {isSelected && !editing && text.text.trim().length > 0 && (
+      {/* Handles so' quando a caixa tem tamanho de tela suficiente pra
+          resizar — no zoom-out, uma caixa minuscula viraria uma sopa de
+          marcadores sobre o texto (as "linhas" que apareciam). */}
+      {isSelected && !editing && text.text.trim().length > 0 &&
+        boxWidth * viewport.zoom >= 44 && (
         <>
           {RESIZE_HANDLES.map((h) => (
             <ResizeHandle
@@ -672,7 +742,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
         </>
       )}
 
-      {isSelected && !editing && toolbarPos && createPortal(
+      {isSelected && toolbarPos && createPortal(
         <div
           data-text-action
           className="fixed z-[70] flex items-center gap-0.5 px-1 py-0.5"
@@ -687,31 +757,34 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
           onMouseDown={(e) => e.stopPropagation()}
         >
           <TinyBtn
-            title="Negrito"
-            active={text.bold}
+            title={editing ? "Negrito (na seleção)" : "Negrito"}
+            active={!editing && text.bold}
             onClick={(e) => {
               e.stopPropagation();
-              updateText(text.id, { bold: !text.bold });
+              if (editing) applyInline("bold");
+              else updateText(text.id, { bold: !text.bold });
             }}
           >
             <Bold size={11} />
           </TinyBtn>
           <TinyBtn
-            title="Italico"
-            active={text.italic}
+            title={editing ? "Itálico (na seleção)" : "Itálico"}
+            active={!editing && text.italic}
             onClick={(e) => {
               e.stopPropagation();
-              updateText(text.id, { italic: !text.italic });
+              if (editing) applyInline("italic");
+              else updateText(text.id, { italic: !text.italic });
             }}
           >
             <Italic size={11} />
           </TinyBtn>
           <TinyBtn
-            title="Sublinhado"
-            active={text.underline}
+            title={editing ? "Sublinhado (na seleção)" : "Sublinhado"}
+            active={!editing && text.underline}
             onClick={(e) => {
               e.stopPropagation();
-              updateText(text.id, { underline: !text.underline });
+              if (editing) applyInline("underline");
+              else updateText(text.id, { underline: !text.underline });
             }}
           >
             <Underline size={11} />
@@ -795,6 +868,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
                 {TEXT_SIZES.map((s) => (
                   <button
                     key={s}
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                       e.stopPropagation();
                       updateText(text.id, { size: s });
@@ -835,9 +909,13 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
                   <button
                     key={c.value || "auto"}
                     title={c.label}
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      updateText(text.id, { color: c.value });
+                      // Editando + cor concreta → pinta so' a selecao. "Auto"
+                      // (vazio) ou fora de edicao → cor do bloco inteiro.
+                      if (editing && c.value) applyInline("foreColor", c.value);
+                      else updateText(text.id, { color: c.value });
                       setOpenMenu(null);
                     }}
                     style={{
@@ -870,9 +948,13 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
                   <button
                     key={c.value || "none"}
                     title={c.label}
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      updateText(text.id, { highlight: c.value || undefined });
+                      // Editando → grifa so' a selecao (ou remove com
+                      // transparent). Fora de edicao → grifo do bloco inteiro.
+                      if (editing) applyInline("hiliteColor", c.value || "transparent");
+                      else updateText(text.id, { highlight: c.value || undefined });
                       setOpenMenu(null);
                     }}
                     style={{
@@ -912,18 +994,24 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
 
 function TextPreview({
   text,
+  html,
   lines,
   list,
   link,
   style,
 }: {
   text: string;
+  /** HTML rico ja' sanitizado. Quando presente, tem precedencia sobre o
+   *  texto puro / bullets (a formatacao inline vive nele). */
+  html?: string;
   lines: string[];
   list?: "bullet";
   link?: string;
   style: React.CSSProperties;
 }) {
-  const content = !text ? (
+  const content = html != null ? (
+    <span dangerouslySetInnerHTML={{ __html: html }} />
+  ) : !text ? (
     <span style={{ color: "var(--canvas-text-placeholder)" }}>Digite...</span>
   ) : list === "bullet" ? (
     <ul
@@ -1038,8 +1126,10 @@ function ResizeHandle({
   if (dir === "e" || dir === "w") {
     style.top = "50%";
     style.transform = "translateY(-50%)";
-    if (dir === "e") style.right = inset;
-    else style.left = inset;
+    // Sobre a BORDA (straddle), nao inset pra dentro — senao vira uma barra
+    // vertical em cima do texto, pior em caixas estreitas e no zoom-out.
+    if (dir === "e") style.right = -sideShort / 2;
+    else style.left = -sideShort / 2;
   }
 
   return (
@@ -1109,6 +1199,10 @@ function TinyBtn({
     <button
       title={title}
       onClick={onClick}
+      // preventDefault no mousedown mantem o foco/selecao no contenteditable —
+      // sem isso, clicar num botao da toolbar tirava a selecao e o execCommand
+      // de formatacao inline nao teria em que aplicar.
+      onMouseDown={(e) => e.preventDefault()}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="p-1 transition-colors"

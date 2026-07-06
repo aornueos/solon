@@ -377,7 +377,10 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
         </div>
       )}
 
-      {isSelected && (
+      {/* Handles so' quando a imagem tem tamanho de tela suficiente pra
+          resizar — no zoom-out, uma imagem minuscula viraria uma sopa de
+          marcadores. Mesmo criterio do FloatingText. */}
+      {isSelected && image.w * viewport.zoom >= 44 && (
         <div
           data-image-action
           onMouseDown={(e) => onResizeDown("se", e)}
@@ -391,7 +394,7 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
           }}
         />
       )}
-      {isSelected &&
+      {isSelected && image.w * viewport.zoom >= 44 &&
         RESIZE_HANDLES.filter((handle) => handle.dir !== "se").map((handle) => (
           <ImageResizeHandle
             key={handle.dir}

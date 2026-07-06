@@ -125,6 +125,13 @@ interface CanvasState {
   duplicateCard: (id: string) => string | null;
   bringToFront: (id: string) => void;
   duplicateSelected: () => void;
+  /** Copia a selecao atual pro clipboard interno do canvas (Ctrl+C). */
+  copySelected: () => void;
+  /** Cola o clipboard interno com novos ids e offset; seleciona os colados
+   *  (Ctrl+V). Retorna `true` se colou algo — o caller usa isso pra decidir
+   *  se da preventDefault (senao deixa o `paste` nativo colar imagens do SO).
+   *  Retorna `false` se o clipboard interno estiver vazio. */
+  pasteClipboard: () => boolean;
   bringSelectionToFront: () => void;
   sendSelectionToBack: () => void;
 
@@ -246,6 +253,20 @@ function rebasePath(
     ? `${newPrefix}${normalizedRel}`
     : `${newPrefix}${sep}${normalizedRel}`;
 }
+
+/**
+ * Clipboard interno do canvas (nao usa a area de transferencia do SO — copiar
+ * um bloco do canvas nao deve sobrescrever o que voce copiou de texto). Vive
+ * em modulo (nao no state) porque nenhuma UI reage a ele. `pasteSeq` faz cada
+ * colagem consecutiva sair mais deslocada, evitando empilhar em cima. */
+let canvasClipboard: {
+  cards: CanvasCard[];
+  texts: CanvasText[];
+  images: CanvasImage[];
+  strokes: CanvasStroke[];
+  arrows: CanvasArrow[];
+} | null = null;
+let pasteSeq = 0;
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   filePath: null,
@@ -496,14 +517,118 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
     const nextIds = new Set(idMap.values());
     if (nextIds.size === 0) return;
+    // Setas entre itens duplicados sao clonadas e religadas aos novos ids —
+    // consistente com o copy/paste. Setas com so' uma ponta duplicada ficam
+    // de fora (o outro extremo nao existe no clone).
+    const arrows = [...s.arrows];
+    for (const a of s.arrows) {
+      const from = idMap.get(a.from);
+      const to = idMap.get(a.to);
+      if (!from || !to) continue;
+      arrows.push({ ...a, id: nanoid(), from, to });
+    }
     set({
       cards,
       texts,
       images,
       strokes,
+      arrows,
       selectedId: nextIds.size === 1 ? [...nextIds][0] : null,
       selectedIds: nextIds,
     });
+  },
+
+  copySelected: () => {
+    const s = get();
+    const ids =
+      s.selectedIds.size > 0
+        ? new Set(s.selectedIds)
+        : s.selectedId
+          ? new Set([s.selectedId])
+          : new Set<string>();
+    if (ids.size === 0) return;
+    // Scene cards ficam de fora (apontam pra arquivo — colar geraria cards
+    // orfaos/duplicados apontando pro mesmo .md). Mesmo criterio do duplicate.
+    canvasClipboard = {
+      cards: s.cards
+        .filter((c) => ids.has(c.id) && c.kind !== "scene")
+        .map((c) => ({ ...c })),
+      texts: s.texts.filter((t) => ids.has(t.id)).map((t) => ({ ...t })),
+      images: s.images.filter((i) => ids.has(i.id)).map((i) => ({ ...i })),
+      strokes: s.strokes
+        .filter((st) => ids.has(st.id))
+        .map((st) => ({ ...st, points: [...st.points] })),
+      // Setas cujos DOIS extremos estao na selecao — colar um grupo conectado
+      // preserva as conexoes (remapeadas pros novos ids no paste). Setas com
+      // so' uma ponta na selecao ficam de fora (nao teriam onde ancorar).
+      arrows: s.arrows.filter((a) => ids.has(a.from) && ids.has(a.to)).map((a) => ({ ...a })),
+    };
+    pasteSeq = 0;
+  },
+
+  pasteClipboard: () => {
+    const clip = canvasClipboard;
+    if (!clip) return false;
+    const total =
+      clip.cards.length +
+      clip.texts.length +
+      clip.images.length +
+      clip.strokes.length;
+    if (total === 0) return false;
+    const s = get();
+    s.pushHistory();
+    pasteSeq += 1;
+    const off = 28 * pasteSeq;
+    const newIds = new Set<string>();
+    // old id → new id, pra religar as setas copiadas aos itens colados.
+    const idMap = new Map<string, string>();
+    const cards = [...s.cards];
+    const texts = [...s.texts];
+    const images = [...s.images];
+    const strokes = [...s.strokes];
+    const arrows = [...s.arrows];
+    for (const c of clip.cards) {
+      const id = nanoid();
+      idMap.set(c.id, id);
+      newIds.add(id);
+      cards.push({ ...c, id, x: c.x + off, y: c.y + off });
+    }
+    for (const t of clip.texts) {
+      const id = nanoid();
+      idMap.set(t.id, id);
+      newIds.add(id);
+      texts.push({ ...t, id, x: t.x + off, y: t.y + off });
+    }
+    for (const i of clip.images) {
+      const id = nanoid();
+      idMap.set(i.id, id);
+      newIds.add(id);
+      images.push({ ...i, id, x: i.x + off, y: i.y + off });
+    }
+    for (const st of clip.strokes) {
+      const id = nanoid();
+      idMap.set(st.id, id);
+      newIds.add(id);
+      strokes.push({ ...st, id, points: st.points.map((p) => p + off) });
+    }
+    // Setas: religa aos ids novos. Ambos os extremos foram copiados (o copy
+    // ja' filtrou isso), entao o remap sempre acha os dois.
+    for (const a of clip.arrows) {
+      const from = idMap.get(a.from);
+      const to = idMap.get(a.to);
+      if (!from || !to) continue;
+      arrows.push({ ...a, id: nanoid(), from, to });
+    }
+    set({
+      cards,
+      texts,
+      images,
+      strokes,
+      arrows,
+      selectedId: newIds.size === 1 ? [...newIds][0] : null,
+      selectedIds: newIds,
+    });
+    return true;
   },
 
   bringSelectionToFront: () => {

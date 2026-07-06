@@ -81,9 +81,6 @@ const StrokeNode = memo(function StrokeNode({
     (st) => st.selectedId !== s.id && st.selectedIds.has(s.id),
   );
   const isLinkSource = useCanvasStore((st) => st.linkingFromId === s.id);
-  const isLinkCandidate = useCanvasStore(
-    (st) => st.linkingFromId !== null && st.linkingFromId !== s.id,
-  );
   const linkingFromSide = useCanvasStore((st) =>
     st.linkingFromId === s.id ? st.linkingFromSide : null,
   );
@@ -179,10 +176,8 @@ const StrokeNode = memo(function StrokeNode({
           entityId={s.id}
           rect={bounds}
           isLinkSource={isLinkSource}
-          isLinkCandidate={isLinkCandidate}
           linkingFromSide={linkingFromSide}
           zoom={zoom}
-          isSelected={isSel}
           onPick={(side) => {
             const fromId = useCanvasStore.getState().linkingFromId;
             if (fromId && fromId !== s.id) {
@@ -210,22 +205,20 @@ function StrokeConnectionDots({
   entityId,
   rect,
   isLinkSource,
-  isLinkCandidate,
   linkingFromSide,
   zoom,
-  isSelected,
   onPick,
 }: {
   entityId: string;
   rect: { x: number; y: number; w: number; h: number };
   isLinkSource: boolean;
-  isLinkCandidate: boolean;
   linkingFromSide: CardSide | null;
   zoom: number;
-  isSelected: boolean;
   onPick: (side: CardSide) => void;
 }) {
-  const alwaysShow = isLinkSource || isLinkCandidate || isSelected;
+  // So' a origem do link mantem os dots fixos; candidatos e selecao simples
+  // aparecem no hover (senao vira sopa de bolinhas). Igual ao ConnectionDots.
+  const alwaysShow = isLinkSource;
   const radius = 5 / zoom;
   const strokeWidth = 1.8 / zoom;
   const sides: { side: CardSide; x: number; y: number; title: string }[] = [

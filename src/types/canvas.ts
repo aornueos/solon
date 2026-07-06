@@ -74,7 +74,14 @@ export interface CanvasText {
   id: string;
   x: number;
   y: number;
+  /** Texto puro (fallback + medida de largura + busca). Mantido em sync com
+   *  `html` (= textContent). Blocos antigos so' tem isto. */
   text: string;
+  /** Rich text opcional: formatacao inline (negrito/italico/grifo/cor por
+   *  trecho). Quando presente, e' o que se renderiza/edita. Os flags de bloco
+   *  (`bold`/`italic`/`underline`/`highlight`) viram so' o estilo-base pra
+   *  nao dobrar com o inline. */
+  html?: string;
   size: number;   // em px (world coords)
   color: string;  // hex
   bold?: boolean;

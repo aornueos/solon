@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { useAppStore } from "../../store/useAppStore";
 import { startDrag } from "../../lib/drag";
@@ -69,64 +69,10 @@ export const ArrowLayer = memo(function ArrowLayer({
     return map;
   }, [cards, editorFontFamily, images, strokes, texts]);
 
-  // Preview pointilhado enquanto o usuário está "linkando" — sai do card
-  // de origem até o cursor. Sem isso o usuário clica e vai cego até o
-  // destino sem feedback de pra onde a seta vai.
-  //
-  // Atualiza direto no pointermove, mas ignora deslocamento sub-pixel em world
-  // coords. O rAF anterior economizava render, mas introduzia atraso visível
-  // ao arrastar a ponta da seta.
-  const [previewWorld, setPreviewWorld] = useState<
-    { x: number; y: number } | null
-  >(null);
-  useEffect(() => {
-    if (!linkingFromId) {
-      setPreviewWorld(null);
-      return;
-    }
-    if (frozenPreviewPoint) return;
-
-    let frame: number | null = null;
-    let last: { x: number; y: number } | null = null;
-    let pending: { x: number; y: number } | null = null;
-
-    const commitPreview = (next: { x: number; y: number }) => {
-      last = next;
-      setPreviewWorld(next);
-    };
-    const flushPreview = () => {
-      frame = null;
-      if (!pending) return;
-      commitPreview(pending);
-      pending = null;
-    };
-    const surface = document.querySelector(".canvas-surface") as HTMLElement | null;
-    if (!surface) return;
-    const surfaceRect = surface.getBoundingClientRect();
-
-    const onMove = (e: PointerEvent) => {
-      const { viewport: vp } = useCanvasStore.getState();
-      const next = {
-        x: (e.clientX - surfaceRect.left - vp.x) / vp.zoom,
-        y: (e.clientY - surfaceRect.top - vp.y) / vp.zoom,
-      };
-      if (last && Math.hypot(next.x - last.x, next.y - last.y) < 0.75 / vp.zoom) {
-        return;
-      }
-      pending = next;
-      if (!last) {
-        flushPreview();
-        return;
-      }
-      if (frame == null) frame = requestAnimationFrame(flushPreview);
-    };
-    document.addEventListener("pointermove", onMove);
-    return () => {
-      if (frame != null) cancelAnimationFrame(frame);
-      document.removeEventListener("pointermove", onMove);
-    };
-  }, [frozenPreviewPoint, linkingFromId]);
-  const effectivePreviewWorld = frozenPreviewPoint ?? previewWorld;
+  // O preview tracejado do linking vive num componente proprio (<LinkPreview>)
+  // pra que o pointermove que o atualiza NAO re-renderize a ArrowLayer inteira
+  // (que mapeia TODAS as setas) a cada frame — era a fonte do stutter ao puxar
+  // uma seta. Isolado, so' o <LinkPreview> re-renderiza por frame.
   const dragRef = useRef<{
     id: string;
     startClientX: number;
@@ -210,7 +156,6 @@ export const ArrowLayer = memo(function ArrowLayer({
   // Larguras em world coords: dividimos por zoom pra manter o traço com
   // espessura visual constante, independente de pan/zoom. Sem isso, em
   // zoom-out (<1), 1.5 world px vira sub-pixel e a arrow some.
-  const baseStroke = 2 / zoom;
   const hitStroke = 16 / zoom;
   const handleR = 6 / zoom;
   const handleStroke = 1.5 / zoom;
@@ -278,40 +223,88 @@ export const ArrowLayer = memo(function ArrowLayer({
         );
       })}
 
-      {/* Preview tracejado durante linking. Ancora no lado cardinal da
-          origem virado pro cursor e extruda o primeiro control point pra
-          manter o mesmo "look" da seta final. */}
-      {linkingFromId &&
-        effectivePreviewWorld &&
-        (() => {
-          const src = rectById.get(linkingFromId);
-          if (!src) return null;
-          const { p1, cp1, cp2, p2 } = routeArrowToPoint(
-            src,
-            effectivePreviewWorld,
-            linkingFromSide ?? undefined,
-          );
-          const d = `M ${p1.x} ${p1.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${p2.x} ${p2.y}`;
-          const dash = 8 / zoom;
-          return (
-            <path
-              d={d}
-              fill="none"
-              strokeWidth={baseStroke}
-              strokeLinecap="round"
-              strokeDasharray={`${dash} ${dash * 0.6}`}
-              markerEnd="url(#arrowhead-selected)"
-              style={{
-                pointerEvents: "none",
-                stroke: "var(--accent)",
-                opacity: 0.7,
-              }}
-            />
-          );
-        })()}
+      {/* Preview tracejado durante linking — isolado em componente proprio
+          pra nao re-renderizar a ArrowLayer a cada pointermove. */}
+      {linkingFromId && (
+        <LinkPreview
+          sourceRect={rectById.get(linkingFromId)}
+          fromSide={linkingFromSide}
+          zoom={zoom}
+          frozenPreviewPoint={frozenPreviewPoint}
+        />
+      )}
     </svg>
   );
 });
+
+/**
+ * Preview tracejado enquanto o usuario puxa uma seta. Isolado da ArrowLayer:
+ * o pointermove atualiza APENAS este componente (uma path), nao a lista
+ * inteira de setas — elimina o stutter ao arrastar. Ancora no lado cardinal
+ * escolhido (fromSide) ou auto pelo vetor origem→cursor.
+ */
+function LinkPreview({
+  sourceRect,
+  fromSide,
+  zoom,
+  frozenPreviewPoint,
+}: {
+  sourceRect: Rect | undefined;
+  fromSide: Side | null;
+  zoom: number;
+  frozenPreviewPoint?: { x: number; y: number } | null;
+}) {
+  // Path atualizado IMPERATIVAMENTE (setAttribute) no pointermove — sem
+  // setState, sem re-render por frame. Elimina o stutter ao puxar a seta.
+  const pathRef = useRef<SVGPathElement | null>(null);
+
+  const buildD = useCallback(
+    (target: { x: number; y: number } | null | undefined) => {
+      if (!sourceRect || !target) return "";
+      const { p1, cp1, cp2, p2 } = routeArrowToPoint(
+        sourceRect,
+        target,
+        fromSide ?? undefined,
+      );
+      return `M ${p1.x} ${p1.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${p2.x} ${p2.y}`;
+    },
+    [sourceRect, fromSide],
+  );
+
+  useEffect(() => {
+    // Preview congelado (menu de link-vazio aberto) e' estatico — sem listener.
+    if (frozenPreviewPoint) return;
+    const surface = document.querySelector(".canvas-surface") as HTMLElement | null;
+    if (!surface) return;
+    const surfaceRect = surface.getBoundingClientRect();
+    const onMove = (e: PointerEvent) => {
+      const { viewport: vp } = useCanvasStore.getState();
+      const target = {
+        x: (e.clientX - surfaceRect.left - vp.x) / vp.zoom,
+        y: (e.clientY - surfaceRect.top - vp.y) / vp.zoom,
+      };
+      const node = pathRef.current;
+      if (node) node.setAttribute("d", buildD(target));
+    };
+    document.addEventListener("pointermove", onMove);
+    return () => document.removeEventListener("pointermove", onMove);
+  }, [frozenPreviewPoint, buildD]);
+
+  if (!sourceRect) return null;
+  const dash = 8 / zoom;
+  return (
+    <path
+      ref={pathRef}
+      d={frozenPreviewPoint ? buildD(frozenPreviewPoint) : ""}
+      fill="none"
+      strokeWidth={2 / zoom}
+      strokeLinecap="round"
+      strokeDasharray={`${dash} ${dash * 0.6}`}
+      markerEnd="url(#arrowhead-selected)"
+      style={{ pointerEvents: "none", stroke: "var(--accent)", opacity: 0.7 }}
+    />
+  );
+}
 
 /**
  * Render de uma seta individual. Memoizado por (arrow, from, to, zoom, tool):
