@@ -129,6 +129,12 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   const [toolbarPos, setToolbarPos] = useState<{ left: number; top: number } | null>(
     null,
   );
+  // Estado da selecao atual (B/I/U "aceso" conforme o trecho selecionado).
+  const [inlineFmt, setInlineFmt] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+  });
   const rootRef = useRef<HTMLDivElement>(null);
   const editRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{
@@ -185,6 +191,26 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
+  // B/I/U reativo: enquanto edita, escuta selectionchange e reflete o estado
+  // do trecho selecionado (queryCommandState). So' atualiza se a selecao esta
+  // DENTRO deste editor — senao um clique em outra caixa mexeria aqui.
+  useEffect(() => {
+    if (!editing) return;
+    const update = () => {
+      const el = editRef.current;
+      const sel = window.getSelection();
+      if (!el || !sel || !sel.anchorNode || !el.contains(sel.anchorNode)) return;
+      setInlineFmt({
+        bold: document.queryCommandState("bold"),
+        italic: document.queryCommandState("italic"),
+        underline: document.queryCommandState("underline"),
+      });
+    };
+    document.addEventListener("selectionchange", update);
+    update();
+    return () => document.removeEventListener("selectionchange", update);
+  }, [editing]);
+
   useEffect(() => {
     if (!editing) setDraftText(text.text);
   }, [editing, text.text]);
@@ -203,8 +229,9 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   }, [openMenu]);
 
   useLayoutEffect(() => {
-    // Mostra a toolbar tambem durante a edicao (pra formatar a selecao inline).
-    if (!isSelected) {
+    // Mostra a toolbar quando selecionado OU editando (pra formatar a selecao
+    // inline — inclui texto novo que ainda nao esta "selecionado" como bloco).
+    if (!isSelected && !editing) {
       setToolbarPos(null);
       return;
     }
@@ -421,6 +448,13 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     document.execCommand("styleWithCSS", false, "true");
     document.execCommand(command, false, value);
     commitDraft();
+    // Reflete o novo estado nos botoes (execCommand nem sempre dispara
+    // selectionchange).
+    setInlineFmt({
+      bold: document.queryCommandState("bold"),
+      italic: document.queryCommandState("italic"),
+      underline: document.queryCommandState("underline"),
+    });
   };
 
   const onResizeMouseDown = (dir: ResizeDir, e: React.MouseEvent) => {
@@ -742,7 +776,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
         </>
       )}
 
-      {isSelected && toolbarPos && createPortal(
+      {(isSelected || editing) && toolbarPos && createPortal(
         <div
           data-text-action
           className="fixed z-[70] flex items-center gap-0.5 px-1 py-0.5"
@@ -758,7 +792,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
         >
           <TinyBtn
             title={editing ? "Negrito (na seleção)" : "Negrito"}
-            active={!editing && text.bold}
+            active={editing ? inlineFmt.bold : text.bold}
             onClick={(e) => {
               e.stopPropagation();
               if (editing) applyInline("bold");
@@ -769,7 +803,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
           </TinyBtn>
           <TinyBtn
             title={editing ? "Itálico (na seleção)" : "Itálico"}
-            active={!editing && text.italic}
+            active={editing ? inlineFmt.italic : text.italic}
             onClick={(e) => {
               e.stopPropagation();
               if (editing) applyInline("italic");
@@ -780,7 +814,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
           </TinyBtn>
           <TinyBtn
             title={editing ? "Sublinhado (na seleção)" : "Sublinhado"}
-            active={!editing && text.underline}
+            active={editing ? inlineFmt.underline : text.underline}
             onClick={(e) => {
               e.stopPropagation();
               if (editing) applyInline("underline");
