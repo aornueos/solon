@@ -1,35 +1,50 @@
 import clsx from "clsx";
-import type { CSSProperties } from "react";
 import { CardSide } from "../../types/canvas";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { startCanvasLinkDrag } from "../../lib/canvasLinkDrag";
 
-const SIDES: {
-  side: CardSide;
-  style: CSSProperties;
-  title: string;
-}[] = [
-  {
-    side: "top",
-    style: { top: 0, left: "50%", transform: "translate(-50%, -50%)" },
-    title: "Conectar pelo topo",
-  },
-  {
-    side: "right",
-    style: { top: "50%", left: "100%", transform: "translate(-50%, -50%)" },
-    title: "Conectar pela direita",
-  },
-  {
-    side: "bottom",
-    style: { top: "100%", left: "50%", transform: "translate(-50%, -50%)" },
-    title: "Conectar pela base",
-  },
-  {
-    side: "left",
-    style: { top: "50%", left: 0, transform: "translate(-50%, -50%)" },
-    title: "Conectar pela esquerda",
-  },
-];
+/**
+ * Posicoes dos dots — FORA da caixa (nao mais em cima da borda). Antes o
+ * centro do dot ficava EXATAMENTE na borda (top:0/left:50%/etc + translate
+ * -50%/-50%), o que colocava metade do dot sobre a caixa e, em itens
+ * pequenos, fazia o dot colidir/sobrepor os handles de resize dos cantos —
+ * dificil de clicar no alvo certo. Com `gap` o dot fica inteiramente fora,
+ * sem disputar espaco com resize.
+ */
+function buildSides(
+  gap: number,
+): { side: CardSide; style: React.CSSProperties; title: string }[] {
+  return [
+    {
+      side: "top",
+      style: { top: -gap, left: "50%", transform: "translate(-50%, -50%)" },
+      title: "Conectar pelo topo",
+    },
+    {
+      side: "right",
+      style: {
+        top: "50%",
+        left: `calc(100% + ${gap}px)`,
+        transform: "translate(-50%, -50%)",
+      },
+      title: "Conectar pela direita",
+    },
+    {
+      side: "bottom",
+      style: {
+        top: `calc(100% + ${gap}px)`,
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+      },
+      title: "Conectar pela base",
+    },
+    {
+      side: "left",
+      style: { top: "50%", left: -gap, transform: "translate(-50%, -50%)" },
+      title: "Conectar pela esquerda",
+    },
+  ];
+}
 
 export function ConnectionDots({
   entityId,
@@ -54,10 +69,14 @@ export function ConnectionDots({
   const dotSize = 10 / zoom;
   const border = 1.8 / zoom;
   const mask = 1.5 / zoom;
+  // Distancia do dot ate' a borda — fora da caixa, sem disputar espaco com
+  // os handles de resize dos cantos.
+  const gap = 8 / zoom;
+  const sides = buildSides(gap);
 
   return (
     <>
-      {SIDES.map(({ side, style, title }) => {
+      {sides.map(({ side, style, title }) => {
         const activeSource = isLinkSource && linkingFromSide === side;
         return (
           <button

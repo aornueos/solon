@@ -49,6 +49,23 @@ export function useCanvasPersistence() {
       }
       const doc = await loadCanvas(activeFilePath);
       if (cancelled) return;
+      if (doc === null) {
+        // Falha ao LER um canvas que existe (erro transiente / arquivo
+        // corrompido). NAO hidratamos como vazio — senao o auto-save
+        // sobrescreveria o arquivo real com um canvas vazio. Mostramos vazio
+        // mas deixamos a persistencia BLOQUEADA (hydratedFor = null → o
+        // subscribe e o flush de unmount nao salvam), preservando o disco.
+        reset();
+        hydratedFor.current = null;
+        useAppStore
+          .getState()
+          .pushToast(
+            "error",
+            "Não foi possível ler o canvas deste arquivo — ele foi preservado no disco. Feche e reabra o arquivo para tentar de novo.",
+            8000,
+          );
+        return;
+      }
       hydrate(activeFilePath, doc);
       hydratedFor.current = activeFilePath;
     })();
@@ -58,6 +75,21 @@ export function useCanvasPersistence() {
   }, [activeFilePath, hydrate, reset]);
 
   useEffect(() => {
+    // Flush best-effort quando a janela some (minimizar, trocar de app,
+    // fechar). O unmount do React NAO roda no fechamento abrupto do webview
+    // Tauri, entao mudancas dentro da janela de debounce se perderiam sem
+    // isto. `visibilitychange=hidden` geralmente precede o close e da tempo
+    // do save async completar.
+    const flush = () => {
+      const file = hydratedFor.current;
+      if (file) void saveCanvas(file, useCanvasStore.getState().toDoc());
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+
     const unsub = useCanvasStore.subscribe((state, prev) => {
       const file = hydratedFor.current;
       if (!file || file !== state.filePath) return;
@@ -85,6 +117,8 @@ export function useCanvasPersistence() {
     });
     return () => {
       unsub();
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
       if (cardTimer.current) clearTimeout(cardTimer.current);
       if (vpTimer.current) clearTimeout(vpTimer.current);
       const file = hydratedFor.current;

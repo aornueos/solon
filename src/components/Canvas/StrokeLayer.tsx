@@ -221,11 +221,14 @@ function StrokeConnectionDots({
   const alwaysShow = isLinkSource;
   const radius = 5 / zoom;
   const strokeWidth = 1.8 / zoom;
+  // Fora do bbox do traco — mesmo gap do ConnectionDots (Card/Image/Text),
+  // pra nao ficar em cima da borda.
+  const gap = 8 / zoom;
   const sides: { side: CardSide; x: number; y: number; title: string }[] = [
-    { side: "top", x: rect.x + rect.w / 2, y: rect.y, title: "Conectar pelo topo" },
-    { side: "right", x: rect.x + rect.w, y: rect.y + rect.h / 2, title: "Conectar pela direita" },
-    { side: "bottom", x: rect.x + rect.w / 2, y: rect.y + rect.h, title: "Conectar pela base" },
-    { side: "left", x: rect.x, y: rect.y + rect.h / 2, title: "Conectar pela esquerda" },
+    { side: "top", x: rect.x + rect.w / 2, y: rect.y - gap, title: "Conectar pelo topo" },
+    { side: "right", x: rect.x + rect.w + gap, y: rect.y + rect.h / 2, title: "Conectar pela direita" },
+    { side: "bottom", x: rect.x + rect.w / 2, y: rect.y + rect.h + gap, title: "Conectar pela base" },
+    { side: "left", x: rect.x - gap, y: rect.y + rect.h / 2, title: "Conectar pela esquerda" },
   ];
 
   return (
