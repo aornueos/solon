@@ -365,15 +365,15 @@ export default function App() {
           toggleReadingMode();
         }
       }
-      // Ctrl+T abre a scratchpad — janela de buffer transiente, sem
-      // criar arquivo no disco. Antes criava "Sem titulo.md" automaticamente,
-      // o que poluia o projeto. createUntitled segue acessivel pelo command
-      // palette ("Nova nota vazia") pra quem quiser de fato.
+      // Ctrl+T cria uma nova nota vazia ("Sem titulo") e abre numa aba nova —
+      // convencao de "nova aba" do browser. O rascunho (scratchpad) migrou pro
+      // Ctrl+Shift+N pra nao conflitar.
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "t") {
         e.preventDefault();
-        openScratchpad();
+        void createUntitled();
         return;
       }
+      // Ctrl+Shift+N — rascunho (scratchpad): buffer transiente, sem arquivo.
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "n") {
         e.preventDefault();
         openScratchpad();
