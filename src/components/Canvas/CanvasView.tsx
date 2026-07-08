@@ -209,11 +209,10 @@ export function CanvasView() {
         setTool("select");
       }
       if (e.key === "Delete" || e.key === "Backspace") {
-        // Guarda considera tanto selecao primaria quanto grupo de marquee.
-        // Antes, `selectedId = null` (estado normal apos marquee sem primary)
-        // fazia Delete virar no-op mesmo com 5 cards selecionados.
-        const { selectedIds } = useCanvasStore.getState();
-        if (!selectedId && selectedIds.size === 0) return;
+        // Le estado FRESCO (nao o closure do effect, que pode estar stale) —
+        // considera selecao primaria E grupo de marquee.
+        const st = useCanvasStore.getState();
+        if (!st.selectedId && st.selectedIds.size === 0) return;
         removeSelected();
       }
       if ((e.key === "a" || e.key === "A") && (e.ctrlKey || e.metaKey)) {
@@ -269,14 +268,10 @@ export function CanvasView() {
         st.removeSelected();
         return;
       }
-      if ((e.key === "v" || e.key === "V") && (e.ctrlKey || e.metaKey)) {
-        // So' preventDefault se colou um bloco interno. Se o clipboard interno
-        // esta vazio, deixamos o evento `paste` nativo rodar (cola imagem do
-        // SO) — preventDefault aqui mataria esse evento.
-        const pasted = useCanvasStore.getState().pasteClipboard();
-        if (pasted) e.preventDefault();
-        return;
-      }
+      // Ctrl+V NAO e' tratado aqui de proposito: deixamos o evento `paste`
+      // nativo (onPaste) cuidar dele — imagem do SO tem prioridade e, se nao
+      // houver, ele cola o clipboard INTERNO do canvas. Assim uma imagem da
+      // web copiada agora vence um bloco antigo no clipboard interno.
       if (e.ctrlKey || e.metaKey) return; // ignora outros Ctrl+X
 
       const numericTool = CANVAS_TOOL_ORDER[Number(e.key) - 1];
@@ -373,6 +368,25 @@ export function CanvasView() {
   // Paste de imagens (somente quando canvas visível e nada focado)
   useEffect(() => {
     if (activeView !== "canvas") return;
+    // Salva + posiciona uma imagem no centro da viewport (escala se grande).
+    const placeImageFile = async (file: File) => {
+      const { src, width, height } = await saveImageForCanvas(rootFolder!, file);
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const centerWX = (rect.width / 2 - viewport.x) / viewport.zoom;
+      const centerWY = (rect.height / 2 - viewport.y) / viewport.zoom;
+      const maxSide = 420;
+      let w = width;
+      let h = height;
+      if (Math.max(w, h) > maxSide) {
+        const r = maxSide / Math.max(w, h);
+        w = Math.round(w * r);
+        h = Math.round(h * r);
+      }
+      addImage({ src, x: centerWX - w / 2, y: centerWY - h / 2, w, h });
+    };
+
     const onPaste = async (e: ClipboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (
@@ -384,50 +398,61 @@ export function CanvasView() {
         return;
       }
       if (!rootFolder) return;
+
+      // 1) Bitmap direto no clipboard — "Copiar imagem" (botao direito),
+      //    screenshots, apps de imagem.
       const items = e.clipboardData?.items;
-      if (!items) return;
-      for (const item of items) {
-        if (!item.type.startsWith("image/")) continue;
-        const file = item.getAsFile();
-        if (!file) continue;
-        e.preventDefault();
-        try {
-          const { src, width, height } = await saveImageForCanvas(
-            rootFolder,
-            file,
-          );
-          // Centraliza a imagem na viewport atual (em world coords)
-          const el = containerRef.current;
-          if (!el) return;
-          const rect = el.getBoundingClientRect();
-          const centerWX =
-            (rect.width / 2 - viewport.x) / viewport.zoom;
-          const centerWY =
-            (rect.height / 2 - viewport.y) / viewport.zoom;
-          // Escala se imagem for grande demais
-          const maxSide = 420;
-          let w = width;
-          let h = height;
-          if (Math.max(w, h) > maxSide) {
-            const r = maxSide / Math.max(w, h);
-            w = Math.round(w * r);
-            h = Math.round(h * r);
+      if (items) {
+        for (const item of items) {
+          if (!item.type.startsWith("image/")) continue;
+          const file = item.getAsFile();
+          if (!file) continue;
+          e.preventDefault();
+          try {
+            await placeImageFile(file);
+          } catch (err) {
+            console.error("Erro ao colar imagem:", err);
+            pushToast(
+              "error",
+              err instanceof Error ? err.message : "Não foi possível colar a imagem.",
+            );
           }
-          addImage({
-            src,
-            x: centerWX - w / 2,
-            y: centerWY - h / 2,
-            w,
-            h,
-          });
-        } catch (err) {
-          console.error("Erro ao colar imagem:", err);
-          pushToast(
-            "error",
-            err instanceof Error ? err.message : "Não foi possível colar a imagem.",
-          );
+          return; // so' a primeira
         }
-        return; // só a primeira imagem
+      }
+
+      // 2) Sem bitmap — imagem da WEB copiada como `<img src>` (text/html) ou
+      //    uma URL / data-uri (text/plain). Copiar imagem do navegador com
+      //    Ctrl+C geralmente cai aqui, nao no caso 1. Baixa e coloca.
+      const html = e.clipboardData?.getData("text/html") ?? "";
+      const plain = (e.clipboardData?.getData("text/plain") ?? "").trim();
+      let url: string | null = null;
+      const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if (m) url = m[1];
+      else if (/^data:image\//i.test(plain)) url = plain;
+      else if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|bmp|svg|avif)(\?\S*)?$/i.test(plain))
+        url = plain;
+      if (!url) {
+        // 3) Sem imagem no clipboard do SO — cola o clipboard INTERNO do canvas
+        //    (blocos copiados com Ctrl+C), se houver.
+        useCanvasStore.getState().pasteClipboard();
+        return;
+      }
+
+      e.preventDefault();
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const blob = await resp.blob();
+        if (!blob.type.startsWith("image/")) throw new Error("Conteúdo não é imagem");
+        const ext = (blob.type.split("/")[1] || "png").split("+")[0];
+        await placeImageFile(new File([blob], `colada.${ext}`, { type: blob.type }));
+      } catch (err) {
+        console.error("Erro ao baixar imagem da web:", err);
+        pushToast(
+          "error",
+          'Não foi possível baixar a imagem da web (rede/CORS). Dica: botão direito na imagem → "Copiar imagem", depois cole.',
+        );
       }
     };
     document.addEventListener("paste", onPaste);
@@ -746,7 +771,12 @@ export function CanvasView() {
     const active = document.activeElement;
     if (
       active instanceof HTMLElement &&
-      (active.tagName === "TEXTAREA" || active.tagName === "INPUT") &&
+      (active.tagName === "TEXTAREA" ||
+        active.tagName === "INPUT" ||
+        // FloatingText agora edita num contenteditable DIV, nao textarea —
+        // sem este caso, clicar fora NAO tirava o foco e o texto "nao saia"
+        // da edicao (e o Delete depois era engolido pelo guard `typing`).
+        active.isContentEditable) &&
       active.closest(".canvas-surface")
     ) {
       active.blur();
@@ -889,7 +919,14 @@ export function CanvasView() {
             o radial-gradient fullscreen 60x/s, causando o stutter. Agora
             e' uma layer estatica gigante; o pan e' so' translate na GPU.
             O quadrado cobre +-100k unidades de mundo (suficiente pra
-            qualquer projeto real). */}
+            qualquer projeto real).
+
+            `translateZ(0)` promove o grid a uma CAMADA COMPOSTA propria,
+            separada da camada de conteudo (cards/setas/textos). Sem isso, os
+            200000x200000px do grid inchavam a camada do container do mundo, e
+            QUALQUER update dentro dela (arrastar seta/card) re-rasterizava uma
+            textura gigantesca → stutter. Isolado, o conteudo re-rasteriza numa
+            camada pequena e o grid so' repinta em zoom. */}
         {canvasGridEnabled && (
           <div
             aria-hidden
@@ -903,6 +940,7 @@ export function CanvasView() {
                 "radial-gradient(circle at 1px 1px, var(--dot-grid) 1px, transparent 1px)",
               backgroundSize: `${canvasGridSize}px ${canvasGridSize}px`,
               pointerEvents: "none",
+              transform: "translateZ(0)",
             }}
           />
         )}
