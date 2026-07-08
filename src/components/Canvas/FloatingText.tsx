@@ -77,6 +77,28 @@ function buildInitialEditHtml(t: CanvasText): string {
   if (t.highlight) styles.push(`background-color:${t.highlight}`);
   return styles.length ? `<span style="${styles.join(";")}">${esc}</span>` : esc;
 }
+// Le o texto puro de um contenteditable PRESERVANDO quebras de linha: <br> e
+// blocos (div/p, que o Chromium cria a cada Enter) viram \n. `textContent`
+// sozinho concatena tudo — as quebras sumiam ao sair da edicao.
+function contentEditableToPlain(root: HTMLElement): string {
+  let out = "";
+  const walk = (node: Node) => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        out += child.textContent ?? "";
+      } else if (child.nodeName === "BR") {
+        out += "\n";
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const isBlock = /^(DIV|P)$/.test(child.nodeName);
+        if (isBlock && out.length > 0 && !out.endsWith("\n")) out += "\n";
+        walk(child);
+        if (isBlock && !out.endsWith("\n")) out += "\n";
+      }
+    });
+  };
+  walk(root);
+  return out.replace(/\n+$/, "");
+}
 // Detecta se o HTML tem alguma marcacao inline de verdade (nao so' texto/br).
 function hasInlineMarkup(html: string): boolean {
   return /<(b|strong|i|em|u|s|strike|mark|span|font)\b/i.test(html);
@@ -137,6 +159,13 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   });
   const rootRef = useRef<HTMLDivElement>(null);
   const editRef = useRef<HTMLDivElement>(null);
+  // Ver `commitDraft` — salvam a edicao em andamento no unmount.
+  const commitRef = useRef<() => void>(() => {});
+  const editingRef = useRef(false);
+  // Debounce do commit-durante-digitacao: mantem o store ~atual pra que
+  // qualquer flush (auto-save, minimizar, fechar app) capture a edicao mesmo
+  // sem o usuario sair da caixa (sem blur).
+  const inputCommitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragState = useRef<{
     startX: number;
     startY: number;
@@ -190,6 +219,14 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     sel?.addRange(range);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
+
+  // Commit da edicao no unmount (rede de seguranca — ver commitDraft).
+  useEffect(() => {
+    return () => {
+      if (inputCommitTimer.current) clearTimeout(inputCommitTimer.current);
+      if (editingRef.current) commitRef.current();
+    };
+  }, []);
 
   // B/I/U reativo: enquanto edita, escuta selectionchange e reflete o estado
   // do trecho selecionado (queryCommandState). So' atualiza se a selecao esta
@@ -430,13 +467,20 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   const commitDraft = () => {
     const el = editRef.current;
     if (!el) return;
-    const plain = el.textContent ?? "";
+    const plain = contentEditableToPlain(el);
     const html = sanitizeRichText(el.innerHTML);
     updateText(text.id, {
       text: plain,
       html: hasInlineMarkup(html) ? html : undefined,
     });
   };
+
+  // Rede de seguranca: se o componente desmontar ENQUANTO edita (trocar de
+  // arquivo/aba por atalho, fechar o canvas — sem passar pelo blur), salva o
+  // que estava na caixa. Sem isso, a edicao nao-commitada se perdia. Refs pra
+  // que a limpeza (roda so' no unmount) leia os valores mais recentes.
+  commitRef.current = commitDraft;
+  editingRef.current = editing;
 
   // Aplica formatacao INLINE na selecao atual do contenteditable (negrito,
   // grifo, cor de trecho — igual Miro). Roda so' em edicao; o preventDefault
@@ -697,8 +741,16 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
           // Uncontrolled: o conteudo e' injetado uma vez no effect de entrada
           // em edicao. onInput so' atualiza o draft (medida), nunca reseta o
           // innerHTML. Selecione um trecho e use a toolbar pra formatar so' ele.
-          onInput={() => setDraftText(editRef.current?.textContent ?? "")}
+          onInput={() => {
+            const el = editRef.current;
+            setDraftText(el ? contentEditableToPlain(el) : "");
+            // Persiste no store de forma debounced (rede de seguranca de
+            // durabilidade — ver inputCommitTimer).
+            if (inputCommitTimer.current) clearTimeout(inputCommitTimer.current);
+            inputCommitTimer.current = setTimeout(() => commitDraft(), 400);
+          }}
           onBlur={() => {
+            if (inputCommitTimer.current) clearTimeout(inputCommitTimer.current);
             commitDraft();
             setEditing(false);
             if (!(editRef.current?.textContent ?? "").trim()) removeText(text.id);

@@ -16,14 +16,28 @@ export function canvasPathFor(filePath: string): string {
   return `${filePath}.canvas.json`;
 }
 
-/** Carrega o sidecar canvas.json do arquivo ou retorna EMPTY_CANVAS. */
-export async function loadCanvas(filePath: string): Promise<CanvasDoc> {
+/**
+ * Carrega o sidecar canvas.json do arquivo.
+ *  - Arquivo NAO existe → EMPTY_CANVAS (canvas novo, ok persistir).
+ *  - Arquivo existe mas falha ao ler/parsear → `null` (SINAL de erro).
+ *
+ * A distincao e' CRITICA pra integridade: se retornassemos EMPTY num erro
+ * transiente (arquivo travado, disco ocupado, JSON corrompido), o auto-save
+ * subsequente sobrescreveria o canvas real com vazio — perda catastrofica.
+ * Com `null`, o caller (useCanvasPersistence) BLOQUEIA a persistencia e
+ * preserva o arquivo no disco.
+ */
+export async function loadCanvas(
+  filePath: string,
+): Promise<CanvasDoc | null> {
   if (!isTauri) {
+    const raw = localStorage.getItem(`solon:canvas:${filePath}`);
+    if (raw == null) return { ...EMPTY_CANVAS };
     try {
-      const raw = localStorage.getItem(`solon:canvas:${filePath}`);
-      if (raw) return normalize(JSON.parse(raw));
-    } catch {}
-    return { ...EMPTY_CANVAS };
+      return normalize(JSON.parse(raw));
+    } catch {
+      return null; // corrompido — nao trata como vazio
+    }
   }
   try {
     const { readTextFile, exists } = await import("@tauri-apps/plugin-fs");
@@ -32,8 +46,9 @@ export async function loadCanvas(filePath: string): Promise<CanvasDoc> {
     const raw = await readTextFile(full);
     return normalize(JSON.parse(raw));
   } catch (err) {
+    // Arquivo existe mas nao deu pra ler/parsear — preserva (retorna null).
     console.error("Erro ao carregar canvas:", err);
-    return { ...EMPTY_CANVAS };
+    return null;
   }
 }
 
