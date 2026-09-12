@@ -216,6 +216,10 @@ interface AppState {
   sceneMeta: SceneMeta;
   /** Abas abertas. A aba ativa e' aquela cujo `path === activeFilePath`. */
   openTabs: OpenTab[];
+  /** Conteudo dos buffers untitled (Ctrl+T) indexado por path sintetico —
+   *  preserva o texto ao trocar de aba, ja' que so' um buffer fica em
+   *  `fileBody` por vez. So' de sessao (nao persiste). */
+  untitledBuffers: Record<string, { body: string; meta: SceneMeta }>;
   /** Pilha curta de abas fechadas para Ctrl+Shift+T. */
   closedTabs: OpenTab[];
   /** Split pane transiente desta janela. */
@@ -399,6 +403,13 @@ interface AppState {
   /** Adiciona aba se ainda nao existe. Idempotente — chamado por `openFile`
    *  toda vez. Persiste a lista em localStorage. */
   addTab: (path: string, name: string) => void;
+  /** Cria uma aba VAZIA em memoria (Ctrl+T) — buffer sem arquivo no disco.
+   *  So' vira arquivo real quando o usuario da Ctrl+S. */
+  createBlankTab: () => void;
+  /** Guarda o conteudo atual de um buffer untitled (chamar ao SAIR dele). */
+  stashUntitled: (path: string, body: string, meta: SceneMeta) => void;
+  /** Descarta um buffer untitled (ao fechar a aba / materializar). */
+  dropUntitled: (path: string) => void;
   replaceActiveTab: (path: string, name: string, previousActivePath?: string | null) => void;
   /** Fecha aba pelo path. Se era a ativa, retorna o path da proxima/anterior
    *  pra que o caller chame `openFile` (precisa de I/O — store nao faz). */
@@ -563,6 +574,13 @@ function saveRecentFiles(files: RecentFile[]): void {
   }
 }
 
+/** Abas "untitled" = buffer em memoria (Ctrl+T), SEM arquivo no disco. O path
+ *  e' sintetico (`untitled:...`). O auto-save as ignora; so' viram arquivo real
+ *  quando o usuario da Ctrl+S (que pede um nome e materializa). */
+export const UNTITLED_PREFIX = "untitled:";
+export const isUntitledPath = (p: string | null | undefined): boolean =>
+  !!p && p.startsWith(UNTITLED_PREFIX);
+
 function loadOpenTabs(): OpenTab[] {
   if (IS_DETACHED_WINDOW) return [];
   try {
@@ -586,7 +604,10 @@ function loadOpenTabs(): OpenTab[] {
 function saveOpenTabs(tabs: OpenTab[]): void {
   if (IS_DETACHED_WINDOW) return;
   try {
-    localStorage.setItem(OPEN_TABS_KEY, JSON.stringify(tabs));
+    // Abas untitled sao de sessao (buffer em memoria) — nao persistem, senao
+    // no reload apontariam pra um `untitled:...` inexistente.
+    const persistable = tabs.filter((t) => !isUntitledPath(t.path));
+    localStorage.setItem(OPEN_TABS_KEY, JSON.stringify(persistable));
   } catch {
     /* storage cheio — ignora */
   }
@@ -1074,6 +1095,7 @@ export const useAppStore = create<AppState>((set) => ({
   fileBody: "",
   sceneMeta: {},
   openTabs: loadOpenTabs(),
+  untitledBuffers: {},
   closedTabs: loadClosedTabs(),
   splitPane: loadSplitPane(),
   scratchpadOpen: false,
@@ -1188,7 +1210,9 @@ export const useAppStore = create<AppState>((set) => ({
     // restore no proximo boot. Mesmo padrao do `solon:rootFolder` mais
     // acima — chave separada porque arquivo pode mudar com mais
     // frequencia que pasta.
-    if (!IS_DETACHED_WINDOW) {
+    // Buffers untitled (Ctrl+T) nao sao arquivos reais — nao viram "lastFile"
+    // (senao o boot tentaria reabrir um `untitled:...` inexistente).
+    if (!IS_DETACHED_WINDOW && !isUntitledPath(path)) {
       try {
       localStorage.setItem("solon:lastFile", path);
       } catch {
@@ -1209,6 +1233,40 @@ export const useAppStore = create<AppState>((set) => ({
       const next = [...s.openTabs, { path, name }];
       saveOpenTabs(next);
       return { openTabs: next };
+    }),
+
+  createBlankTab: () =>
+    set((s) => {
+      const path = `${UNTITLED_PREFIX}${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 6)}`;
+      const openTabs = [...s.openTabs, { path, name: "Sem título" }];
+      saveOpenTabs(openTabs); // filtra untitled (nao persiste)
+      return {
+        openTabs,
+        activeFilePath: path,
+        activeFileName: "Sem título",
+        fileBody: "",
+        sceneMeta: {},
+        headings: [],
+        wordCount: 0,
+        charCount: 0,
+        saveStatus: "idle",
+        activeView: "editor",
+      };
+    }),
+
+  stashUntitled: (path, body, meta) =>
+    set((s) => ({
+      untitledBuffers: { ...s.untitledBuffers, [path]: { body, meta } },
+    })),
+
+  dropUntitled: (path) =>
+    set((s) => {
+      if (!(path in s.untitledBuffers)) return s;
+      const next = { ...s.untitledBuffers };
+      delete next[path];
+      return { untitledBuffers: next };
     }),
 
   replaceActiveTab: (path, name, previousActivePath) =>
@@ -1253,13 +1311,23 @@ export const useAppStore = create<AppState>((set) => ({
       } else {
         nextActive = s.activeFilePath;
       }
-      const nextClosed = closed
-        ? [closed, ...s.closedTabs.filter((t) => t.path !== closed.path)].slice(0, 12)
-        : s.closedTabs;
+      // Abas untitled NAO entram na pilha de "reabrir" (nao ha arquivo pra
+      // reabrir) e o buffer em memoria e' descartado.
+      const isUntitled = isUntitledPath(path);
+      const nextClosed =
+        closed && !isUntitled
+          ? [closed, ...s.closedTabs.filter((t) => t.path !== closed.path)].slice(0, 12)
+          : s.closedTabs;
       saveClosedTabs(nextClosed);
+      let untitledBuffers = s.untitledBuffers;
+      if (isUntitled && path in untitledBuffers) {
+        untitledBuffers = { ...untitledBuffers };
+        delete untitledBuffers[path];
+      }
       return {
         openTabs: next,
         closedTabs: nextClosed,
+        untitledBuffers,
       };
     });
     return nextActive;

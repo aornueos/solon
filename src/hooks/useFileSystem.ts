@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useAppStore, FileNode } from "../store/useAppStore";
+import { useAppStore, FileNode, isUntitledPath } from "../store/useAppStore";
 import { useCanvasStore } from "../store/useCanvasStore";
 import { parseDocument, serializeDocument } from "../lib/frontmatter";
 import { renameCanvasSidecar, deleteCanvasSidecar } from "../lib/canvas";
@@ -186,6 +186,25 @@ export function useFileSystem() {
       // body do novo. Tem que rodar ANTES da mudanca da store pq depende
       // de prev.fileBody no subscribe do useAutoSave.
       flushEditor();
+
+      // Saindo de um buffer untitled → guarda o conteudo em memoria pra nao
+      // perder ao voltar (so' um buffer fica em fileBody por vez).
+      const prev = useAppStore.getState();
+      if (isUntitledPath(previousActivePath) && previousActivePath) {
+        prev.stashUntitled(previousActivePath, prev.fileBody, prev.sceneMeta);
+      }
+      // Alvo e' um buffer untitled → restaura da memoria (nao le do disco).
+      if (isUntitledPath(path)) {
+        const buf = useAppStore.getState().untitledBuffers[path];
+        setActiveFile(path, name, buf?.body ?? "", buf?.meta ?? {});
+        if (tabMode === "replace") {
+          useAppStore.getState().replaceActiveTab(path, name, previousActivePath);
+        } else if (tabMode === "new") {
+          useAppStore.getState().addTab(path, name);
+        }
+        return; // untitled nao entra em recents nem le disco
+      }
+
       if (isTauri) {
         try {
           assertProjectNotePath(useAppStore.getState().rootFolder, path);
@@ -900,6 +919,60 @@ export function useFileSystem() {
     }
   }, [rootFolder, refresh, openFile]);
 
+  /**
+   * Materializa um buffer untitled (Ctrl+T) num arquivo real. Grava o
+   * conteudo ATUAL (que esta em fileBody, ativo) com o nome dado, troca a aba
+   * untitled -> arquivo real e descarta o buffer da memoria. Usado no Ctrl+S
+   * quando a aba ativa e' untitled. Retorna `true` se salvou.
+   */
+  const materializeUntitled = useCallback(
+    async (untitledPath: string, rawName: string): Promise<boolean> => {
+      if (!isTauri) return false;
+      if (!rootFolder) {
+        useAppStore
+          .getState()
+          .pushToast("info", "Abra uma pasta antes de salvar a nota.");
+        return false;
+      }
+      const finalName =
+        rawName.endsWith(".md") || rawName.endsWith(".txt")
+          ? rawName
+          : `${rawName}.md`;
+      if (rejectUnsafeName(finalName, "file")) return false;
+      const full = joinPath(rootFolder, finalName);
+      try {
+        assertProjectNotePath(rootFolder, full, "Arquivo");
+        const { exists } = await import("@tauri-apps/plugin-fs");
+        if (await exists(full)) {
+          useAppStore
+            .getState()
+            .pushToast("error", "Já existe um arquivo com esse nome.");
+          return false;
+        }
+        // Garante que o ultimo trabalho do editor esta em fileBody.
+        flushEditor();
+        const s = useAppStore.getState();
+        const content = serializeDocument(s.sceneMeta, s.fileBody);
+        const ok = await atomicWriteTextFile(full, content);
+        if (!ok) throw new Error("falha ao gravar (FS readonly ou bloqueio)");
+        await refresh();
+        // Troca a aba untitled -> arquivo real, aponta o ativo e limpa o buffer.
+        useAppStore.getState().renameTab(untitledPath, full, finalName);
+        setActiveFile(full, finalName, s.fileBody, s.sceneMeta);
+        useAppStore.getState().dropUntitled(untitledPath);
+        useAppStore.getState().pushRecentFile(full, finalName);
+        useAppStore.getState().setSaveStatus("saved");
+        return true;
+      } catch (err) {
+        useAppStore
+          .getState()
+          .pushToast("error", `Erro ao salvar: ${describeError(err)}`);
+        return false;
+      }
+    },
+    [refresh, rootFolder, setActiveFile],
+  );
+
   return {
     openFolder,
     openFile,
@@ -908,6 +981,7 @@ export function useFileSystem() {
     restoreLastFolder,
     createFile,
     createUntitled,
+    materializeUntitled,
     duplicateFile,
     createFolder,
     renameNode,

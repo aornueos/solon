@@ -1801,6 +1801,14 @@ select:focus-visible {
   background-color: var(--bg-app);
 }
 
+/* Enquanto arrasta uma pasta no explorador, forca o cursor "grabbing" em TUDO
+   — senao o `cursor` proprio das linhas (folders = default) revertia a
+   maozinha pra seta ao passar por cima do alvo. */
+html.solon-folder-dragging,
+html.solon-folder-dragging * {
+  cursor: grabbing !important;
+}
+
 .canvas-text-input::placeholder {
   color: var(--canvas-text-placeholder);
   opacity: 1;

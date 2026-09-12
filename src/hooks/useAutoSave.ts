@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useAppStore } from "../store/useAppStore";
+import { useAppStore, isUntitledPath } from "../store/useAppStore";
 import { serializeDocument } from "../lib/frontmatter";
 import { flushEditor } from "../lib/editorRef";
 import { useFileSystem } from "./useFileSystem";
@@ -16,7 +16,7 @@ const FORCE_FLUSH_HINT_MS = 1500;
  *  - Ctrl+S força flush imediato.
  */
 export function useAutoSave() {
-  const { saveFile } = useFileSystem();
+  const { saveFile, materializeUntitled } = useFileSystem();
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -31,7 +31,9 @@ export function useAutoSave() {
       // atrasada — o user perderia as ultimas teclas.
       flushEditor();
       const s = useAppStore.getState();
-      if (!s.activeFilePath) return false;
+      // Buffers untitled nao gravam no disco por aqui — so' via Ctrl+S
+      // (materializeUntitled, que pede um nome). Auto-save os ignora.
+      if (!s.activeFilePath || isUntitledPath(s.activeFilePath)) return false;
       const content = serializeDocument(s.sceneMeta, s.fileBody);
       s.setSaveStatus("saving");
       try {
@@ -66,6 +68,9 @@ export function useAutoSave() {
       if (state.activeFilePath !== prev.activeFilePath) {
         const shouldFlushPrevious =
           !!prev.activeFilePath &&
+          // untitled nao grava no disco no switch — o openFile ja' guardou o
+          // buffer em memoria (stashUntitled).
+          !isUntitledPath(prev.activeFilePath) &&
           (prev.saveStatus === "dirty" ||
             (timer !== null && prev.saveStatus !== "saved"));
         if (shouldFlushPrevious) {
@@ -92,6 +97,9 @@ export function useAutoSave() {
       if (state.saveStatus !== "saving" && state.saveStatus !== "dirty") {
         state.setSaveStatus("dirty");
       }
+      // Buffers untitled (Ctrl+T) nao auto-salvam — ficam "dirty" ate' o
+      // usuario dar Ctrl+S (que pede um nome e materializa em arquivo).
+      if (isUntitledPath(state.activeFilePath)) return;
       // Pref `autoSaveEnabled` desligada: deixa dirty parado. Ctrl+S
       // continua funcionando porque tem listener proprio (flushNow
       // direto). Visualmente o user ve "Editado" persistente — feedback
@@ -104,6 +112,25 @@ export function useAutoSave() {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
         void (async () => {
+          const active = useAppStore.getState().activeFilePath;
+          // Buffer untitled (Ctrl+T): Ctrl+S pede um nome e materializa em
+          // arquivo real (nao existe no disco ainda).
+          if (isUntitledPath(active) && active) {
+            const name = await useAppStore.getState().openPrompt({
+              title: "Salvar nota",
+              message: "Dê um nome para salvar esta nota no projeto.",
+              placeholder: "Ex: minha-nota",
+              confirmLabel: "Salvar",
+            });
+            if (!name?.trim()) return;
+            const ok = await materializeUntitled(active, name.trim());
+            if (ok) {
+              useAppStore
+                .getState()
+                .pushToast("success", "Salvo", FORCE_FLUSH_HINT_MS);
+            }
+            return;
+          }
           const ok = await flushNow();
           if (ok && useAppStore.getState().activeFilePath) {
             useAppStore
@@ -123,5 +150,5 @@ export function useAutoSave() {
       }
       document.removeEventListener("keydown", onKey);
     };
-  }, [saveFile]);
+  }, [saveFile, materializeUntitled]);
 }

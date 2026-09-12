@@ -522,10 +522,9 @@ function FileTreeRow({
     const originY = e.clientY;
     let dragging = false;
     let currentTargetPath: string | null = null;
-    const originalCursor = document.body.style.cursor;
 
     const finishDrag = () => {
-      document.body.style.cursor = originalCursor;
+      document.documentElement.classList.remove("solon-folder-dragging");
     };
 
     startDrag({
@@ -537,11 +536,12 @@ function FileTreeRow({
           dragging = true;
           suppressClickRef.current = true;
           onDragStart(node.path);
-          // Cursor "grabbing" enquanto arrasta a pasta — feedback visual de
-          // que ela esta sendo movida. Arquivo usa drag nativo (ghost image
-          // automatico); pasta usa pointer-drag manual, entao o cursor e' a
-          // unica pista alem do row em opacity 0.4 + highlight do alvo.
-          document.body.style.cursor = "grabbing";
+          // Cursor "grabbing" GLOBAL enquanto arrasta a pasta. Via classe no
+          // <html> + CSS !important (nao `body.style.cursor`) porque as linhas
+          // de pasta tem `cursor: default` proprio, que sobrescrevia o cursor
+          // do body ao passar por cima do alvo — a maozinha "revertia" pra
+          // seta. Com !important no <html>, o grabbing vale em tudo.
+          document.documentElement.classList.add("solon-folder-dragging");
         }
 
         ev.preventDefault();

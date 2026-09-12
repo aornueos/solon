@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { AppLayout } from "./components/Layout/AppLayout";
-import { useAppStore } from "./store/useAppStore";
+import { useAppStore, isUntitledPath } from "./store/useAppStore";
 import { useFileSystem } from "./hooks/useFileSystem";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useCrashRecovery } from "./hooks/useCrashRecovery";
@@ -47,7 +47,7 @@ export default function App() {
   const toggleReadingMode = useAppStore((s) => s.toggleReadingMode);
   const appZoom = useAppStore((s) => s.appZoom);
   const setAppZoom = useAppStore((s) => s.setAppZoom);
-  const { restoreLastFolder, refresh, openFile, createUntitled, openFolder } = useFileSystem();
+  const { restoreLastFolder, refresh, openFile, openFolder } = useFileSystem();
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", "light");
@@ -370,7 +370,13 @@ export default function App() {
       // Ctrl+Shift+N pra nao conflitar.
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "t") {
         e.preventDefault();
-        void createUntitled();
+        // Guarda o buffer untitled atual (se houver) antes de abrir outro.
+        flushEditor();
+        const st = useAppStore.getState();
+        if (isUntitledPath(st.activeFilePath) && st.activeFilePath) {
+          st.stashUntitled(st.activeFilePath, st.fileBody, st.sceneMeta);
+        }
+        st.createBlankTab();
         return;
       }
       // Ctrl+Shift+N — rascunho (scratchpad): buffer transiente, sem arquivo.
@@ -444,7 +450,6 @@ export default function App() {
     openScratchpad,
     toggleReadingMode,
     openFile,
-    createUntitled,
     openFolder,
     refresh,
     setAppZoom,
