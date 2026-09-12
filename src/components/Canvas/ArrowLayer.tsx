@@ -516,35 +516,32 @@ function extrude(p: { x: number; y: number }, side: Side, len: number) {
   }
 }
 
-const clampN = (v: number, lo: number, hi: number) =>
-  Math.max(lo, Math.min(hi, v));
 // Respiro pra fora da borda — a seta nasce/termina FORA da caixa, nao colada
 // (nem por dentro, sobre o texto). Combina com os dots de conexao (que ja'
 // ficam fora).
 const ANCHOR_GAP = 7;
 
 /**
- * Ponto de ancoragem na lateral `side`, DESLIZADO em direcao a `toward`
- * (clampado ao segmento, com margem do canto) e extrudado pra fora pelo gap.
- * Antes usava o midpoint fixo da lateral — numa caixa alta/larga a seta saia
- * "do meio", longe de onde aponta. Agora sai do ponto da borda mais proximo
- * do alvo (estilo Miro/Excalidraw).
+ * Ponto de ancoragem no MEIO da lateral `side`, extrudado pra fora pelo gap.
+ * FIXO (nao desliza) — coincide com o dot de conexao daquele lado. Uma versao
+ * anterior deslizava a ancora "em direcao ao alvo", o que fazia a CAUDA da
+ * seta escorregar enquanto voce arrastava o preview (parecia bugado). Fixo no
+ * meio do lado e' previsivel e consistente com o dot.
  */
-function sideAnchor(r: Rect, side: Side, toward: { x: number; y: number }) {
-  const m = 10; // margem pra nao colar no canto
+function sideAnchor(r: Rect, side: Side) {
   let p: { x: number; y: number };
   switch (side) {
     case "top":
-      p = { x: clampN(toward.x, r.x + m, r.x + r.w - m), y: r.y };
+      p = { x: r.x + r.w / 2, y: r.y };
       break;
     case "bottom":
-      p = { x: clampN(toward.x, r.x + m, r.x + r.w - m), y: r.y + r.h };
+      p = { x: r.x + r.w / 2, y: r.y + r.h };
       break;
     case "left":
-      p = { x: r.x, y: clampN(toward.y, r.y + m, r.y + r.h - m) };
+      p = { x: r.x, y: r.y + r.h / 2 };
       break;
     case "right":
-      p = { x: r.x + r.w, y: clampN(toward.y, r.y + m, r.y + r.h - m) };
+      p = { x: r.x + r.w, y: r.y + r.h / 2 };
       break;
   }
   return extrude(p, side, ANCHOR_GAP);
@@ -569,11 +566,8 @@ function routeArrow(
   const fromSide = overrides?.fromSide ?? sideFacing(from, to);
   const toSide = overrides?.toSide ?? sideFacing(to, from);
 
-  const toCenter = { x: to.x + to.w / 2, y: to.y + to.h / 2 };
-  const fromCenter = { x: from.x + from.w / 2, y: from.y + from.h / 2 };
-  // Ancora deslizando em direcao ao outro card (nao no midpoint fixo).
-  const p1 = sideAnchor(from, fromSide, toCenter);
-  const p2 = sideAnchor(to, toSide, fromCenter);
+  const p1 = sideAnchor(from, fromSide);
+  const p2 = sideAnchor(to, toSide);
 
   const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
   // Distância de extrusão: 40% da reta, com piso (cards próximos ainda
@@ -629,7 +623,7 @@ function routeArrowToPoint(
         : "top";
   }
 
-  const p1 = sideAnchor(from, fromSide, target);
+  const p1 = sideAnchor(from, fromSide);
   const p2 = { x: target.x, y: target.y };
   const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
   const outLen = Math.min(180, Math.max(40, dist * 0.4));

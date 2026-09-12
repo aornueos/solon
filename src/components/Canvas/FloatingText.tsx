@@ -629,16 +629,18 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       };
     };
 
-    // Cada handle resiza a CAIXA (largura → o texto reflui), nunca escala a
-    // fonte — resize responsivo tipo Miro. O tamanho da fonte fica no seletor
-    // da toolbar. `computeResizePatch(..., true)` = so' largura; altura auto.
+    // Cantos ESCALAM o bloco todo (fonte + caixa, proporcional) — o resize de
+    // "tamanho" que o usuario espera ao arrastar um canto. Antes usavam so'
+    // largura (o texto refluia mas a fonte nao crescia), entao num texto curto
+    // arrastar o canto nao produzia mudanca visivel — parecia que nao
+    // funcionava. `computeResizePatch(..., false)` = escala size+width+height.
     startDrag({
       onMove: (ev) => {
-        scheduleResize(computeResizePatch(ev.clientX, ev.clientY, true));
+        scheduleResize(computeResizePatch(ev.clientX, ev.clientY, false));
       },
       onEnd: (ev) => {
         cancelPendingResize();
-        updateText(text.id, computeResizePatch(ev.clientX, ev.clientY, true));
+        updateText(text.id, computeResizePatch(ev.clientX, ev.clientY, false));
       },
       onCancel: () => {
         cancelPendingResize();
@@ -666,7 +668,13 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     position: "absolute",
     left: text.x,
     top: text.y,
-    width: boxWidth,
+    // Sem largura fixa (auto-grow): usa `max-content` — o PROPRIO DOM mede a
+    // largura do texto, entao ele nunca quebra "uma letra pra linha de baixo"
+    // (o bug era a medida canvas2d `implicitWidth` subestimar vs. o render
+    // real). So' quando o usuario resiza (text.width setado) usamos largura
+    // fixa e o texto reflui. maxWidth limita o crescimento horizontal.
+    width: text.width != null ? boxWidth : "max-content",
+    maxWidth: 800,
     // Altura SEMPRE automatica: a caixa cresce com o conteudo e nunca deixa
     // o texto vazar/clipar (era o bug do texto transbordando embaixo). O
     // minHeight garante um piso (fonte + altura resultante de resize de canto).

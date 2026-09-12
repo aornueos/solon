@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useAppStore } from "../store/useAppStore";
+import { useAppStore, isUntitledPath } from "../store/useAppStore";
 import { useCanvasStore } from "../store/useCanvasStore";
 import { loadCanvas, saveCanvas } from "../lib/canvas";
 
@@ -27,7 +27,8 @@ export function useCanvasPersistence() {
     // Flush pendências do arquivo anterior ANTES de trocar. Sem isso, um
     // timer em flight salvaria os dados novos no sidecar do arquivo antigo.
     const prevFile = hydratedFor.current;
-    if (prevFile && prevFile !== activeFilePath) {
+    // untitled nao tem sidecar de canvas — nunca grava (path bogus).
+    if (prevFile && prevFile !== activeFilePath && !isUntitledPath(prevFile)) {
       if (cardTimer.current) {
         clearTimeout(cardTimer.current);
         cardTimer.current = null;
@@ -42,7 +43,9 @@ export function useCanvasPersistence() {
     hydratedFor.current = null;
 
     (async () => {
-      if (!activeFilePath) {
+      // Buffer untitled (Ctrl+T): sem arquivo → sem canvas. Nem carrega nem
+      // persiste (o path e' sintetico, nao existe sidecar).
+      if (!activeFilePath || isUntitledPath(activeFilePath)) {
         reset();
         hydratedFor.current = null;
         return;
