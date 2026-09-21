@@ -60,11 +60,11 @@ export function AppLayout() {
   const inCanvas = activeView === "canvas";
   const inHome = activeView === "home";
   // Reading mode esconde TODO chrome — supera focusMode + chrome-toggles.
-  // Outros toggles (sidebar/outline/inspector) sao ignorados enquanto
+  // Outros toggles (sidebar/outline/inspector) são ignorados enquanto
   // reading mode estiver ativo; quando sai, volta ao que estava.
   const showSidebar = isSidebarOpen && !focusMode && !readingMode && !inHome;
   // No canvas/home: painel direito não faz sentido (Inspector/Outline são do editor).
-  // Home tambem fica sem chrome — landing limpa, so o conteudo central.
+  // Home também fica sem chrome — landing limpa, so o conteudo central.
   const showInspector =
     isInspectorOpen &&
     !floatingInspector.enabled &&
@@ -87,13 +87,13 @@ export function AppLayout() {
   const showTabBar = !inHome && !readingMode;
 
   // Focus mode: titlebar + tabbar + statusbar viram hover-only via CSS
-  // (atributo `data-solon-focus-chrome` no <html>). Sem isso o usuario
-  // ainda via 3 faixas de chrome em volta da pagina; com isso, fica
-  // realmente so' o documento, com as ferramentas a um pixel de
-  // distancia (mesma tecnica do .solon-editor-toolbar--hover).
+  // (atributo `data-solon-focus-chrome` no <html>). Sem isso o usuário
+  // ainda via 3 faixas de chrome em volta da página; com isso, fica
+  // realmente só o documento, com as ferramentas a um pixel de
+  // distância (mesma tecnica do .solon-editor-toolbar--hover).
   //
   // Reading mode tem precedencia: la' o chrome some via display:none
-  // (modo mais agressivo), entao nao acumular focus em cima.
+  // (modo mais agressivo), então não acumular focus em cima.
   const focusChromeOn = focusMode && !readingMode && !inHome;
   useEffect(() => {
     document.documentElement.toggleAttribute(
@@ -108,8 +108,8 @@ export function AppLayout() {
   // Hover-intent pra revelar Titlebar + TabBar JUNTOS no focus mode.
   // Em JS (toggle de atributo) em vez de CSS :has(:hover) — o :has(:hover)
   // forcava o Chromium a rastrear invalidacao de hover na arvore inteira
-  // a cada pointermove, gerando stutter no canvas/editor. Aqui o custo e'
-  // so' nos enter/leave das duas faixas.
+  // a cada pointermove, gerando stutter no canvas/editor. Aqui o custo é
+  // só nos enter/leave das duas faixas.
   //
   // O delay de 90ms no leave evita o flicker quando o mouse cruza a
   // fronteira entre Titlebar e TabBar (mouseleave de uma dispara antes do
@@ -141,8 +141,8 @@ export function AppLayout() {
     }
   }, [focusChromeOn]);
 
-  // Handlers so' "ligam" quando focus mode esta ativo — fora dele, passar
-  // o mouse no topo nao deve fazer nada (chrome ja' esta visivel).
+  // Handlers só "ligam" quando focus mode esta ativo — fora dele, passar
+  // o mouse no topo não deve fazer nada (chrome já esta visível).
   const topHoverProps = focusChromeOn
     ? { onMouseEnter: revealTop, onMouseLeave: hideTopDeferred }
     : {};
@@ -272,8 +272,8 @@ export function AppLayout() {
           onDragLeave={() => setTabDropHint(false)}
           onDrop={onMainDrop}
         >
-          {/* TabBar aparece fora da home — na landing nao faz sentido,
-              e ela ja' tem chrome proprio. Em focus mode permanece: o
+          {/* TabBar aparece fora da home — na landing não faz sentido,
+              e ela já tem chrome próprio. Em focus mode permanece: o
               user pediu pra ela ficar aberta porque navegar entre abas
               e parte do fluxo de escrita; eh menos chrome do que tirar
               a navegacao. */}

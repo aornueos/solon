@@ -2,13 +2,13 @@
  * Indexador de tags do projeto inteiro.
  *
  * Le todos os `.md`/`.txt` do projeto, parseia frontmatter e coleta as
- * tags. Roda sob demanda (quando o user abre o popup de filtro) — nao
+ * tags. Roda sob demanda (quando o user abre o popup de filtro) — não
  * vive em background pra evitar custo de I/O constante.
  *
  * O resultado eh um Map<path, tags[]>. Quem precisa da lista de tags
  * unicas pode reduzir do Map.
  *
- * Paralelizado em chunks de 16 (mesmo padrao da HomePage/GlobalSearch).
+ * Paralelizado em chunks de 16 (mesmo padrão da HomePage/GlobalSearch).
  */
 import { parseDocument } from "./frontmatter";
 import type { FileNode } from "../store/useAppStore";
@@ -29,8 +29,8 @@ function flatten(nodes: FileNode[]): FileNode[] {
 
 /**
  * Indexa tags de toda a fileTree. Arquivos sem tags ficam fora do map
- * (size do map = numero de arquivos *com* ao menos uma tag), o que
- * facilita os reducers de lista unica.
+ * (size do map = número de arquivos *com* ao menos uma tag), o que
+ * facilita os reducers de lista única.
  */
 export async function buildTagIndex(tree: FileNode[]): Promise<TagIndex> {
   const result: TagIndex = new Map();

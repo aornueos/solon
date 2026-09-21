@@ -4,6 +4,7 @@ import { useAppStore } from "../../store/useAppStore";
 import { startDrag } from "../../lib/drag";
 import { CardSide } from "../../types/canvas";
 import { strokeRect, textRect } from "../../lib/canvasGeom";
+import { isSelectionToggle } from "../../lib/canvasSelectionInput";
 
 /**
  * Camada SVG com as setas entre os itens do canvas.
@@ -392,7 +393,7 @@ const ArrowNode = memo(function ArrowNode({
             removeArrow(a.id);
             return;
           }
-          if (e.ctrlKey || e.metaKey) {
+          if (isSelectionToggle(e)) {
             toggleInSelection(a.id);
             return;
           }

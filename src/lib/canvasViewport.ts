@@ -8,10 +8,18 @@ import { Rect, strokeRect, textRect } from "./canvasGeom";
  * divide a tela com sidebar, titlebar e status bar.
  */
 export function canvasSurfaceRect(from?: Element | null): DOMRect | null {
+  if (typeof document === "undefined") return null;
   const surface =
     from?.closest(".canvas-surface") ??
     document.querySelector(".canvas-surface");
   return surface instanceof HTMLElement ? surface.getBoundingClientRect() : null;
+}
+
+/** Tamanho da superfície, com a janela como último recurso. */
+function surfaceSize(rect: DOMRect | null): { w: number; h: number } {
+  if (rect) return { w: rect.width, h: rect.height };
+  if (typeof window === "undefined") return { w: 0, h: 0 };
+  return { w: window.innerWidth, h: window.innerHeight };
 }
 
 /** Converte coordenadas de tela (clientX/clientY) para a superfície. */
@@ -68,8 +76,7 @@ export function fitAllViewport(surface: DOMRect | null): CanvasViewport {
 
   const w = maxX - minX + FIT_PADDING * 2;
   const h = maxY - minY + FIT_PADDING * 2;
-  const screenW = surface?.width ?? window.innerWidth;
-  const screenH = surface?.height ?? window.innerHeight;
+  const { w: screenW, h: screenH } = surfaceSize(surface);
   const zoom = Math.min(
     FIT_MAX_ZOOM,
     Math.max(FIT_MIN_ZOOM, Math.min(screenW / w, screenH / h)),
@@ -83,8 +90,23 @@ export function fitAllViewport(surface: DOMRect | null): CanvasViewport {
 
 /** Passo de zoom ancorado no centro da superfície. */
 export function zoomStep(direction: 1 | -1, from?: Element | null) {
-  const rect = canvasSurfaceRect(from);
-  const cx = rect ? rect.width / 2 : window.innerWidth / 2;
-  const cy = rect ? rect.height / 2 : window.innerHeight / 2;
-  useCanvasStore.getState().zoomAt(cx, cy, direction * 200);
+  const { w, h } = surfaceSize(canvasSurfaceRect(from));
+  useCanvasStore.getState().zoomAt(w / 2, h / 2, direction * 200);
+}
+
+/**
+ * Vai para um nível de zoom exato mantendo o que está no centro da tela.
+ * Diferente de resetar o viewport, que joga a vista de volta à origem do
+ * mundo e faz o usuário perder o lugar onde estava.
+ */
+export function zoomToLevel(level: number, from?: Element | null) {
+  const { w, h } = surfaceSize(canvasSurfaceRect(from));
+  const { viewport, setViewport } = useCanvasStore.getState();
+  const worldCx = (w / 2 - viewport.x) / viewport.zoom;
+  const worldCy = (h / 2 - viewport.y) / viewport.zoom;
+  setViewport({
+    zoom: level,
+    x: w / 2 - worldCx * level,
+    y: h / 2 - worldCy * level,
+  });
 }

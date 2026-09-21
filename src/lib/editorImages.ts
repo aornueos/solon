@@ -37,7 +37,7 @@ export async function resolveEditorImageHtml(
   // parser nativo do WebView reescreve detalhes do HTML (entities,
   // whitespace canonico, atributos auto-fechados) que em alguns casos
   // raros confundem o TipTap. Detectado quando user reportou bold
-  // virando texto literal `**Onírica**` apos trocar de aba e voltar.
+  // virando texto literal `**Onírica**` após trocar de aba e voltar.
   // Pular o round-trip elimina o caminho problematico pra ~99% dos
   // docs e mantem o flow rapido.
   if (!/<img\b/i.test(html)) return html;

@@ -249,7 +249,7 @@ export function ExportDialog() {
                 multiline
               />
               <div className="flex gap-1.5">
-                <Field label="Email" value={email} placeholder="voce@email.com" onChange={setEmail} />
+                <Field label="Email" value={email} placeholder="voce@exemplo.com" onChange={setEmail} />
                 <Field label="Telefone" value={phone} placeholder="opcional" onChange={setPhone} />
               </div>
               <Field
@@ -283,7 +283,7 @@ export function ExportDialog() {
             className="solon-btn solon-btn--primary inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <FileDown size={12} />
-            {busy ? "Gerando..." : "Exportar"}
+            {busy ? "Gerando…" : "Exportar"}
           </button>
         </div>
       </div>

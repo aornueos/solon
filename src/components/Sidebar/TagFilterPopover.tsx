@@ -23,7 +23,7 @@ export function TagFilterPopover({ onClose, anchor }: Props) {
   const [index, setIndex] = useState<TagIndex | null>(null);
   const [loading, setLoading] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
-  // Posicao calculada do anchor — atualiza so' no mount (se o user
+  // Posicao calculada do anchor — atualiza só no mount (se o user
   // redimensionar a janela durante o popover aberto, fecha de qualquer
   // jeito por mousedown fora).
   const [position, setPosition] = useState<{ top: number; left: number } | null>(

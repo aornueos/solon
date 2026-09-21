@@ -88,9 +88,9 @@ export function DialogLayer() {
         className="solon-dialog w-full max-w-md animate-in fade-in zoom-in-95"
       >
         <div className="px-5 pt-5 pb-3">
-          {/* Titulo em serif display + plaqueta nao porque dialog ja' tem
-              header proprio nas variantes maiores (Settings/Shortcuts);
-              prompt/confirm sao compactos demais pra plaqueta full. */}
+          {/* Titulo em serif display + plaqueta não porque dialog já tem
+              header próprio nas variantes maiores (Settings/Shortcuts);
+              prompt/confirm são compactos demais pra plaqueta full. */}
           <h2 id={`dialog-title-${dialog.id}`} className="solon-dialog-title">
             {dialog.title}
           </h2>

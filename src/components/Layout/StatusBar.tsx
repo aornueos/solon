@@ -94,9 +94,9 @@ export function StatusBar() {
                   }}
                 >
                   <div
-                    className="h-full transition-all"
+                    className="h-full w-full origin-left transition-transform"
                     style={{
-                      width: `${progress}%`,
+                      transform: `scaleX(${progress / 100})`,
                       background: onTarget ? "var(--success)" : "var(--accent-2)",
                     }}
                   />
@@ -152,10 +152,10 @@ function Lozenge() {
  *  - dirty: ponto am-bar pulsando ("Editado")
  *  - saving: "Salvando…" italico
  *  - saved: "Salvo ha 12s" — atualiza o tempo relativo ate idle
- *  - idle: nada (nao polui a barra quando nada aconteceu)
+ *  - idle: nada (não polui a barra quando nada aconteceu)
  *
- * O timestamp relativo re-renderiza a cada 15s pra nao piscar muito mas
- * tambem nao mostrar "Salvo ha 1s" eternamente.
+ * O timestamp relativo re-renderiza a cada 15s pra não piscar muito mas
+ * também não mostrar "Salvo ha 1s" eternamente.
  */
 function SaveIndicator({
   status,
@@ -223,7 +223,7 @@ function formatRelative(timestamp: number): string {
 
 /**
  * Pílula minúscula que aparece no canto da StatusBar quando ha update.
- * Discreto por design — nao queremos chamar atencao em sessao de escrita.
+ * Discreto por design — não queremos chamar atencao em sessao de escrita.
  * Click abre o UpdateNotesDialog (mesmo que o banner da home).
  */
 function UpdateIndicator({

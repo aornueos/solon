@@ -3,6 +3,7 @@ import { useCanvasStore } from "../../store/useCanvasStore";
 import { CanvasStroke, CardSide } from "../../types/canvas";
 import { strokeRect } from "../../lib/canvasGeom";
 import { startCanvasLinkDrag } from "../../lib/canvasLinkDrag";
+import { isSelectionToggle } from "../../lib/canvasSelectionInput";
 
 /**
  * SVG com os traços de free-draw. Renderizado dentro do world container
@@ -153,7 +154,7 @@ const StrokeNode = memo(function StrokeNode({
           }
           if (tool !== "select") return;
           e.stopPropagation();
-          if (e.ctrlKey || e.metaKey) {
+          if (isSelectionToggle(e)) {
             toggleInSelection(s.id);
             return;
           }

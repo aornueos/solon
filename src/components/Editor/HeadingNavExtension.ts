@@ -7,12 +7,12 @@ import { Extension } from "@tiptap/core";
  * - Shift+Tab: diminui o level (H6 -> H5 ... H2 -> H1). Floor em 1.
  *
  * IMPORTANTE: deve ser carregado ANTES de IndentExtension na lista de
- * extensions (assim TipTap testa esse shortcut primeiro; se nao for
+ * extensions (assim TipTap testa esse shortcut primeiro; se não for
  * heading, retorna false e o Indent assume).
  *
  * Promover/demote em ficcao reorganiza a hierarquia sem mexer no texto.
  * Exemplo: "## Cena 3" virou "### Cena 3" subordinada ao capitulo
- * anterior — fluxo classico de outliner.
+ * anterior — fluxo clássico de outliner.
  */
 export const HeadingNavExtension = Extension.create({
   name: "headingNav",
@@ -27,7 +27,7 @@ export const HeadingNavExtension = Extension.create({
         const currentLevel = (node.attrs.level as number) ?? 1;
         const nextLevel = Math.min(6, currentLevel + 1);
         if (nextLevel === currentLevel) {
-          // ja' em H6 — bloqueia o Tab pra nao escapar do editor mesmo
+          // já em H6 — bloqueia o Tab pra não escapar do editor mesmo
           // sem mudanca de level.
           return true;
         }

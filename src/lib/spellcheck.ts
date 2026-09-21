@@ -3,17 +3,17 @@
  *
  * Historia das tentativas:
  *  - nspell (JS): "Too many properties to enumerate" no V8
- *  - hunspell-asm (WASM): build browser e' UMD legacy, incompativel
+ *  - hunspell-asm (WASM): build browser é UMD legacy, incompativel
  *    com Vite + Worker type:'module'
  *  - typo-js (JS): mesmo problema do nspell
  *  - Web Worker custom (Set + Levenshtein em JS): funcionava, mas user
- *    nao via sugestoes confiaveis; foco e' desktop
+ *    não via sugestoes confiaveis; foco é desktop
  *  - **ATUAL**: Rust backend via Tauri invoke. HashSet + Levenshtein
  *    em rust nativo. Sem limite V8, sem WASM, sem worker. Funciona
  *    sempre.
  *
- * Trade: roda so' em Tauri (no `npm run dev` puro browser, e' no-op).
- * Decisao explicita do user — foco e' desktop.
+ * Trade: roda só em Tauri (no `npm run dev` puro browser, é no-op).
+ * Decisao explicita do user — foco é desktop.
  *
  * API publica (mesma interface dos providers anteriores):
  *  - `ensureSpellchecker()`     — sync, dispara warm-up
@@ -65,14 +65,14 @@ function notifyPersonalDictChanged(): void {
  * Warm-up assincrono: dispara um `spell_size` no backend pra forcar a
  * inicializacao das estruturas Lazy do Rust (HashSet + Vec). E' tipo
  * "wake the server up" — o primeiro suggest depois desse warm vai ser
- * fast porque a lista ja esta carregada na memoria do processo.
+ * fast porque a lista ja esta carregada na memória do processo.
  *
  * Tambem re-aplica o dict pessoal — palavras adicionadas em sessoes
  * anteriores precisam ser re-injetadas no backend (que sobe vazio em
  * cada start).
  *
  * Idempotente: chamadas repetidas retornam o mesmo Promise pendente
- * ou nao fazem nada se ja' completou.
+ * ou não fazem nada se já completou.
  */
 export function ensureSpellchecker(): void {
   if (!isTauriRuntime()) return;
@@ -119,9 +119,9 @@ export function shouldSpellcheckWord(word: string): boolean {
 }
 
 /**
- * Verifica se a palavra e' correta. Curta-circuita pelo dict pessoal
+ * Verifica se a palavra é correta. Curta-circuita pelo dict pessoal
  * pra evitar round-trip ao backend pra palavras conhecidas. No browser
- * dev (sem Tauri), retorna true (assume correto pra nao falsamente
+ * dev (sem Tauri), retorna true (assume correto pra não falsamente
  * marcar tudo como erro).
  */
 export async function isCorrect(word: string): Promise<boolean> {
@@ -166,10 +166,10 @@ export async function checkWords(words: string[]): Promise<Map<string, boolean>>
 }
 
 /**
- * Pede sugestoes ao backend. Retorna array de ate' 8 candidatos
+ * Pede sugestoes ao backend. Retorna array de até 8 candidatos
  * ordenados por edit distance (asc) + alfabetico (tiebreaker).
  *
- * Backend faz a iteracao em ~5-15ms — nao precisamos de cache
+ * Backend faz a iteracao em ~5-15ms — não precisamos de cache
  * extra aqui.
  */
 export async function suggest(word: string): Promise<string[]> {

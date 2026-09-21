@@ -770,7 +770,7 @@ function Section({
   children: React.ReactNode;
 }) {
   // Section = card minimalista: hairline, cantos suaves, sem sombra
-  // (cards estaticos dentro do dialog nao precisam elevacao). Header com
+  // (cards estaticos dentro do dialog não precisam elevacao). Header com
   // label small-caps discreto.
   return (
     <section

@@ -7,6 +7,7 @@ import { startDrag } from "../../lib/drag";
 import { Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { ConnectionDots } from "./ConnectionDots";
+import { isSelectionToggle } from "../../lib/canvasSelectionInput";
 
 interface Props {
   image: CanvasImage;
@@ -111,7 +112,7 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
 
     e.stopPropagation();
 
-    if (e.ctrlKey || e.metaKey) {
+    if (isSelectionToggle(e)) {
       e.preventDefault();
       toggleInSelection(image.id);
       return;
@@ -364,7 +365,8 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
           onMouseDown={(e) => e.stopPropagation()}
         >
           <button
-            title="Excluir"
+            title="Excluir imagem"
+            aria-label="Excluir imagem"
             onClick={(e) => {
               e.stopPropagation();
               removeImage(image.id);

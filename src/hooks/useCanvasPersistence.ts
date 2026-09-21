@@ -27,7 +27,7 @@ export function useCanvasPersistence() {
     // Flush pendências do arquivo anterior ANTES de trocar. Sem isso, um
     // timer em flight salvaria os dados novos no sidecar do arquivo antigo.
     const prevFile = hydratedFor.current;
-    // untitled nao tem sidecar de canvas — nunca grava (path bogus).
+    // untitled não tem sidecar de canvas — nunca grava (path bogus).
     if (prevFile && prevFile !== activeFilePath && !isUntitledPath(prevFile)) {
       if (cardTimer.current) {
         clearTimeout(cardTimer.current);
@@ -44,7 +44,7 @@ export function useCanvasPersistence() {
 
     (async () => {
       // Buffer untitled (Ctrl+T): sem arquivo → sem canvas. Nem carrega nem
-      // persiste (o path e' sintetico, nao existe sidecar).
+      // persiste (o path é sintetico, não existe sidecar).
       if (!activeFilePath || isUntitledPath(activeFilePath)) {
         reset();
         hydratedFor.current = null;
@@ -57,7 +57,7 @@ export function useCanvasPersistence() {
         // corrompido). NAO hidratamos como vazio — senao o auto-save
         // sobrescreveria o arquivo real com um canvas vazio. Mostramos vazio
         // mas deixamos a persistencia BLOQUEADA (hydratedFor = null → o
-        // subscribe e o flush de unmount nao salvam), preservando o disco.
+        // subscribe e o flush de unmount não salvam), preservando o disco.
         reset();
         hydratedFor.current = null;
         useAppStore
@@ -80,7 +80,7 @@ export function useCanvasPersistence() {
   useEffect(() => {
     // Flush best-effort quando a janela some (minimizar, trocar de app,
     // fechar). O unmount do React NAO roda no fechamento abrupto do webview
-    // Tauri, entao mudancas dentro da janela de debounce se perderiam sem
+    // Tauri, então mudancas dentro da janela de debounce se perderiam sem
     // isto. `visibilitychange=hidden` geralmente precede o close e da tempo
     // do save async completar.
     const flush = () => {

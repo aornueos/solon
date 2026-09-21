@@ -83,6 +83,7 @@ export function ConnectionDots({
             data-image-action
             data-connection-side={side}
             title={title}
+            aria-label={title}
             onMouseDown={(e) => {
               e.stopPropagation();
               e.preventDefault();

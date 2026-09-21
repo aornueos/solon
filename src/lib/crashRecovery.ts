@@ -4,7 +4,7 @@
  * Problema: auto-save tem debounce de 1.2s. Se o app crashar entre dois
  * saves (kill -9, BSOD, queda de luz, OneDrive lockando o arquivo),
  * a janela de digitacao mais recente vai pro vacuo. O atomic write
- * cobre crash *durante* a escrita; este modulo cobre o gap *entre*
+ * cobre crash *durante* a escrita; este módulo cobre o gap *entre*
  * escritas.
  *
  * Estrategia:
@@ -18,11 +18,11 @@
  *
  * Trade-offs:
  *  - Drafts ficam em texto puro (mesmo conteudo que vai pro .md), o
- *    que e' aceitavel — quem tem acesso ao FS ja tem acesso ao .md.
+ *    que é aceitavel — quem tem acesso ao FS ja tem acesso ao .md.
  *  - Encoding do path: base64url do path absoluto, evita problemas
  *    com `/`, `\`, espacos, unicode em nome de arquivo.
- *  - Best-effort: falhas silenciosas em todas as operacoes — recovery
- *    nao pode bloquear o fluxo normal.
+ *  - Best-effort: falhas silenciosas em todas as operações — recovery
+ *    não pode bloquear o fluxo normal.
  */
 
 import { isProjectNotePath } from "./pathSecurity";
@@ -42,7 +42,7 @@ export interface RecoveryDraft {
 function recoveryIdFor(filePath: string): string {
   // Base64url do path absoluto — reverte deterministico. URL-safe pra
   // que o nome do arquivo nunca tenha `/`, `+` ou `=` (compatibilidade
-  // Windows + macOS + Linux). Comprimento maximo previsto: ~340 chars
+  // Windows + macOS + Linux). Comprimento máximo previsto: ~340 chars
   // pra path de 260 (MAX_PATH do Windows), fica dentro do limite de
   // nome de arquivo em qualquer FS moderno.
   const bytes = new TextEncoder().encode(filePath);
@@ -98,7 +98,7 @@ export async function saveRecoveryDraft(
 }
 
 /**
- * Apaga o draft de recovery (chamado apos save real bem-sucedido).
+ * Apaga o draft de recovery (chamado após save real bem-sucedido).
  */
 export async function clearRecoveryDraft(
   rootFolder: string | null,
@@ -118,8 +118,8 @@ export async function clearRecoveryDraft(
 
 /**
  * Varre o diretorio de recovery e retorna drafts cujo conteudo diverge
- * do que esta no disco. Esses sao candidatos a "recuperar" no proximo
- * boot. Drafts cujo arquivo original sumiu sao descartados (orfaos).
+ * do que esta no disco. Esses são candidatos a "recuperar" no proximo
+ * boot. Drafts cujo arquivo original sumiu são descartados (órfãos).
  *
  * **Performance**: antes lia O ARQUIVO INTEIRO de cada candidato pra
  * comparar string-igual com o draft — fatal pra projetos com varios
@@ -132,7 +132,7 @@ export async function clearRecoveryDraft(
  * Caso `mtime` <= `savedAt`, ai sim le e compara strings (acontece
  * apenas pra drafts genuinamente em conflito, casos raros).
  *
- * Tambem paraleliza as N comparacoes — antes era serie pura.
+ * As N comparações rodam em paralelo.
  */
 export async function scanRecoveryDrafts(
   rootFolder: string | null,
@@ -152,7 +152,7 @@ export async function scanRecoveryDrafts(
 
     // Avalia em paralelo. Cada draft: le metadata do .draft (rapido,
     // arquivo pequeno) + stat do original (rapido). Compara mtime.
-    // Le conteudo do original SOMENTE se a heuristica de mtime nao
+    // Le conteudo do original SOMENTE se a heurística de mtime não
     // resolve o caso. Resultado: boot ~5x mais rapido em projetos
     // com ~10 drafts acumulados.
     const SKEW_MS = 1000;
@@ -175,7 +175,7 @@ export async function scanRecoveryDrafts(
           }
           // Heuristica rapida via stat: arquivo em disco mais novo que
           // o draft (com tolerancia de 1s) significa que o save real
-          // concluiu DEPOIS do ultimo draft escrito — draft eh stale.
+          // concluiu DEPOIS do último draft escrito — draft eh stale.
           try {
             const info = await stat(draft.path);
             const mtimeMs =

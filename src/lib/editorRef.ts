@@ -9,7 +9,7 @@ import type { Editor } from "@tiptap/react";
  *
  * Editor.tsx registra/desregistra via `setCurrentEditor` no ciclo de
  * vida. So' existe um editor por janela do app — ate que a gente
- * implemente split view, a singleton e' suficiente.
+ * implemente split view, a singleton é suficiente.
  */
 let currentEditor: Editor | null = null;
 
@@ -42,17 +42,17 @@ export function flushEditor(): void {
 }
 
 /**
- * Encontra a palavra na posicao client (mouse coords) dentro do editor.
+ * Encontra a palavra na posição client (mouse coords) dentro do editor.
  *
- * Usa `posAtCoords` do ProseMirror pra mapear pixel → posicao do doc, e
+ * Usa `posAtCoords` do ProseMirror pra mapear pixel → posição do doc, e
  * depois caminha pra tras/frente no texto do textblock pai pra achar
  * limites de palavra. Considera "letra" qualquer codepoint Unicode em
  * \p{L} ou \p{M} (combining marks pra acentos compostos).
  *
  * Retorna null se:
  *  - o clique foi fora de qualquer texto
- *  - o textblock nao tem conteudo de texto
- *  - a posicao caiu numa quebra de palavra (espaco, pontuacao)
+ *  - o textblock não tem conteudo de texto
+ *  - a posição caiu numa quebra de palavra (espaco, pontuacao)
  */
 export function findWordAtCoords(
   editor: Editor,
@@ -95,8 +95,8 @@ export function findWordAtCoords(
 
 /**
  * Substitui o range [from, to] do doc pela `replacement`. Usa o command
- * pipeline do TipTap pra que a operacao apareca no undo stack como uma
- * unica acao (Ctrl+Z desfaz a correcao volta ao texto errado).
+ * pipeline do TipTap pra que a operação apareca no undo stack como uma
+ * única ação (Ctrl+Z desfaz a correcao volta ao texto errado).
  */
 export function replaceRange(
   editor: Editor,

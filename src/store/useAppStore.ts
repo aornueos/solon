@@ -16,7 +16,7 @@ export interface HeadingItem {
   text: string;
   /** Posicao do heading no doc (1-indexed, igual `state.doc`). */
   pos: number;
-  /** Posicao do *proximo* heading (ou doc.content.size se for o ultimo).
+  /** Posicao do *proximo* heading (ou doc.content.size se for o último).
    *  Usado pra delimitar a secao em reorder/word-count. */
   endPos: number;
   /** Contagem de palavras DA SECAO (heading inclusivo até o proximo
@@ -110,7 +110,7 @@ export interface ConfirmOptions {
 }
 
 /**
- * Item de context menu custom. Pode ser uma acao normal, um separador
+ * Item de context menu custom. Pode ser uma ação normal, um separador
  * (linha horizontal), ou um item-toggle (checkbox-like).
  *
  * `disabled` desabilita o click e baixa opacity. `danger` deixa em
@@ -131,7 +131,7 @@ export type ContextMenuItem =
 
 /** Context menu ativo — coordenadas em viewport (clientX/Y).
  *  `id` permite que callers async (ex: spellcheck no worker) atualizem
- *  os items DESTE menu especifico via `updateContextMenuItems(id, ...)`,
+ *  os items DESTE menu específico via `updateContextMenuItems(id, ...)`,
  *  sem risco de sobrescrever o menu errado se o user fechou e abriu
  *  outro no meio do round-trip. */
 export interface ActiveContextMenu {
@@ -143,12 +143,12 @@ export interface ActiveContextMenu {
 
 /**
  * Estado do sistema de update.
- *  - `idle`: nada a fazer (boot inicial ou apos check vazio).
+ *  - `idle`: nada a fazer (boot inicial ou após check vazio).
  *  - `checking`: requisicao em andamento.
- *  - `available`: tem versao nova; UI mostra banner/indicator.
+ *  - `available`: tem versão nova; UI mostra banner/indicator.
  *  - `downloading`: baixando bundle (com progress 0..1).
  *  - `ready`: bundle instalado, esperando user clicar "Reiniciar".
- *  - `error`: ultima checagem falhou (silencioso na UI; so log).
+ *  - `error`: última checagem falhou (silencioso na UI; so log).
  */
 export type UpdateInfo = {
   version: string;
@@ -166,10 +166,10 @@ export type UpdateStatus =
   | { kind: "error"; message: string };
 
 /** Aba aberta — pointer pro arquivo. O buffer (`fileBody`/`sceneMeta`)
- *  vive na store no nivel raiz pro arquivo ATIVO; trocar de aba flusha
+ *  vive na store no nível raiz pro arquivo ATIVO; trocar de aba flusha
  *  o save da ativa anterior e re-le' o conteudo da nova. Manter buffers
- *  em memoria pra todas as abas seria caro pra arquivos grandes, e o
- *  feature flag aqui e' "minimalista". */
+ *  em memória pra todas as abas seria caro pra arquivos grandes, e o
+ *  feature flag aqui é "minimalista". */
 export interface OpenTab {
   path: string;
   name: string;
@@ -214,24 +214,24 @@ interface AppState {
   fileBody: string;
   /** Metadados parseados do frontmatter. Editável via Inspector. */
   sceneMeta: SceneMeta;
-  /** Abas abertas. A aba ativa e' aquela cujo `path === activeFilePath`. */
+  /** Abas abertas. A aba ativa é aquela cujo `path === activeFilePath`. */
   openTabs: OpenTab[];
   /** Conteudo dos buffers untitled (Ctrl+T) indexado por path sintetico —
-   *  preserva o texto ao trocar de aba, ja' que so' um buffer fica em
-   *  `fileBody` por vez. So' de sessao (nao persiste). */
+   *  preserva o texto ao trocar de aba, já que só um buffer fica em
+   *  `fileBody` por vez. So' de sessao (não persiste). */
   untitledBuffers: Record<string, { body: string; meta: SceneMeta }>;
   /** Pilha curta de abas fechadas para Ctrl+Shift+T. */
   closedTabs: OpenTab[];
   /** Split pane transiente desta janela. */
   splitPane: SplitPaneState;
-  /** Scratchpad efemero: nao vira arquivo ate o usuario decidir salvar. */
+  /** Scratchpad efemero: não vira arquivo ate o usuário decidir salvar. */
   scratchpadOpen: boolean;
   scratchpadText: string;
   /** Inspector flutuante, independente do painel direito fixo. */
   floatingInspector: FloatingInspectorState;
   /** Drafts de crash recovery pendentes — settados no boot quando
    *  `scanRecoveryDrafts` encontra divergencias. Dispara o
-   *  `RecoveryDialog` no AppLayout enquanto for nao-vazio. */
+   *  `RecoveryDialog` no AppLayout enquanto for não-vazio. */
   pendingRecoveryDrafts: RecoveryDraftEntry[];
   /** Lista LRU de arquivos recém-abertos. Persiste em localStorage,
    *  cap em RECENT_FILES_MAX. Exibido na HomePage abaixo do CTA. */
@@ -241,7 +241,7 @@ interface AppState {
   rootFolder: string | null;
   fileTree: FileNode[];
   /** Ordem manual de items no Sidebar (drag-and-drop). Persistida em
-   *  `<rootFolder>/.solon/order.json`. Items nao listados ficam ao
+   *  `<rootFolder>/.solon/order.json`. Items não listados ficam ao
    *  fim em ordem alfabetica. */
   sidebarOrder: SidebarOrder;
 
@@ -257,15 +257,15 @@ interface AppState {
   focusMode: boolean;
   /** Reading mode — modo "livro": esconde TODO chrome (titlebar,
    *  sidebar, outline, inspector, statusbar, tabbar, editor toolbar).
-   *  Sobra so' a coluna do texto. Mais agressivo que focusMode (que
-   *  preserva toolbar/statusbar). Pra leitura, revisao, ou imersao
+   *  Sobra só a coluna do texto. Mais agressivo que focusMode (que
+   *  preserva toolbar/statusbar). Pra leitura, revisão, ou imersao
    *  maxima. Esc sai. */
   readingMode: boolean;
   wordCount: number;
   charCount: number;
   /** Visão principal — home (landing), editor de texto, ou canvas storyboard.
    *  "home" e o estado inicial e o destino do clique no wordmark "Solon"
-   *  na titlebar; os outros sao acionados por abrir um arquivo / atalhos. */
+   *  na titlebar; os outros são acionados por abrir um arquivo / atalhos. */
   activeView: "home" | "editor" | "canvas";
   /** Notificações transientes mostradas na StatusBar. */
   toasts: Toast[];
@@ -277,34 +277,34 @@ interface AppState {
   showUpdateDialog: boolean;
   /** Dialog de busca global no projeto. */
   showGlobalSearch: boolean;
-  /** Dialog de historico local do arquivo ativo. */
+  /** Dialog de histórico local do arquivo ativo. */
   showLocalHistory: boolean;
   /** Dialog de saúde do workspace: links quebrados, imagens ausentes e notas vazias. */
   showWorkspaceHealth: boolean;
   /** Estado do auto-save — usado pela StatusBar pra dar feedback discreto.
-   *  `dirty`: ha alteracoes no buffer que ainda nao foram persistidas.
+   *  `dirty`: ha alterações no buffer que ainda não foram persistidas.
    *  `saving`: write em andamento.
-   *  `saved`: ultima escrita teve sucesso (timestamp em `lastSavedAt`).
-   *  `idle`: sem arquivo ou nada mudou desde o ultimo load. */
+   *  `saved`: última escrita teve sucesso (timestamp em `lastSavedAt`).
+   *  `idle`: sem arquivo ou nada mudou desde o último load. */
   saveStatus: "idle" | "dirty" | "saving" | "saved";
-  /** Timestamp da ultima escrita bem-sucedida (epoch ms), null se nunca salvou. */
+  /** Timestamp da última escrita bem-sucedida (epoch ms), null se nunca salvou. */
   lastSavedAt: number | null;
 
   /** Estatisticas agregadas do projeto inteiro — calculadas pela HomePage
    *  varrendo todos os .md/.txt da fileTree. `null` enquanto computa ou
-   *  quando nao ha pasta. Cache invalida quando o fileTree muda. */
+   *  quando não ha pasta. Cache invalida quando o fileTree muda. */
   projectStats: { wordCount: number; fileCount: number } | null;
 
-  // ─── Preferencias do usuario (persistidas em localStorage) ───
-  /** Zoom da area de escrita — 75..200, default 100. No layout A4,
-   *  escala a pagina; no layout livre, escala a coluna como visualizacao.
+  // ─── Preferencias do usuário (persistidas em localStorage) ───
+  /** Zoom da área de escrita — 75..200, default 100. No layout A4,
+   *  escala a página; no layout livre, escala a coluna como visualizacao.
    *  Tamanho tipografico semantico vive em `editorTextSize`. */
   editorZoom: number;
   appZoom: number;
   /** Liga/desliga auto-save (so afeta o debounce; Ctrl+S sempre salva). */
   autoSaveEnabled: boolean;
-  /** Liga/desliga check de update no boot. Tambem valido pra ja' marcar
-   *  "nao quero saber sobre updates" e suprimir o banner. */
+  /** Liga/desliga check de update no boot. Tambem válido pra já marcar
+   *  "não quero saber sobre updates" e suprimir o banner. */
   autoCheckUpdates: boolean;
   /** Visibilidade do dialog de preferencias. */
   showSettings: boolean;
@@ -323,7 +323,7 @@ interface AppState {
   /** Cache do index de tags (path -> tags[]). Populado pelo
    *  TagFilterPopover quando o user abre o popover, consumido pela
    *  Sidebar pra montar a view filtrada sem re-indexar. null =
-   *  ainda nao indexado nesta sessao. */
+   *  ainda não indexado nesta sessao. */
   tagIndex: Map<string, string[]> | null;
   /** Cache do index de wikilinks (target normalizado -> arquivos
    *  fonte). Populado por buildBacklinkIndex sob demanda (quando o
@@ -334,8 +334,8 @@ interface AppState {
   /** Liga/desliga spellcheck visual (red underlines) no editor. */
   spellcheckEnabled: boolean;
   /** Largura maxima da coluna de texto do editor (px). Afeta a "medida"
-   *  da linha — escritor pode preferir mais estreito (560-680, classico
-   *  livro) ou mais ar (820-1000). Default 680 e' o sweet spot pt-BR. */
+   *  da linha — escritor pode preferir mais estreito (560-680, clássico
+   *  livro) ou mais ar (820-1000). Default 680 é o sweet spot pt-BR. */
   editorMaxWidth: number;
   /** Layout visual da superficie de escrita. "fluid" preserva a coluna
    *  historica; "a4-continuous" desenha uma folha A4 continua sem paginar
@@ -352,7 +352,7 @@ interface AppState {
   editorParagraphSpacing: "tight" | "normal" | "airy";
   /** Tamanho do recuo aplicado por Tab em paragrafos. */
   editorIndentSize: "small" | "normal" | "large";
-  /** Familia tipografica padrao do editor. */
+  /** Familia tipografica padrão do editor. */
   editorFontFamily: EditorFontFamily;
   /** Tema visual do app e do editor. */
   editorPaper: EditorPaper;
@@ -374,7 +374,7 @@ interface AppState {
   showStatusStats: boolean;
   /** Mostra caminho completo do arquivo na StatusBar. */
   showStatusPath: boolean;
-  /** Mostra a fileira de acoes extras da Titlebar. */
+  /** Mostra a fileira de ações extras da Titlebar. */
   showTitlebarActions: boolean;
   /** Preferencias do canvas. */
   canvasGridEnabled: boolean;
@@ -400,11 +400,11 @@ interface AppState {
 
   // Actions
   setActiveFile: (path: string, name: string, body: string, meta: SceneMeta) => void;
-  /** Adiciona aba se ainda nao existe. Idempotente — chamado por `openFile`
+  /** Adiciona aba se ainda não existe. Idempotente — chamado por `openFile`
    *  toda vez. Persiste a lista em localStorage. */
   addTab: (path: string, name: string) => void;
-  /** Cria uma aba VAZIA em memoria (Ctrl+T) — buffer sem arquivo no disco.
-   *  So' vira arquivo real quando o usuario da Ctrl+S. */
+  /** Cria uma aba VAZIA em memória (Ctrl+T) — buffer sem arquivo no disco.
+   *  So' vira arquivo real quando o usuário da Ctrl+S. */
   createBlankTab: () => void;
   /** Guarda o conteudo atual de um buffer untitled (chamar ao SAIR dele). */
   stashUntitled: (path: string, body: string, meta: SceneMeta) => void;
@@ -412,9 +412,9 @@ interface AppState {
   dropUntitled: (path: string) => void;
   replaceActiveTab: (path: string, name: string, previousActivePath?: string | null) => void;
   /** Fecha aba pelo path. Se era a ativa, retorna o path da proxima/anterior
-   *  pra que o caller chame `openFile` (precisa de I/O — store nao faz). */
+   *  pra que o caller chame `openFile` (precisa de I/O — store não faz). */
   closeTab: (path: string) => string | null;
-  /** Atualiza path/name de uma aba apos rename ou move. */
+  /** Atualiza path/name de uma aba após rename ou move. */
   renameTab: (oldPath: string, newPath: string, newName: string) => void;
   reorderTab: (
     sourcePath: string,
@@ -423,7 +423,7 @@ interface AppState {
   ) => void;
   reopenClosedTab: () => OpenTab | null;
   /** Renomeia em massa quando uma pasta foi movida/renomeada — todos os
-   *  paths que comecam com `oldPrefix` sao reescritos. */
+   *  paths que comecam com `oldPrefix` são reescritos. */
   rebaseTabs: (oldPrefix: string, newPrefix: string) => void;
   setSplitPane: (pane: SplitPaneState) => void;
   closeSplitPane: () => void;
@@ -432,15 +432,15 @@ interface AppState {
   setScratchpadText: (text: string) => void;
   setFloatingInspector: (enabled: boolean) => void;
   setFloatingInspectorRect: (rect: Partial<FloatingInspectorState>) => void;
-  /** Settar drafts pendentes — usado pelo `restoreLastFolder` apos
+  /** Settar drafts pendentes — usado pelo `restoreLastFolder` após
    *  varredura de recovery. UI consome via RecoveryDialog. */
   setPendingRecoveryDrafts: (drafts: RecoveryDraftEntry[]) => void;
-  /** Limpa a lista (apos user decidir — aceitar ou descartar). */
+  /** Limpa a lista (após user decidir — aceitar ou descartar). */
   clearPendingRecoveryDrafts: () => void;
   /** Registra um arquivo no LRU de recents. Idempotente: se o path ja
    *  esta na lista, sobe pro topo. Cap em RECENT_FILES_MAX. */
   pushRecentFile: (path: string, name: string) => void;
-  /** Remove um arquivo do LRU — usado em delete/rename pra nao deixar
+  /** Remove um arquivo do LRU — usado em delete/rename pra não deixar
    *  entry orfa. */
   removeRecentFile: (path: string) => void;
   setFileBody: (body: string) => void;
@@ -525,11 +525,11 @@ interface AppState {
   closeExport: () => void;
   /** Reset de todas as preferencias pro default. */
   resetSettings: () => void;
-  /** Abre context menu e retorna id unico — uso em fluxos async (ex:
+  /** Abre context menu e retorna id único — uso em fluxos async (ex:
    *  spellcheck) que precisam atualizar items DESTE menu sem risco de
    *  sobrescrever outro que tenha sido aberto no meio do caminho. */
   openContextMenu: (x: number, y: number, items: ContextMenuItem[]) => string;
-  /** Substitui items do menu identificado por `id`. Se o id nao bate
+  /** Substitui items do menu identificado por `id`. Se o id não bate
    *  com o menu ativo (foi fechado/trocado), no-op — protege de races. */
   updateContextMenuItems: (id: string, items: ContextMenuItem[]) => void;
   closeContextMenu: () => void;
@@ -574,9 +574,9 @@ function saveRecentFiles(files: RecentFile[]): void {
   }
 }
 
-/** Abas "untitled" = buffer em memoria (Ctrl+T), SEM arquivo no disco. O path
- *  e' sintetico (`untitled:...`). O auto-save as ignora; so' viram arquivo real
- *  quando o usuario da Ctrl+S (que pede um nome e materializa). */
+/** Abas "untitled" = buffer em memória (Ctrl+T), SEM arquivo no disco. O path
+ *  é sintetico (`untitled:...`). O auto-save as ignora; só viram arquivo real
+ *  quando o usuário da Ctrl+S (que pede um nome e materializa). */
 export const UNTITLED_PREFIX = "untitled:";
 export const isUntitledPath = (p: string | null | undefined): boolean =>
   !!p && p.startsWith(UNTITLED_PREFIX);
@@ -604,7 +604,7 @@ function loadOpenTabs(): OpenTab[] {
 function saveOpenTabs(tabs: OpenTab[]): void {
   if (IS_DETACHED_WINDOW) return;
   try {
-    // Abas untitled sao de sessao (buffer em memoria) — nao persistem, senao
+    // Abas untitled são de sessao (buffer em memória) — não persistem, senao
     // no reload apontariam pra um `untitled:...` inexistente.
     const persistable = tabs.filter((t) => !isUntitledPath(t.path));
     localStorage.setItem(OPEN_TABS_KEY, JSON.stringify(persistable));
@@ -823,7 +823,7 @@ export const EDITOR_FONT_FAMILIES = [
 ] as const;
 
 /** Lista canonica de variantes de papel + meta visual.
- *  Hex coordenado com legibilidade: contraste minimo AA pra texto
+ *  Hex coordenado com legibilidade: contraste mínimo AA pra texto
  *  normal mantido em todos os pares bg/text. */
 export const EDITOR_PAPERS: ReadonlyArray<{
   value: EditorPaper;
@@ -916,7 +916,7 @@ function loadEditorFontFamily(): EditorFontFamily {
 // (sepia, gray, midnight, marble) — não estão aqui porque o validador
 // já cai no DEFAULT_EDITOR_PAPER pra qualquer valor desconhecido. O
 // "orchid-noir" mapeia pra "vinho" (mesmo slot conceitual, paleta
-// redesenhada de roxo pra tinto na 0.9.25).
+// em tinto).
 const EDITOR_PAPER_RENAMES_0_9_25: Record<string, EditorPaper> = {
   roseglow: "amanhecer",
   custard: "mel",
@@ -1123,7 +1123,7 @@ export const useAppStore = create<AppState>((set) => ({
   wordCount: 0,
   charCount: 0,
   // ActiveView inicial respeita a pref `startView` (default "home").
-  // Se o user escolheu abrir direto no editor/canvas, comeca por la'.
+  // Se o user escolheu abrir direto no editor/canvas, começa por la'.
   activeView: loadInitialActiveView(),
   toasts: [],
   activeDialog: null,
@@ -1206,11 +1206,11 @@ export const useAppStore = create<AppState>((set) => ({
   startView: loadStartView(),
 
   setActiveFile: (path, name, body, meta) => {
-    // Persiste o ultimo arquivo aberto pra "Continuar" na HomePage e
-    // restore no proximo boot. Mesmo padrao do `solon:rootFolder` mais
+    // Persiste o último arquivo aberto pra "Continuar" na HomePage e
+    // restore no proximo boot. Mesmo padrão do `solon:rootFolder` mais
     // acima — chave separada porque arquivo pode mudar com mais
-    // frequencia que pasta.
-    // Buffers untitled (Ctrl+T) nao sao arquivos reais — nao viram "lastFile"
+    // frequência que pasta.
+    // Buffers untitled (Ctrl+T) não são arquivos reais — não viram "lastFile"
     // (senao o boot tentaria reabrir um `untitled:...` inexistente).
     if (!IS_DETACHED_WINDOW && !isUntitledPath(path)) {
       try {
@@ -1241,7 +1241,7 @@ export const useAppStore = create<AppState>((set) => ({
         .toString(36)
         .slice(2, 6)}`;
       const openTabs = [...s.openTabs, { path, name: "Sem título" }];
-      saveOpenTabs(openTabs); // filtra untitled (nao persiste)
+      saveOpenTabs(openTabs); // filtra untitled (não persiste)
       return {
         openTabs,
         activeFilePath: path,
@@ -1303,7 +1303,7 @@ export const useAppStore = create<AppState>((set) => ({
       const next = s.openTabs.filter((_, i) => i !== idx);
       saveOpenTabs(next);
       // Se a aba fechada era a ativa, descobre quem assume o foco —
-      // proxima a' direita; se nao houver, a' esquerda; se nada, null.
+      // proxima a' direita; se não houver, a' esquerda; se nada, null.
       // Caller faz o openFile com `nextActive`.
       if (s.activeFilePath === path) {
         nextActive =
@@ -1311,8 +1311,8 @@ export const useAppStore = create<AppState>((set) => ({
       } else {
         nextActive = s.activeFilePath;
       }
-      // Abas untitled NAO entram na pilha de "reabrir" (nao ha arquivo pra
-      // reabrir) e o buffer em memoria e' descartado.
+      // Abas untitled NAO entram na pilha de "reabrir" (não ha arquivo pra
+      // reabrir) e o buffer em memória é descartado.
       const isUntitled = isUntitledPath(path);
       const nextClosed =
         closed && !isUntitled
@@ -1640,7 +1640,7 @@ export const useAppStore = create<AppState>((set) => ({
   closeExport: () => set({ showExport: false }),
   resetSettings: () => {
     // Apaga todas as chaves de pref do localStorage e reseta o state pros
-    // defaults. Theme nao entra aqui — e' uma pref "vivendo" no proprio
+    // defaults. Theme não entra aqui — é uma pref "vivendo" no próprio
     // OS (dark mode preference) e o user pode estar em dark deliberadamente.
     try {
       localStorage.removeItem(EDITOR_ZOOM_KEY);
@@ -1715,8 +1715,8 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   openContextMenu: (x, y, items) => {
-    // Id legivel + uniqueness o suficiente — Math.random + base36 da uns
-    // 11 chars de entropia. Nao precisa ser cripto-seguro; so' precisa
+    // Id legível + uniqueness o suficiente — Math.random + base36 da uns
+    // 11 chars de entropia. Nao precisa ser cripto-seguro; só precisa
     // distinguir menus consecutivos.
     const id =
       Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -1727,7 +1727,7 @@ export const useAppStore = create<AppState>((set) => ({
   updateContextMenuItems: (id, items) =>
     set((s) => {
       // Race protection: se o menu fechou ou foi substituido por outro
-      // entre o openContextMenu e o updateContextMenuItems, nao
+      // entre o openContextMenu e o updateContextMenuItems, não
       // queremos sobrescrever o menu novo com items velhos.
       if (!s.activeContextMenu || s.activeContextMenu.id !== id) return s;
       return { activeContextMenu: { ...s.activeContextMenu, items } };
@@ -1746,7 +1746,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   setEditorMaxWidth: (w) => {
     // So' aceita valores da lista oficial; previne corruption por
-    // localStorage manipulado ou legado de versao anterior.
+    // localStorage manipulado ou legado de versão anterior.
     if (!(EDITOR_MAX_WIDTHS as readonly number[]).includes(w)) return;
     try {
       localStorage.setItem(EDITOR_MAX_WIDTH_KEY, String(w));

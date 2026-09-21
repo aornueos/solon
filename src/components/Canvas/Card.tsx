@@ -8,6 +8,7 @@ import { startDrag } from "../../lib/drag";
 import { ConnectionDots } from "./ConnectionDots";
 import { Link2, Trash2, Palette, FileText, MapPin, Clock, User } from "lucide-react";
 import clsx from "clsx";
+import { isSelectionToggle } from "../../lib/canvasSelectionInput";
 
 interface Props {
   card: CanvasCard;
@@ -113,7 +114,7 @@ export const Card = memo(function Card({ card }: Props) {
 
     e.stopPropagation();
 
-    if ((e.ctrlKey || e.metaKey) && tool === "select") {
+    if (isSelectionToggle(e) && tool === "select") {
       e.preventDefault();
       toggleInSelection(card.id);
       return;
@@ -456,6 +457,8 @@ export const Card = memo(function Card({ card }: Props) {
             <button
               key={c.value}
               title={c.label}
+              aria-label={`Pintar o card de ${c.label.toLowerCase()}`}
+              aria-pressed={card.color === c.value}
               onClick={(e) => {
                 e.stopPropagation();
                 updateCard(card.id, { color: c.value });

@@ -23,8 +23,8 @@ import { isTauriRuntime } from "./runtime";
 
 function tmpSuffix(): string {
   // 6 chars hex random — ~16M combinacoes. Suficiente pra evitar
-  // colisao entre N saves concorrentes do mesmo arquivo. crypto
-  // disponivel em Tauri webview; fallback Math.random pro caso dev.
+  // colisão entre N saves concorrentes do mesmo arquivo. crypto
+  // disponível em Tauri webview; fallback Math.random pro caso dev.
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
     const buf = new Uint8Array(3);
     crypto.getRandomValues(buf);
@@ -67,7 +67,7 @@ export async function atomicWriteTextFile(
     await rename(tmpPath, path);
     return true;
   } catch (renameErr) {
-    // Fallback: escreve direto (nao-atomico). Tenta limpar o tmp.
+    // Fallback: escreve direto (não-atomico). Tenta limpar o tmp.
     try {
       await writeTextFile(path, content);
     } catch (writeErr) {
@@ -75,14 +75,14 @@ export async function atomicWriteTextFile(
       try {
         if (await exists(tmpPath)) await remove(tmpPath);
       } catch {
-        /* tmp orfao — usuario pode limpar manualmente */
+        /* tmp órfão — usuário pode limpar manualmente */
       }
       return false;
     }
     try {
       if (await exists(tmpPath)) await remove(tmpPath);
     } catch {
-      /* tmp orfao OK */
+      /* tmp órfão OK */
     }
     console.warn("[atomicWrite] rename atomico falhou, fallback direto:", renameErr);
     return true;

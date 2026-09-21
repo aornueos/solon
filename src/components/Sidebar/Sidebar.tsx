@@ -53,7 +53,7 @@ export function Sidebar() {
   // Seletores granulares: assinar `useAppStore()` cru fazia o Sidebar
   // re-renderizar TODA arvore de arquivos a cada keystroke (porque o store
   // tem fileBody/headings/saveStatus/wordCount mudando constantemente).
-  // Em projetos com muitas pastas/arquivos isso e' o ofensor #1 de lag.
+  // Em projetos com muitas pastas/arquivos isso é o ofensor #1 de lag.
   const fileTree = useAppStore((s) => s.fileTree);
   const rootFolder = useAppStore((s) => s.rootFolder);
   const activeFilePath = useAppStore((s) => s.activeFilePath);
@@ -111,8 +111,8 @@ export function Sidebar() {
 
   const handleNewFile = async (parentDir: string) => {
     // NAO pre-fill com "Nova nota" porque isso gera arquivos chamados
-    // "Nova nota" "Nova nota 2" etc se o user so' clicar Enter por habito.
-    // Placeholder vazio + dica visual e' mais limpo.
+    // "Nova nota" "Nova nota 2" etc se o user só clicar Enter por habito.
+    // Placeholder vazio + dica visual é mais limpo.
     const name = await openPrompt({
       title: "Nova nota",
       message: "Informe o nome da nova nota.",
@@ -137,7 +137,7 @@ export function Sidebar() {
     const isFile = node.type === "file";
 
     // Pra arquivos, separa basename da extensao (.md/.txt). O input
-    // mostra so' o basename — assim o user nao consegue apagar a
+    // mostra só o basename — assim o user não consegue apagar a
     // extensao por engano (e quebrar o arquivo). Se ele digitar uma
     // extensao no novo nome, a gente strippa silenciosamente e
     // re-anexa a original.
@@ -164,7 +164,7 @@ export function Sidebar() {
     const trimmed = newName.trim();
     if (!trimmed) return;
     // Se for arquivo, strip qualquer .md/.txt que o user tenha digitado
-    // por habito e re-anexa a extensao original — extensao e' imutavel.
+    // por habito e re-anexa a extensao original — extensao é imutavel.
     const cleanedBase = isFile
       ? trimmed.replace(/\.(?:md|txt)$/i, "")
       : trimmed;
@@ -407,7 +407,7 @@ function HeaderBtn({
   onClick: () => void;
   title: string;
 }) {
-  // 18x18 pra caber o label "Arquivos" + acoes na largura padrao do
+  // 18x18 pra caber o label "Arquivos" + ações na largura padrão do
   // sidebar (200px) sem truncar. Hover preenche com bg-hover sem borda
   // pra ficar mais discreto (chrome interno deve respirar).
   return (
@@ -485,13 +485,13 @@ function FileTreeRow({
   const activeDragPath = dragPathRef.current ?? dragPath;
 
   // Regra de drop por TIPO do alvo:
-  //  - Drop em FILE → reorder (so' dentro do mesmo parent)
+  //  - Drop em FILE → reorder (só dentro do mesmo parent)
   //  - Drop em FOLDER → move-into SEMPRE (independente de ser sibling)
   //
-  // Antes a gente bloqueava move se folder destino era sibling, o que
-  // impedia "arrastar pasta A pra dentro de pasta B" no mesmo nivel.
-  // Agora pra reorder voce solta em arquivo; pra mover pra dentro
-  // de pasta, solta na pasta. Conflito impossivel — file != folder.
+  // Mover para uma pasta irmã é legítimo; bloquear esse caso
+  // impedia "arrastar pasta A pra dentro de pasta B" no mesmo nível.
+  // Agora pra reorder você solta em arquivo; pra mover pra dentro
+  // de pasta, solta na pasta. Conflito impossível — file != folder.
   const isSameParent = !!activeDragPath && siblingPaths.includes(activeDragPath);
   const canMoveIntoThisFolder =
     node.type === "folder" && canMoveIntoFolder(activeDragPath, node.path);
@@ -537,8 +537,8 @@ function FileTreeRow({
           suppressClickRef.current = true;
           onDragStart(node.path);
           // Cursor "grabbing" GLOBAL enquanto arrasta a pasta. Via classe no
-          // <html> + CSS !important (nao `body.style.cursor`) porque as linhas
-          // de pasta tem `cursor: default` proprio, que sobrescrevia o cursor
+          // <html> + CSS !important (não `body.style.cursor`) porque as linhas
+          // de pasta tem `cursor: default` próprio, que sobrescrevia o cursor
           // do body ao passar por cima do alvo — a maozinha "revertia" pra
           // seta. Com !important no <html>, o grabbing vale em tudo.
           document.documentElement.classList.add("solon-folder-dragging");
@@ -594,9 +594,9 @@ function FileTreeRow({
           e.preventDefault();
           return;
         }
-        // 2 funcoes:
+        // 2 funções:
         // 1. Drag pro Canvas (scene cards) — usa MIME `SCENE_DND_MIME`
-        //    (so' arquivos, nao pastas)
+        //    (só arquivos, não pastas)
         // 2. Drag pra reorder no sidebar — usa estado interno (dragPath)
         if (node.type === "file") {
           const payload = JSON.stringify({
@@ -645,7 +645,7 @@ function FileTreeRow({
 
         // FOLDER alvo: sempre tenta move-into (regra simples,
         // independente de sibling). Tem prioridade absoluta sobre
-        // reorder porque um folder nunca e' alvo valido de reorder.
+        // reorder porque um folder nunca é alvo válido de reorder.
         if (canDropOnFolder) {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
@@ -653,7 +653,7 @@ function FileTreeRow({
           if (dragOverPath !== null) onDragOver(null);
           return;
         }
-        // FILE alvo: so' aceita reorder se mesmo parent.
+        // FILE alvo: só aceita reorder se mesmo parent.
         if (canReorderHere) {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
@@ -663,9 +663,9 @@ function FileTreeRow({
       onDragLeave={(e) => {
         // Race classica: dragleave dispara TODA vez que o cursor sai
         // de QUALQUER elemento dentro do row (icone, chevron, span do
-        // nome) — mesmo so' transitando entre filhos. Fica piscando.
-        // Solucao: so' limpa o highlight se o cursor REALMENTE saiu
-        // da bbox do row. relatedTarget e' onde o cursor entrou; se
+        // nome) — mesmo só transitando entre filhos. Fica piscando.
+        // Solucao: só limpa o highlight se o cursor REALMENTE saiu
+        // da bbox do row. relatedTarget é onde o cursor entrou; se
         // for descendente do row, ainda estamos "dentro" — ignora.
         const next = e.relatedTarget as Node | null;
         const row = e.currentTarget;
@@ -679,9 +679,9 @@ function FileTreeRow({
         // porque ha race condition classica do HTML5 D&D: dragleave
         // pode disparar transitoriamente quando o cursor passa sobre
         // filhos do row (icone, chevron) ANTES do drop, limpando o
-        // state. Como o drop so' chega aqui se passou pelo dragover
-        // (que ja' validou via preventDefault), e canMoveIntoThisFolder
-        // e' sync (depende so' do dragPath/node), basta confiar nele.
+        // state. Como o drop só chega aqui se passou pelo dragover
+        // (que já validou via preventDefault), e canMoveIntoThisFolder
+        // é sync (depende só do dragPath/node), basta confiar nele.
         if (
           node.type === "folder" &&
           draggedPath &&
@@ -692,7 +692,7 @@ function FileTreeRow({
           onMoveToFolder(draggedPath, node.path);
           return;
         }
-        // FILE → reorder. Mesmo principio: nao depende de dragOverPath
+        // FILE → reorder. Mesmo principio: não depende de dragOverPath
         // hover state, que poderia ter sido limpado pelo dragleave race.
         if (
           node.type === "file" &&
@@ -760,7 +760,7 @@ function FileTreeRow({
         borderRadius: "var(--radius-sm)",
         // Toda a lateral em Inter upright (pastas E arquivos), sem italico.
         // A distincao pasta/arquivo vem do icone (folder colorido vs file
-        // muted) e da cor do texto (text-primary vs text-secondary), nao do
+        // muted) e da cor do texto (text-primary vs text-secondary), não do
         // estilo da fonte.
         fontFamily: "var(--font-ui)",
         fontWeight: 400,
@@ -858,12 +858,12 @@ function FileTree({
 }: FileTreeProps) {
   const { openFile } = useFileSystem();
 
-  // `siblingNames` e' o snapshot da ordem atual desta pasta — passado
+  // `siblingNames` é o snapshot da ordem atual desta pasta — passado
   // pro reorder pra que o JSON saiba como inicializar essa pasta caso
-  // ainda nao tinha custom order. `siblingPaths` (paths absolutos) e'
-  // computado UMA vez por render do FileTree, nao por iteracao do
-  // .map — antes era `nodes.map((n) => n.path)` dentro de cada linha,
-  // criando arrays redundantes O(N) por nivel.
+  // ainda não tinha custom order. `siblingPaths` (paths absolutos) é
+  // computado UMA vez por render do FileTree, não por iteracao do
+  // .map. Construir a lista dentro de cada linha criaria um array novo
+  // por item, O(N) por nível da árvore.
   const siblingNames = nodes.map((n) => n.name);
   const siblingPaths = nodes.map((n) => n.path);
 
@@ -881,7 +881,7 @@ function FileTree({
             }}
             onOpenInBackground={() => {
               // Middle-click em arquivo abre nova aba SEM tirar o foco
-              // do arquivo atual. Convencao de browser. Pasta nao tem
+              // do arquivo atual. Convencao de browser. Pasta não tem
               // analogo (sem dois "expandidos" simultaneos).
               if (node.type !== "file") return;
               useAppStore.getState().addTab(node.path, node.name);
@@ -1126,8 +1126,8 @@ function ContextMenuItem({
 /**
  * Lista flat de arquivos que tem a tag ativa. Substitui a arvore de
  * pastas quando ha filtro — abandonar a estrutura hierarquica simplifica
- * implementacao e o resultado UX faz sentido: "estou navegando por tag,
- * nao por organizacao fisica do disco".
+ * implementação e o resultado UX faz sentido: "estou navegando por tag,
+ * não por organizacao fisica do disco".
  *
  * tagIndex pode ser null se o user nunca abriu o popover (ex: aplicou
  * filtro via CommandPalette futuro). Nesse caso mostra uma mensagem
@@ -1157,7 +1157,7 @@ function FilteredFileList({
   for (const [path, tags] of tagIndex) {
     if (tags.some((t) => t.toLowerCase() === lower)) matchPaths.add(path);
   }
-  // Mantemos a ordem da arvore (alfabetica + folders first), so' filtramos.
+  // Mantemos a ordem da arvore (alfabetica + folders first), só filtramos.
   const allFiles = flattenForList(tree).filter((f) => matchPaths.has(f.path));
   if (allFiles.length === 0) {
     return (

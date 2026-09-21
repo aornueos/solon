@@ -459,7 +459,7 @@ export function CommandPalette() {
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Linha de busca — sem borda interna; a borda 2px do .solon-dialog
-            ja' delimita. Input em tipografia editorial pra dar peso. */}
+            já delimita. Input em tipografia editorial pra dar peso. */}
         <div className="flex items-center gap-3 px-4 py-3.5">
           <Search size={16} style={{ color: "var(--accent)" }} />
           <input

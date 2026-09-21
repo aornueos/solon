@@ -3,13 +3,13 @@ import { Extension } from "@tiptap/core";
 /**
  * Handler de Backspace pra sair de listas (BulletList/OrderedList).
  *
- * Comportamento padrao do TipTap:
- *  - Enter no item vazio  → ja' sai da lista (built-in)
- *  - Backspace no item    → so apaga char ate' esvaziar; chegar em
- *                           "•" sozinho com cursor posicao 0 NAO sai.
+ * Comportamento padrão do TipTap:
+ *  - Enter no item vazio  → já sai da lista (built-in)
+ *  - Backspace no item    → so apaga char até esvaziar; chegar em
+ *                           "•" sozinho com cursor posição 0 NAO sai.
  *
- * O usuario espera o oposto disso vindo de Notion/Bear/Obsidian: comeca
- * a fazer uma lista, decide que nao era pra ser lista, aperta Backspace
+ * O usuário espera o oposto disso vindo de Notion/Bear/Obsidian: começa
+ * a fazer uma lista, decide que não era pra ser lista, aperta Backspace
  * pra escapar. Esta extensao adiciona esse atalho universal:
  *
  *   Item de lista vazio + cursor no inicio + Backspace → liftListItem
@@ -25,12 +25,12 @@ export const ListExitExtension = Extension.create({
       Backspace: ({ editor }) => {
         const { state } = editor;
         const { $from, empty } = state.selection;
-        // So mexe em selecao colapsada — selecao com range vai pelo
-        // delete-range padrao.
+        // So mexe em seleção colapsada — seleção com range vai pelo
+        // delete-range padrão.
         if (!empty) return false;
         if ($from.parentOffset !== 0) return false;
 
-        // Sobe ate' achar um listItem como antecessor direto.
+        // Sobe até achar um listItem como antecessor direto.
         const grandparent = $from.node(-1);
         if (!grandparent) return false;
         if (grandparent.type.name !== "listItem") return false;

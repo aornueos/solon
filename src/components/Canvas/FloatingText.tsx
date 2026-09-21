@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { ConnectionDots } from "./ConnectionDots";
+import { isSelectionToggle } from "../../lib/canvasSelectionInput";
 
 interface Props {
   text: CanvasText;
@@ -340,7 +341,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
 
     e.stopPropagation();
 
-    if (e.ctrlKey || e.metaKey) {
+    if (isSelectionToggle(e)) {
       e.preventDefault();
       toggleInSelection(text.id);
       return;
@@ -757,7 +758,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
           className="canvas-text-input"
           contentEditable
           suppressContentEditableWarning
-          data-placeholder="Digite..."
+          data-placeholder="Digite…"
           // Uncontrolled: o conteudo é injetado uma vez no effect de entrada
           // em edição. onInput só atualiza o draft (medida), nunca reseta o
           // innerHTML. Selecione um trecho e use a toolbar pra formatar só ele.
@@ -948,7 +949,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
                 title: "Link do texto",
                 message: "Cole uma URL ou deixe em branco para remover.",
                 defaultValue: text.link ?? "",
-                placeholder: "https://...",
+                placeholder: "https://exemplo.com",
                 confirmLabel: "Aplicar",
               });
               if (value === null) return;
@@ -1014,7 +1015,9 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
                 {DRAW_COLORS.map((c) => (
                   <button
                     key={c.value || "auto"}
-                    title={c.label}
+                    title={c.value ? c.label : "Auto — acompanha o tema"}
+                    aria-label={`Cor ${c.label}`}
+                    aria-pressed={text.color === c.value}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1054,6 +1057,8 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
                   <button
                     key={c.value || "none"}
                     title={c.label}
+                    aria-label={`Grifo ${c.label.toLowerCase()}`}
+                    aria-pressed={(text.highlight ?? "") === c.value}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                       e.stopPropagation();

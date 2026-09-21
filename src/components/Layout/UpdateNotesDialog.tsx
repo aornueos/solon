@@ -17,11 +17,11 @@ const UPDATE_NOTES_SANITIZE_CONFIG = {
 };
 
 /**
- * Dialog de release notes + acoes do update.
+ * Dialog de release notes + ações do update.
  *
  * Estados visuais derivados de `updateStatus`:
  *  - `available`: mostra "Atualizar agora" + "Ignorar 0.X" + corpo das notas.
- *  - `downloading`: mostra barra de progresso, esconde acoes.
+ *  - `downloading`: mostra barra de progresso, esconde ações.
  *  - `ready`: mostra "Reiniciar agora" + "Mais tarde".
  *
  * O dialog NAO interrompe escrita — so e montado quando o user clica
@@ -34,7 +34,7 @@ export function UpdateNotesDialog() {
   const setStatus = useAppStore((s) => s.setUpdateStatus);
   const setProgress = useAppStore((s) => s.setUpdateProgress);
 
-  // Em estados sem info (idle/checking/error), nao tem o que mostrar.
+  // Em estados sem info (idle/checking/error), não tem o que mostrar.
   // Renderizamos null em vez de fechar pra preservar showUpdateDialog
   // caso o status volte pra `available` (ex: re-check no fundo).
   const info =
@@ -44,8 +44,8 @@ export function UpdateNotesDialog() {
       ? status.info
       : null;
 
-  // HTML sanitizado das release notes (markdown). Memoizado por versao
-  // pra nao re-parsear a cada render do dialog.
+  // HTML sanitizado das release notes (markdown). Memoizado por versão
+  // pra não re-parsear a cada render do dialog.
   const [notesHtml, setNotesHtml] = useState<string>("");
   useEffect(() => {
     if (!info?.notes) {
@@ -118,7 +118,7 @@ export function UpdateNotesDialog() {
         className="solon-dialog w-full max-w-xl flex flex-col max-h-[80vh]"
       >
         {/* Header no estilo da HomePage: meta-label em solon-caps em cima,
-            versao em display grande (Inter) embaixo. Coerencia com a hero. */}
+            versão em display grande (Inter) embaixo. Coerencia com a hero. */}
         <div className="solon-dialog-header items-start">
           <div className="min-w-0">
             <div className="solon-caps mb-1.5">
@@ -176,7 +176,7 @@ export function UpdateNotesDialog() {
           )}
         </div>
 
-        {/* Footer: progresso + acoes */}
+        {/* Footer: progresso + ações */}
         <div
           className="px-5 py-3.5"
           style={{ borderTop: "1px solid var(--border-subtle)" }}
@@ -204,9 +204,9 @@ export function UpdateNotesDialog() {
                 }}
               >
                 <div
-                  className="h-full transition-all"
+                  className="h-full w-full origin-left transition-transform"
                   style={{
-                    width: `${progressPct}%`,
+                    transform: `scaleX(${progressPct / 100})`,
                     background: "var(--accent)",
                   }}
                 />

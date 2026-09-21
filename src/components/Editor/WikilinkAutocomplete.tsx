@@ -23,10 +23,10 @@ interface Props {
  * Autocomplete de wikilinks. Detecta quando o caret esta dentro de
  * `[[...]]` (sem o segundo `]` fechado ainda), abre popup com lista
  * dos arquivos do projeto filtrada pelo texto digitado, e ao
- * selecionar substitui `[[query` (ou `[[query]]` se ja' fechou) por
+ * selecionar substitui `[[query` (ou `[[query]]` se já fechou) por
  * `[[selected]]`.
  *
- * Setas navegam, Enter seleciona, Esc fecha. Mouse hover tambem
+ * Setas navegam, Enter seleciona, Esc fecha. Mouse hover também
  * navega. Quando o user move o caret pra fora do trigger, fecha
  * automaticamente.
  */
@@ -48,22 +48,22 @@ export function WikilinkAutocomplete({ editor }: Props) {
         setState(null);
         return;
       }
-      // Pega ate' 80 chars antes do caret no mesmo paragrafo.
+      // Pega até 80 chars antes do caret no mesmo paragrafo.
       const $pos = pmState.doc.resolve(from);
       const blockStart = $pos.start();
       const textBefore = pmState.doc.textBetween(blockStart, from, "\n", " ");
       // Acha o ULTIMO `[[` antes do caret sem `]]` fechando entre os
-      // dois. Regex greedy: pega tudo de `[[` ate o caret se nao houver
+      // dois. Regex greedy: pega tudo de `[[` ate o caret se não houver
       // `]` no meio. Newline dentro do textBetween foi sub por "\n" —
-      // tambem invalida trigger (wikilink so' em uma linha).
+      // também invalida trigger (wikilink só em uma linha).
       const m = textBefore.match(/\[\[([^\]\n\[]*)$/);
       if (!m) {
         setState(null);
         return;
       }
       const query = m[1];
-      // from local = posicao do `[` aberto. blockStart + offset onde o
-      // match comeca + 2 (pula `[[`).
+      // from local = posição do `[` aberto. blockStart + offset onde o
+      // match começa + 2 (pula `[[`).
       const matchIdx = textBefore.lastIndexOf("[[");
       const queryStart = blockStart + matchIdx + 2;
       // Coords no viewport pro popup posicionar.
@@ -91,7 +91,7 @@ export function WikilinkAutocomplete({ editor }: Props) {
   }, [editor]);
 
   // Filtra a lista pelo query. Match prefix-first + substring fallback.
-  // Cap em 8 results pra nao explodir o popup.
+  // Cap em 8 results pra não explodir o popup.
   const results = useMemo(() => {
     if (!state) return [];
     const q = normalize(state.query);
@@ -232,8 +232,8 @@ function insertWikilink(editor: Editor, state: SuggestState, fileName: string) {
   const target = fileName.replace(/\.(md|txt)$/i, "");
   const inserted = `[[${target}]]`;
   // `state.to` aponta pro caret no momento da deteccao. Se o user
-  // continuou digitando, a posicao pode estar desatualizada — mas
-  // pra o caso comum (digitou ate' Enter), funciona. Re-le o doc no
+  // continuou digitando, a posição pode estar desatualizada — mas
+  // pra o caso comum (digitou até Enter), funciona. Re-le o doc no
   // momento da transacao pra sanity.
   const currentTo = editor.state.selection.from;
   editor

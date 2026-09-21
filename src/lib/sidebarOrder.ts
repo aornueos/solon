@@ -1,5 +1,5 @@
 /**
- * Persistencia + aplicacao de ordem manual no Sidebar.
+ * Persistencia + aplicação de ordem manual no Sidebar.
  *
  * Schema do arquivo `.solon/order.json` na pasta raiz do projeto:
  *
@@ -11,14 +11,14 @@
  *     }
  *   }
  *
- * Keys do `folders` sao paths relativos da raiz do projeto (`.` =
- * raiz). Values sao arrays com os nomes (basename) dos itens na ordem
+ * Keys do `folders` são paths relativos da raiz do projeto (`.` =
+ * raiz). Values são arrays com os nomes (basename) dos itens na ordem
  * desejada. Items NAO listados (recem-criados, renomeados sem update,
  * etc) vao pro fim em ordem alfabetica.
  *
  * Por que nomes em vez de paths absolutos? Porque o user pode
  * mover/renomear o rootFolder e a ordem continua valida (relativa). E
- * porque escrever arrays curtos com nomes e' mais legivel se o user
+ * porque escrever arrays curtos com nomes é mais legível se o user
  * abrir o JSON manualmente.
  */
 import type { FileNode } from "../store/useAppStore";
@@ -84,8 +84,8 @@ function replaceFolderKeyPrefix(
 }
 
 /**
- * Le `.solon/order.json`. Retorna ordem vazia se arquivo nao existe ou
- * e' invalido — degrada graciosamente.
+ * Le `.solon/order.json`. Retorna ordem vazia se arquivo não existe ou
+ * é inválido — degrada graciosamente.
  */
 export async function loadOrder(rootFolder: string): Promise<SidebarOrder> {
   if (!isTauriRuntime()) return { version: 1, folders: {} };
@@ -103,7 +103,7 @@ export async function loadOrder(rootFolder: string): Promise<SidebarOrder> {
       parsed.folders &&
       typeof parsed.folders === "object"
     ) {
-      // Sanity check: garante que values sao arrays de strings
+      // Sanity check: garante que values são arrays de strings
       const cleanFolders: Record<string, string[]> = {};
       for (const [k, v] of Object.entries(parsed.folders)) {
         if (Array.isArray(v) && v.every((s) => typeof s === "string")) {
@@ -120,8 +120,8 @@ export async function loadOrder(rootFolder: string): Promise<SidebarOrder> {
 }
 
 /**
- * Grava `.solon/order.json`. Cria a pasta `.solon/` se nao existe.
- * Falhas sao logadas mas nao throw — perda do arquivo so' significa
+ * Grava `.solon/order.json`. Cria a pasta `.solon/` se não existe.
+ * Falhas são logadas mas não throw — perda do arquivo só significa
  * que a ordem volta pro default alfabetico.
  */
 export async function saveOrder(
@@ -144,13 +144,13 @@ export async function saveOrder(
 }
 
 /**
- * Aplica a ordem manual num tree ja' construido. Pasta a pasta:
+ * Aplica a ordem manual num tree já construido. Pasta a pasta:
  *  1. Items na lista de ordem aparecem primeiro, na ordem listada
  *  2. Items NAO listados (novos, renomeados sem update) vao pro fim,
  *     ordem alfabetica + folders antes de files (consistente com
  *     buildFileTree default).
  *
- * Recursivo: aplica em cada folder filha tambem.
+ * Recursivo: aplica em cada folder filha também.
  */
 export function applyOrder(
   rootFolder: string,
@@ -207,8 +207,8 @@ function applyOrderRecursive(
 
 /**
  * Reordena items dentro de uma pasta. `draggedName` deve ficar antes de
- * `targetName`. Se `targetName` e' null, vai pro FIM da lista. Se a
- * pasta nao tinha entrada na ordem, cria uma usando a ordem atual da
+ * `targetName`. Se `targetName` é null, vai pro FIM da lista. Se a
+ * pasta não tinha entrada na ordem, cria uma usando a ordem atual da
  * UI como base (passada via `currentSiblingNames`).
  */
 export function reorderInFolder(
@@ -218,12 +218,12 @@ export function reorderInFolder(
   targetName: string | null,
   currentSiblingNames: string[],
 ): SidebarOrder {
-  // Materializa a ordem atual da pasta — usa o que ja' esta salvo, ou
-  // a ordem dos siblings na UI (alfabetica se ainda nao tem custom).
+  // Materializa a ordem atual da pasta — usa o que já esta salvo, ou
+  // a ordem dos siblings na UI (alfabetica se ainda não tem custom).
   const existing = order.folders[folderKey] ?? [];
   // Garante que TODOS os siblings atuais estao representados, na ordem
   // certa: existing primeiro (pra preservar custom), seguidos de quem
-  // esta na UI mas nao no existing.
+  // esta na UI mas não no existing.
   const usedSet = new Set<string>();
   const base: string[] = [];
   for (const name of existing) {
@@ -263,7 +263,7 @@ export function reorderInFolder(
 }
 
 /**
- * Atualiza o JSON de ordem quando um item e' renomeado. Substitui
+ * Atualiza o JSON de ordem quando um item é renomeado. Substitui
  * `oldName` por `newName` em qualquer pasta que liste `oldName`.
  */
 export function renameInOrder(
@@ -315,7 +315,7 @@ export function removeFromOrder(
 }
 
 /**
- * Move as entradas internas de ordem de uma pasta quando ela e' renomeada
+ * Move as entradas internas de ordem de uma pasta quando ela é renomeada
  * ou movida. Ex: "parte1/cap" vira "parte2/cap".
  */
 export function renameFolderInOrder(

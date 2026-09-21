@@ -193,9 +193,9 @@ export function Editor() {
   // Debounce do trabalho pesado em `onUpdate` (extractHeadings, getText,
   // getHTML, htmlToMarkdown). Esses passos custam ms em docs grandes e
   // disparavam por keystroke — em cap. de 8k palavras a digitacao
-  // visivelmente atrasava. 180ms e' um sweet spot: invisivel ao user mas
-  // coalesce burstos de digitacao em uma unica passada. O auto-save tem
-  // seu proprio debounce de 1.2s acima disso, entao nao mexemos nele.
+  // visivelmente atrasava. 180ms é um sweet spot: invisivel ao user mas
+  // coalesce burstos de digitacao em uma única passada. O auto-save tem
+  // seu próprio debounce de 1.2s acima disso, então não mexemos nele.
   const updateTimerRef = useRef<number | null>(null);
   // `flushUpdate` roda o trabalho pendente *agora* (sem esperar debounce).
   // Chamado em 3 lugares:
@@ -203,9 +203,9 @@ export function Editor() {
   //   2. Antes de trocar `activeFilePath` — senao o body do arquivo antigo
   //      pendente seria descartado quando o setContent do novo rodar.
   //   3. Em Ctrl+S (via flushEditor() chamado pelo useAutoSave) — senao o
-  //      save iria gravar a versao 180ms atrasada.
+  //      save iria gravar a versão 180ms atrasada.
   // Definida fora do escopo da useEditor pra que possa ser registrada via
-  // setEditorFlush logo apos a criacao do editor.
+  // setEditorFlush logo após a criação do editor.
   const flushUpdateRef = useRef<(() => void) | null>(null);
   const [findOpen, setFindOpen] = useState(false);
   const [findInitialQuery, setFindInitialQuery] = useState("");
@@ -327,7 +327,7 @@ export function Editor() {
       WikilinkExtension,
       // Ordem: HeadingNav ANTES de IndentExtension. Ambos respondem a
       // Tab/Shift+Tab; TipTap testa em ordem e o primeiro que retornar
-      // `true` consome o evento. HeadingNav so' age se cursor esta em
+      // `true` consome o evento. HeadingNav só age se cursor esta em
       // heading; senao retorna false e o Indent assume.
       HeadingNavExtension,
       CollapsibleHeadingsExtension,
@@ -338,8 +338,8 @@ export function Editor() {
       TableRow,
       TableHeader,
       TableCell,
-      // Alinhamento de texto: paragrafos + headings. Default 'left' nao
-      // e' explicitamente settado (vira null/undefined no atributo) pra
+      // Alinhamento de texto: paragrafos + headings. Default 'left' não
+      // é explicitamente settado (vira null/undefined no atributo) pra
       // que markdown sem alinhamento permaneca markdown sem alinhamento.
       TextAlign.configure({
         types: ["heading", "paragraph"],
@@ -348,15 +348,15 @@ export function Editor() {
       }),
       // Highlight (grifo) com cores. `multicolor: true` permite marcar
       // texto com cor especifica via setHighlight({ color: '#...' });
-      // `false` so' permite toggle on/off (cor padrao). Queremos cores.
+      // `false` só permite toggle on/off (cor padrão). Queremos cores.
       Highlight.configure({
         multicolor: true,
         HTMLAttributes: { class: "solon-mark" },
       }),
-      // Placeholder vazio — o user nao queria a frase "Comece a escrever
+      // Placeholder vazio — o user não queria a frase "Comece a escrever
       // sua historia..." aparecendo. Mantemos a Extension instalada
-      // (e' lightweight) caso queiramos placeholders dinamicos por nota
-      // no futuro (ex: do frontmatter), mas por agora fica em branco.
+      // (é lightweight) caso queiramos placeholders dinamicos por nota
+      // Sem título derivado do frontmatter ainda; fica em branco.
       EditorImageExtension,
       Placeholder.configure({
         placeholder: "",
@@ -372,7 +372,7 @@ export function Editor() {
     },
     onUpdate: ({ editor }) => {
       if (isLoadingRef.current) return;
-      // Coalesce todo o trabalho pesado num unico debounce. Antes,
+      // Coalesce todo o trabalho pesado num único debounce. Antes,
       // digitar uma frase de 30 letras disparava 30x:
       //   - extractHeadings (descend O(n) do doc inteiro)
       //   - editor.getText() + split (O(n))
@@ -401,7 +401,7 @@ export function Editor() {
   });
   editorInstanceRef.current = editor;
 
-  // Mantem flushUpdateRef apontando pra uma funcao que cancela o timer
+  // Mantem flushUpdateRef apontando pra uma função que cancela o timer
   // pendente e roda o trabalho agora. Chamado quando o user troca de
   // arquivo (via useEffect de load) e em Ctrl+S (via flushEditor() do
   // useAutoSave).
@@ -458,16 +458,16 @@ export function Editor() {
     saveVisibleScroll();
     saveVisibleSelection();
     // CUIDADO: NAO chamar flushUpdateRef aqui. Quando este effect roda,
-    // `activeFilePath` ja' mudou pro arquivo NOVO, mas o editor ainda
+    // `activeFilePath` já mudou pro arquivo NOVO, mas o editor ainda
     // tem o conteudo do arquivo ANTIGO. Se a gente flushasse, o turndown
     // do conteudo antigo viraria fileBody DO NOVO arquivo — e logo
     // abaixo a gente le esse fileBody pra o setContent. Resultado:
     // editor mostraria o conteudo antigo, autosave gravaria o antigo
     // por cima do novo, *apagando o arquivo*. Bug catastrofico.
-    // O flush correto e' feito em `useFileSystem.openFile` ANTES do
+    // O flush correto é feito em `useFileSystem.openFile` ANTES do
     // setActiveFile mudar a store — ai o editor ainda casa com o path
     // antigo.
-    // Cancela timer pendente pra que ele nao dispare em cima do
+    // Cancela timer pendente pra que ele não dispare em cima do
     // setContent abaixo.
     if (updateTimerRef.current != null) {
       window.clearTimeout(updateTimerRef.current);
@@ -518,7 +518,7 @@ export function Editor() {
 
   // Mantemos o spellcheck nativo do WebView desligado. Ele costuma seguir
   // o idioma do sistema/Edge e marcar portugues correto como erro; o Solon
-  // usa o backend pt-BR proprio para sublinhados e sugestoes.
+  // usa o backend pt-BR próprio para sublinhados e sugestoes.
   useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom as HTMLElement;
@@ -624,14 +624,14 @@ export function Editor() {
   //
   // Usamos `coordsAtPos` (viewport coords) + bounding rect do scroller
   // pra calcular o delta exato. scrollBy "instant" (sem smooth) — em
-  // digitacao continua, smooth-scroll dava jitter visivel.
+  // digitacao continua, smooth-scroll dava jitter visível.
   useEffect(() => {
     if (!editor || !typewriterMode) return;
     const scroller = scrollRef.current;
     if (!scroller) return;
     let raf: number | null = null;
     const recenter = () => {
-      // rAF garante que a layout passou pelo ciclo apos a edicao (caret
+      // rAF garante que a layout passou pelo ciclo após a edição (caret
       // pode ter ido pra linha nova).
       if (raf != null) cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
@@ -646,7 +646,7 @@ export function Editor() {
             scroller.scrollTop += delta;
           }
         } catch {
-          /* posicoes podem invalidar durante hot-reload — ignora */
+          /* posições podem invalidar durante hot-reload — ignora */
         }
       });
     };
@@ -692,13 +692,13 @@ export function Editor() {
     return () => dom.removeEventListener("click", onClick);
   }, [editor, openFile]);
 
-  // Pre-warming do spellcheck: spawna o worker 2s apos o editor montar.
+  // Pre-warming do spellcheck: spawna o worker 2s após o editor montar.
   // Worker compila o dicionario em background sem travar a UI (~8-10s
   // numa maquina lenta). Quando o user fizer o primeiro right-click em
-  // palavra errada, a engine ja' esta pronta e sugestoes aparecem em
+  // palavra errada, a engine já esta pronta e sugestoes aparecem em
   // <100ms.
   //
-  // ANTES essa funcao bloqueava a main thread durante o parsing —
+  // ANTES essa função bloqueava a main thread durante o parsing —
   // primeiro right-click congelava o app por 10s. Agora o worker
   // isola completamente.
   useEffect(() => {
@@ -709,8 +709,8 @@ export function Editor() {
     return () => window.clearTimeout(t);
   }, [spellcheckEnabled]);
 
-  // Ctrl+Scroll = zoom da area de escrita. No modo A4, isso aumenta ou
-  // diminui a pagina inteira; tamanho tipografico semantico fica nos
+  // Ctrl+Scroll = zoom da área de escrita. No modo A4, isso aumenta ou
+  // diminui a página inteira; tamanho tipografico semantico fica nos
   // presets Pequeno/Medio/Grande da toolbar. Acumulador suaviza trackpads que
   // disparam dezenas de events com delta pequeno por gesto — sem
   // acumulador, um swipe casual saltaria de 100% pra 200%. Cada 50px
@@ -720,7 +720,7 @@ export function Editor() {
     if (!el) return;
 
     let accumulator = 0;
-    const STEP_THRESHOLD = 50; // pixels deltaY ate' disparar 1 step
+    const STEP_THRESHOLD = 50; // pixels deltaY até disparar 1 step
     const STEP_SIZE = 5; // % por step
 
     const onWheel = (e: WheelEvent) => {
@@ -738,15 +738,15 @@ export function Editor() {
     };
 
     // {passive: false} obriga browser a esperar o handler decidir antes
-    // de scrollar. Sem isso, preventDefault() e' ignorado e o scroll
+    // de scrollar. Sem isso, preventDefault() é ignorado e o scroll
     // acontece junto do zoom — UX confusa.
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-    // `activeFilePath` na dep: o scrollRef so' "existe" quando ha
-    // arquivo aberto (early-return sem-arquivo nao renderiza o div com
+    // `activeFilePath` na dep: o scrollRef só "existe" quando ha
+    // arquivo aberto (early-return sem-arquivo não renderiza o div com
     // o ref). Sem essa dep, useEffect rodava no mount inicial com
     // scrollRef.current=null (path de empty-state), e nunca re-rodava
-    // quando o user abria arquivo. Resultado: Ctrl+Scroll nao zoomava.
+    // quando o user abria arquivo. Resultado: Ctrl+Scroll não zoomava.
   }, [setEditorZoom, activeFilePath]);
 
   // Scroll para heading via evento do Outline. Chain pra scrollar DE FATO
@@ -802,7 +802,7 @@ export function Editor() {
   // simulada + container max-w-680px com padding identico) e so um
   // paragrafo placeholder dentro. NAO e uma "tela cheia centralizada com
   // CTA" — isso virava percepcao de "segunda homepage". Agora parece
-  // literalmente um editor com pagina em branco, top-aligned como qualquer
+  // literalmente um editor com página em branco, top-aligned como qualquer
   // documento. A landing real (Solon serif gigante, sumario etc) so existe
   // em activeView === "home".
   if (!activeFilePath) {
@@ -810,7 +810,7 @@ export function Editor() {
       <div className="flex flex-col h-full">
         {/* Espacador da altura da toolbar (so pra alinhamento visual com
             quando ha arquivo aberto — sem renderizar a EditorToolbar
-            propriamente porque ela depende de uma instancia do editor). */}
+            propriamente porque ela depende de uma instância do editor). */}
         {!focusMode && (
           <div
             className="h-[44px] flex-shrink-0"
@@ -877,24 +877,24 @@ export function Editor() {
     );
   }
 
-  // Click na area branca em volta do EditorContent posiciona o caret
+  // Click na área branca em volta do EditorContent posiciona o caret
   // baseado na coordenada Y do click — clicar acima do primeiro
-  // paragrafo posiciona no INICIO do doc, abaixo do ultimo posiciona
-  // no FIM. Antes era sempre fim; "preciso clicar especificamente
-  // na primeira palavra pra ir pro inicio" era a queixa do user.
+  // paragrafo posiciona no INICIO do doc, abaixo do último posiciona
+  // no FIM. Clicar acima do primeiro parágrafo precisa levar ao começo do
+  // documento, não ao fim dele.
   const focusEnd = (e: React.MouseEvent) => {
     if (!editor) return;
     const target = e.target as HTMLElement;
     if (target.closest(".ProseMirror")) return;
 
-    // Se ha selecao ativa (user fez drag-select), deixa quieta —
-    // senao colapsavamos a selecao acidentalmente.
+    // Se ha seleção ativa (user fez drag-select), deixa quieta —
+    // senao colapsavamos a seleção acidentalmente.
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && sel.toString().length > 0) return;
 
     // Tenta posicionar o caret na coordenada do click (ProseMirror
-    // resolve pra posicao mais proxima dentro do doc). Se nao achar
-    // nada (click muito longe), heuristica: acima do editor → inicio,
+    // resolve pra posição mais proxima dentro do doc). Se não achar
+    // nada (click muito longe), heurística: acima do editor → inicio,
     // abaixo → fim.
     const coords = editor.view.posAtCoords({
       left: e.clientX,
@@ -917,7 +917,7 @@ export function Editor() {
     }
   };
 
-  // Zoom e presets tipograficos: zoom escala a area de escrita; tamanho
+  // Zoom e presets tipograficos: zoom escala a área de escrita; tamanho
   // do texto muda a hierarquia editorial (paragrafos + headings) sem
   // depender de porcentagem livre.
   const lineHeightValue =
@@ -1001,7 +1001,7 @@ export function Editor() {
  * Acha o primeiro arquivo no tree cujo basename (sem extensao) bate
  * case-insensitive com `name`. Comparacao normalizada (acentos
  * stripados) pra que `[[capitulo um]]` ache "Capitulo Um.md" e
- * "capítulo um.md" indistintamente. Pasta nao matcha.
+ * "capítulo um.md" indistintamente. Pasta não matcha.
  */
 function findFileByName(
   nodes: { type: "file" | "folder"; name: string; path: string; children?: any[] }[],
@@ -1046,9 +1046,9 @@ function extractHeadings(
   });
   // Pos passo 2: pra cada heading, mede a secao ate o proximo heading
   // (ou ate o fim do doc) e conta palavras. Sem isso o Outline mostraria
-  // so' o titulo — com a contagem, o user ve a "massa" de cada secao e
+  // só o título — com a contagem, o user ve a "massa" de cada secao e
   // identifica onde escrever mais. textBetween extrai so o texto plano
-  // entre as posicoes (ignora a estrutura de blocos — perfeito pra contar).
+  // entre as posições (ignora a estrutura de blocos — perfeito pra contar).
   const docSize = editor.state.doc.content.size;
   const headings = raw.map((h, idx) => {
     const endPos = idx + 1 < raw.length ? raw[idx + 1].pos : docSize;

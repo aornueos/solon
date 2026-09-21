@@ -163,9 +163,9 @@ export function EditorToolbar({ editor }: Props) {
     },
   ];
 
-  // Alinhamento — paragrafos e headings. Default 'left' nao precisa
-  // estar marcado como ativo (pra evitar 4 botoes acesos quando voce
-  // nao escolheu nada). isActive checa explicit alignment via attrs.
+  // Alinhamento — paragrafos e headings. Default 'left' não precisa
+  // estar marcado como ativo (pra evitar 4 botoes acesos quando você
+  // não escolheu nada). isActive checa explicit alignment via attrs.
   const alignTools: ToolSpec[] = [
     {
       icon: <AlignLeft size={15} />,
@@ -304,7 +304,7 @@ function ToolBtn({
   active?: boolean;
 }) {
   // Botao minimalista: cantos suaves, tint accent suave quando ativo
-  // (sem borda dura). 28×28 pra nao inflar a fileira da toolbar.
+  // (sem borda dura). 28×28 pra não inflar a fileira da toolbar.
   return (
     <button
       onMouseDown={(e) => {
@@ -342,7 +342,7 @@ function ToolBtn({
  * Glifo textual estilizado pra botoes de formatacao (B / I / S / H1).
  * Substitui icones Lucide por letras editoriais — mais imediato e coerente
  * com a serifa display do app. Mantem o tamanho/peso visual de um icone
- * 15px atraves de line-height 1 e largura fixa.
+ * 15px através de line-height 1 e largura fixa.
  */
 function GlyphLabel({
   children,
@@ -371,7 +371,7 @@ function GlyphLabel({
 
 /**
  * Paleta de cores do grifo. Tons translúcidos pra que o texto continue
- * legivel por cima — saturacoes baixas, alphas explicitas no hex
+ * legível por cima — saturacoes baixas, alphas explicitas no hex
  * (`80` = 50%). Inspirados em marcadores de texto reais (amarelo,
  * verde, rosa, azul, lilas, cinza).
  */
@@ -388,7 +388,7 @@ function HighlightPicker({ editor }: { editor: Editor }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
-  // Fecha ao clicar fora — usuario pode escolher cor ou abandonar.
+  // Fecha ao clicar fora — usuário pode escolher cor ou abandonar.
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {

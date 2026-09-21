@@ -27,17 +27,17 @@ import clsx from "clsx";
 
 /**
  * Tauri 2 com `decorations: false` esconde a barra nativa do SO. Esse
- * util encapsula o handle do `Window` e expõe os 3 controles classicos
- * (min/max/close) com tracking do estado maximized — necessario pra
+ * útil encapsula o handle do `Window` e expõe os 3 controles classicos
+ * (min/max/close) com tracking do estado maximized — necessário pra
  * trocar o icone (Square ↔ Copy de "restore" ao maximizar).
  *
  * `available` indica se podemos chamar a API; em dev/browser puro retorna
- * false e os botoes sao escondidos pelo caller.
+ * false e os botoes são escondidos pelo caller.
  */
 function useWindowControls() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  // Fora do Tauri (vite dev no browser) as APIs de janela nao existem e
+  // Fora do Tauri (vite dev no browser) as APIs de janela não existem e
   // `getCurrentWindow()` estoura; o caller esconde os controles.
   const available = isTauriRuntime();
 
@@ -72,7 +72,7 @@ function useWindowControls() {
         });
       } catch {
         // Defensivo — se a chamada falhar mesmo com __TAURI_INTERNALS__
-        // presente (versao incompativel, etc) silencia o erro pra nao
+        // presente (versão incompativel, etc) silencia o erro pra não
         // crashar a UI inteira.
       }
     })();
@@ -84,7 +84,7 @@ function useWindowControls() {
 
   // Erros aqui significam permissao faltando no capabilities/default.json
   // (core:window:allow-minimize, allow-toggle-maximize, allow-close).
-  // Logamos pra que o problema seja visivel ao inves de silencioso.
+  // Logamos pra que o problema seja visível ao inves de silencioso.
   const minimize = () => {
     if (!available) return;
     getCurrentWindow().minimize().catch((e) => console.error("minimize:", e));
@@ -501,12 +501,12 @@ export function Titlebar() {
       </div>
 
       {/* Controles de janela (Tauri custom titlebar — `decorations: false`).
-          Sem essa barra o usuario nao tinha como minimizar/maximizar/fechar
-          pelo proprio app, so via teclado/SO. Convencao Windows: min, max,
+          Sem essa barra o usuário não tinha como minimizar/maximizar/fechar
+          pelo próprio app, so via teclado/SO. Convencao Windows: min, max,
           close — nessa ordem, encostado na borda direita.
           Renderizamos so quando `available` (estamos dentro do Tauri); em
-          vite dev/browser puro escondemos pra nao crashar e pra nao expor
-          botoes que nao fariam nada. */}
+          vite dev/browser puro escondemos pra não crashar e pra não expor
+          botoes que não fariam nada. */}
       {available && (
         <div className="flex items-stretch h-full">
           <WindowBtn onClick={minimize} title="Minimizar">
@@ -530,7 +530,7 @@ export function Titlebar() {
 /**
  * Botao de window-control (min/max/close). Diferente do `IconBtn` porque:
  * - ocupa altura total da titlebar (sensa~o de "cantinho do SO");
- * - e mais largo (46px) pra bater na area de clique padrao do Windows;
+ * - e mais largo (46px) pra bater na área de clique padrão do Windows;
  * - close em hover vira vermelho (convencao universal).
  */
 function WindowBtn({

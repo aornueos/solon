@@ -95,11 +95,11 @@ export default function App() {
     });
   }, [openFile, restoreLastFolder, setActiveView]);
 
-  // Update check no boot, com defer pra nao concorrer com bootstrap (lendo
+  // Update check no boot, com defer pra não concorrer com bootstrap (lendo
   // pasta, montando editor, etc). 5s e suficiente pra app sentir snappy.
   // Throttle de 6h fica dentro do `checkForUpdate` — chamadas subsequentes
-  // (ex: foco da janela) sao cheap se ja checou recente.
-  // Respeitamos a pref `autoCheckUpdates` — usuario que desligou nao quer
+  // (ex: foco da janela) são cheap se ja checou recente.
+  // Respeitamos a pref `autoCheckUpdates` — usuário que desligou não quer
   // ver banner de update no proximo boot.
   useEffect(() => {
     const t = window.setTimeout(async () => {
@@ -110,7 +110,7 @@ export default function App() {
       if (result.kind === "available") {
         setUpdateStatus({ kind: "available", info: result.info });
       } else if (result.kind === "error") {
-        // Silencioso — so log. Volta pra idle pra UI nao travar em "checking".
+        // Silencioso — so log. Volta pra idle pra UI não travar em "checking".
         setUpdateStatus({ kind: "idle" });
       } else {
         // none / skipped / unsupported — todos viram idle visualmente.
@@ -121,9 +121,9 @@ export default function App() {
   }, [setUpdateStatus]);
 
   // Refresca árvore quando a janela ganha foco (pega mudanças externas).
-  // Debounce de 400ms pra absorver alt-tab rapido e clicks em sequencia
+  // Debounce de 400ms pra absorver alt-tab rapido e clicks em sequência
   // que disparam multiplos `focus` no mesmo "evento" pra o user. Sem isso,
-  // alternar janelas N vezes em sequencia faz N reads do FS em paralelo.
+  // alternar janelas N vezes em sequência faz N reads do FS em paralelo.
   useEffect(() => {
     let timer: number | null = null;
     const onFocus = () => {
@@ -141,10 +141,10 @@ export default function App() {
   }, [refresh]);
 
   // No app desktop, bloqueia os atalhos classicos de DevTools. No browser
-  // web eles continuam livres, o que ajuda no desenvolvimento da versao web.
-  // F11 tambem entra aqui (em capture) pra garantir que nenhum editor/dialog
+  // web eles continuam livres, o que ajuda no desenvolvimento da versão web.
+  // F11 também entra aqui (em capture) pra garantir que nenhum editor/dialog
   // consuma o evento antes do toggle de fullscreen — TipTap e prosemirror
-  // tem listeners proprios que as vezes "engolem" teclas de funcao.
+  // tem listeners próprios que as vezes "engolem" teclas de função.
   useEffect(() => {
     const inTauri = isTauriRuntime();
     const handler = (e: KeyboardEvent) => {
@@ -233,19 +233,19 @@ export default function App() {
       // AltGr (Alt direito) em layouts internacionais — Windows reporta
       // como `Ctrl+Alt`. Em pt-BR ABNT2 (Portugal) AltGr+W produz "?",
       // AltGr+Q produz "@", etc. Sem cuidado, os bindings Ctrl+letra
-      // abaixo disparariam erroneamente quando o user so' queria digitar
+      // abaixo disparariam erroneamente quando o user só queria digitar
       // o caractere especial — fechando aba, abrindo paleta, etc.
       //
-      // Estrategia: shortcuts que dependem da TECLA-CARACTERE (e nao da
-      // posicao fisica da letra) ficam ANTES do bailout, porque o key
-      // ja' veio traduzido pela layout — "?" e "/" sao validos vindos de
+      // Estrategia: shortcuts que dependem da TECLA-CARACTERE (e não da
+      // posição fisica da letra) ficam ANTES do bailout, porque o key
+      // já veio traduzido pela layout — "?" e "/" são válidos vindos de
       // AltGr e fazem sentido como invocacao explicita. Em seguida, os
       // Ctrl+Alt+X explicitos do app (history/inspector). DEPOIS, um
       // early-return mata qualquer outro Ctrl+Alt+letra restante.
-      // (`ctrl` ja' definido no topo deste handler.)
+      // (`ctrl` já definido no topo deste handler.)
 
       // Ctrl+/ e Ctrl+? — cheatsheet. Aceita altKey porque na layout
-      // pt-PT o usuario pressiona Ctrl+Alt+W pra produzir Ctrl+? (a
+      // pt-PT o usuário pressiona Ctrl+Alt+W pra produzir Ctrl+? (a
       // tecla fisica W gera "?" via AltGr). Sem essa precedencia, o
       // bailout abaixo bloqueava a cheatsheet.
       if (ctrl && (e.key === "/" || e.key === "?")) {
@@ -289,8 +289,8 @@ export default function App() {
         openGlobalSearch();
       }
       // Ctrl+1..8 ativa a N-esima aba aberta; Ctrl+9 vai pra ULTIMA aba
-      // (convencao de browser: Chrome/Firefox). Sem aba naquela posicao =
-      // no-op. Ativar tambem tira da Home pro editor, igual clicar na aba.
+      // (convencao de browser: Chrome/Firefox). Sem aba naquela posição =
+      // no-op. Ativar também tira da Home pro editor, igual clicar na aba.
       if (ctrl && !e.shiftKey && e.key >= "1" && e.key <= "9") {
         const { openTabs, activeFilePath, activeView } = useAppStore.getState();
         if (openTabs.length === 0) return;
@@ -311,7 +311,7 @@ export default function App() {
         e.preventDefault();
         openSettings();
       }
-      // (Ctrl+/ e Ctrl+? sao tratados acima — antes do bailout do
+      // (Ctrl+/ e Ctrl+? são tratados acima — antes do bailout do
       // AltGr — pra que continuem funcionando em layouts onde "?" exige
       // AltGr+W.)
       // Ctrl+Shift+E abre o dialog de export (PDF/DOCX) — convencao
@@ -325,8 +325,8 @@ export default function App() {
         openExport();
       }
       // Ctrl+Shift+R alterna reading mode (modo livro — esconde todo
-      // chrome). R aqui *nao* eh "reload" do browser; em Tauri release
-      // o reload nao tem efeito util e em dev fica como Ctrl+R puro.
+      // chrome). R aqui *não* eh "reload" do browser; em Tauri release
+      // o reload não tem efeito útil e em dev fica como Ctrl+R puro.
       // Combinacao com Shift evita colidir com Ctrl+R do TipTap.
       if (
         (e.ctrlKey || e.metaKey) &&
@@ -337,9 +337,9 @@ export default function App() {
         toggleReadingMode();
       }
       // PANIC KEY — Ctrl+Shift+Esc reseta TODOS os modos especiais e
-      // restaura o chrome ao default. Pensado pra cenarios onde o user
-      // fica "preso" num modo (reading sem chrome visivel) sem saber
-      // como sair. Nao toca em ajustes persistidos — so' nos modos transientes.
+      // restaura o chrome ao default. Pensado pra cenários onde o user
+      // fica "preso" num modo (reading sem chrome visível) sem saber
+      // como sair. Nao toca em ajustes persistidos — só nos modos transientes.
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "Escape") {
         e.preventDefault();
         useAppStore.setState({
@@ -352,22 +352,22 @@ export default function App() {
         void setAppFullscreen(false).catch(() => {});
         return;
       }
-      // Esc em reading mode sai do modo (mesmo padrao de presentation
+      // Esc em reading mode sai do modo (mesmo padrão de presentation
       // mode em browsers/Keynote). Nao bloqueia outros usos do Esc
-      // (dialogs, etc) — esses tem listeners proprios com stopPropagation.
+      // (dialogs, etc) — esses tem listeners próprios com stopPropagation.
       // Capture phase pra sair ANTES de outros listeners consumirem o Esc.
       if (e.key === "Escape" && useAppStore.getState().readingMode) {
-        // So' sai se nao tem texto selecionado ou dialog aberto. Dialogs
-        // ja se fecham primeiro via seus proprios handlers — se chegou
+        // So' sai se não tem texto selecionado ou dialog aberto. Dialogs
+        // ja se fecham primeiro via seus próprios handlers — se chegou
         // aqui, nada esta priorizando o Esc.
         if (!useAppStore.getState().showCommandPalette) {
           e.preventDefault();
           toggleReadingMode();
         }
       }
-      // Ctrl+T cria uma nova nota vazia ("Sem titulo") e abre numa aba nova —
+      // Ctrl+T cria uma nova nota vazia ("Sem título") e abre numa aba nova —
       // convencao de "nova aba" do browser. O rascunho (scratchpad) migrou pro
-      // Ctrl+Shift+N pra nao conflitar.
+      // Ctrl+Shift+N pra não conflitar.
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "t") {
         e.preventDefault();
         // Guarda o buffer untitled atual (se houver) antes de abrir outro.
@@ -391,9 +391,9 @@ export default function App() {
         if (tab) void openFile(tab.path, tab.name, { tab: "preserve" });
         return;
       }
-      // Ctrl+W fecha aba ativa. Se nao houver aba ativa, no-op (browser
-      // fecharia a janela; nao queremos isso). Se a aba fechada era a
-      // unica, limpa o arquivo ativo.
+      // Ctrl+W fecha aba ativa. Se não houver aba ativa, no-op (browser
+      // fecharia a janela; não queremos isso). Se a aba fechada era a
+      // única, limpa o arquivo ativo.
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "w") {
         const { activeFilePath, closeTab, openTabs } = useAppStore.getState();
         if (!activeFilePath) return;
@@ -403,9 +403,9 @@ export default function App() {
           const tab = useAppStore.getState().openTabs.find((t) => t.path === next);
           if (tab) void openFile(tab.path, tab.name, { tab: "preserve" });
         } else if (openTabs.length <= 1) {
-          // Era a unica aba: limpa o arquivo ativo (mesmo comportamento
-          // do botao ✕ na ultima aba). Flush ANTES de zerar pra que
-          // useAutoSave persista a ultima janela de digitacao no arquivo
+          // Era a única aba: limpa o arquivo ativo (mesmo comportamento
+          // do botao ✕ na última aba). Flush ANTES de zerar pra que
+          // useAutoSave persista a última janela de digitacao no arquivo
           // que esta saindo de foco.
           flushEditor();
           useAppStore.setState({
@@ -420,7 +420,7 @@ export default function App() {
         }
       }
       // Ctrl+Tab e Ctrl+Shift+Tab ciclam entre abas. Nao usa Ctrl+PageUp/Down
-      // pra nao colidir com scroll de paginacao em outros contextos.
+      // pra não colidir com scroll de paginacao em outros contextos.
       if ((e.ctrlKey || e.metaKey) && e.key === "Tab") {
         const { openTabs, activeFilePath } = useAppStore.getState();
         if (openTabs.length < 2) return;

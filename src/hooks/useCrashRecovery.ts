@@ -8,19 +8,19 @@ const DRAFT_INTERVAL_MS = 5000;
 
 /**
  * Hook global: enquanto o arquivo ativo esta "dirty" (auto-save ainda
- * nao gravou), escreve um draft de recovery a cada 5s em
+ * não gravou), escreve um draft de recovery a cada 5s em
  * `<root>/.solon/.recovery/`. Se o app crashar antes do save real, o
  * draft permite oferecer recuperacao no proximo boot.
  *
  * Quando saveStatus vira "saved", o draft eh apagado pelo `saveFile`
- * em useFileSystem (clearRecoveryDraft) — entao aqui so cuidamos da
+ * em useFileSystem (clearRecoveryDraft) — então aqui so cuidamos da
  * escrita periodica.
  */
 export function useCrashRecovery() {
   useEffect(() => {
     let timer: number | null = null;
-    // Cache do ultimo conteudo escrito como draft, por arquivo. Evita
-    // re-escrever o mesmo content a cada 5s se o user nao digitou
+    // Cache do último conteudo escrito como draft, por arquivo. Evita
+    // re-escrever o mesmo content a cada 5s se o user não digitou
     // nada novo entre ticks (dirty pode ficar "stuck" enquanto o user
     // pensa). Antes escrevia I/O desnecessario.
     const lastDraft = new Map<string, string>();
@@ -34,14 +34,14 @@ export function useCrashRecovery() {
       // restaura tanto sceneMeta quanto body com fidelidade total.
       const content = serializeDocument(s.sceneMeta, s.fileBody);
       const prev = lastDraft.get(s.activeFilePath);
-      if (prev === content) return; // nada mudou desde o ultimo draft
+      if (prev === content) return; // nada mudou desde o último draft
       lastDraft.set(s.activeFilePath, content);
       void saveRecoveryDraft(s.rootFolder, s.activeFilePath, content);
     };
 
-    // Limpa o cache quando o arquivo ativo muda — drafts antigos sao
+    // Limpa o cache quando o arquivo ativo muda — drafts antigos são
     // limpos pelo saveFile via clearRecoveryDraft, mas o cache local
-    // pode segurar o ultimo content de um arquivo ja' fechado e
+    // pode segurar o último content de um arquivo já fechado e
     // impedir a primeira escrita do draft do novo (se conteudo bater
     // por coincidencia em arquivos vazios, ex). Subscribe granular.
     const unsub = useAppStore.subscribe((state, prev) => {

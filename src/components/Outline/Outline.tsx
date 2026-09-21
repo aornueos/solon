@@ -6,17 +6,17 @@ import clsx from "clsx";
 /**
  * Indice das secoes do documento. Cada linha mostra:
  *  - indentacao por level (H1 fundo, H6 mais a' direita)
- *  - titulo da secao
+ *  - título da secao
  *  - contagem de palavras da secao (heading inclusivo, ate o proximo
  *    heading do doc)
  *
  * Drag-and-drop reordena secoes inteiras: arrastar um heading move o
  * heading + todo o conteudo abaixo dele (ate o proximo heading) pra uma
- * nova posicao no doc. Drop indicator (linha amber) aparece em cima do
+ * nova posição no doc. Drop indicator (linha amber) aparece em cima do
  * row alvo enquanto o user arrasta.
  *
  * Implementado via DOM transactions do TipTap — ProseMirror gerencia
- * mapping automatico entre delete + insert pra que as posicoes nao se
+ * mapping automático entre delete + insert pra que as posições não se
  * invalidem no meio.
  */
 export function Outline() {
@@ -71,7 +71,7 @@ export function Outline() {
                 onDragStart={() => setDragId(heading.pos)}
                 onDragOver={() => setDropIdx(idx)}
                 onDragLeave={() => {
-                  // Limpa so' se o leave era pra ESTE idx — events de
+                  // Limpa só se o leave era pra ESTE idx — events de
                   // children podem disparar leave/over alternados.
                   setDropIdx((curr) => (curr === idx ? null : curr));
                 }}
@@ -148,7 +148,7 @@ function HeadingRow({
       draggable
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
-        // Dado simbolico — a referencia real esta no state do Outline.
+        // Dado simbolico — a referência real esta no state do Outline.
         e.dataTransfer.setData("text/plain", String(heading.pos));
         onDragStart();
       }}
@@ -223,12 +223,12 @@ function formatCount(n: number): string {
 /**
  * Reordena uma seção (heading inclusivo + conteudo) no doc do editor.
  *
- * `sourcePos` e a posicao do heading que esta sendo arrastado;
- * `targetPos` e a posicao do heading-alvo (a secao source vai parar
+ * `sourcePos` e a posição do heading que esta sendo arrastado;
+ * `targetPos` e a posição do heading-alvo (a secao source vai parar
  * ANTES desse target).
  *
- * Usa o `mapping` da transaction pra ajustar posicoes apos o delete —
- * sem isso o insert apontaria pra lugar errado. Tudo numa unica
+ * Usa o `mapping` da transaction pra ajustar posições após o delete —
+ * sem isso o insert apontaria pra lugar errado. Tudo numa única
  * transaction (1 entry no undo stack).
  */
 async function reorderSection(sourcePos: number, targetPos: number) {
@@ -241,7 +241,7 @@ async function reorderSection(sourcePos: number, targetPos: number) {
   if (!source || !target) return;
   if (source.pos === target.pos) return;
 
-  // Sanity: nao deixa um heading "engolir a si mesmo" — se o target
+  // Sanity: não deixa um heading "engolir a si mesmo" — se o target
   // esta DENTRO do range do source, ignora.
   if (target.pos >= source.pos && target.pos < source.endPos) return;
 
@@ -249,11 +249,11 @@ async function reorderSection(sourcePos: number, targetPos: number) {
   const slice = state.doc.slice(source.pos, source.endPos);
 
   // Transaction: delete source range, depois insere o slice antes do
-  // target. tr.mapping.map() resolve onde o target ficou apos o delete.
+  // target. tr.mapping.map() resolve onde o target ficou após o delete.
   const tr = state.tr.delete(source.pos, source.endPos);
   const mappedTarget = tr.mapping.map(target.pos);
   tr.insert(mappedTarget, slice.content);
   editor.view.dispatch(tr);
   // O onUpdate do editor (debounced 180ms) vai re-extrair headings,
-  // entao a Outline atualiza sozinha apos o reorder.
+  // então a Outline atualiza sozinha após o reorder.
 }

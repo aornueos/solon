@@ -47,8 +47,8 @@ function flatten(nodes: FileNode[]): FileNode[] {
 
 /**
  * Constroi o index completo varrendo o projeto. Le os arquivos em
- * paralelo (chunks). Falhas individuais sao ignoradas — arquivo
- * ilegivel nao quebra o resto.
+ * paralelo (chunks). Falhas individuais são ignoradas — arquivo
+ * ilegivel não quebra o resto.
  */
 export async function buildBacklinkIndex(tree: FileNode[]): Promise<BacklinkIndex> {
   const idx: BacklinkIndex = new Map();
@@ -65,7 +65,7 @@ export async function buildBacklinkIndex(tree: FileNode[]): Promise<BacklinkInde
             const raw = await readTextFile(f.path);
             const { body } = parseDocument(raw);
             const matches: string[] = [];
-            // RegExp tem estado (lastIndex) por instancia; criamos
+            // RegExp tem estado (lastIndex) por instância; criamos
             // uma nova por iteracao pra evitar bug em multi-call.
             const re = new RegExp(WIKILINK_RE.source, "g");
             let m: RegExpExecArray | null;

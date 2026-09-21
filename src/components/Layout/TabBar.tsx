@@ -15,22 +15,22 @@ import clsx from "clsx";
 
 /**
  * Barra de abas dos arquivos abertos. Aparece entre Titlebar e o conteudo
- * (editor/canvas) sempre que ha 1+ aba aberta — ate' com 1 so aba ja'
+ * (editor/canvas) sempre que ha 1+ aba aberta — até com 1 so aba já
  * mostra (consistencia + feedback visual de qual arquivo esta ativo).
  *
  * Comportamento:
  *  - Click esquerdo: ativa a aba (chama openFile do path).
  *  - Middle-click (button=1) na aba: fecha. Convencao de browser.
  *  - Click no ✕: fecha. Se era a ativa, ativa a vizinha automaticamente.
- *  - Indicador `●` antes do ✕ quando ha edits nao salvos no arquivo
- *    ATIVO (saveStatus dirty/saving). Abas inativas nao tem buffer em
- *    memoria, entao sao sempre "limpas" do ponto de vista da UI.
- *  - Scroll horizontal automatico quando ha mais abas que largura. Ao
- *    ativar uma aba off-screen, scrolla pra ela ficar visivel.
+ *  - Indicador `●` antes do ✕ quando ha edits não salvos no arquivo
+ *    ATIVO (saveStatus dirty/saving). Abas inativas não tem buffer em
+ *    memória, então são sempre "limpas" do ponto de vista da UI.
+ *  - Scroll horizontal automático quando ha mais abas que largura. Ao
+ *    ativar uma aba off-screen, scrolla pra ela ficar visível.
  *
  * O auto-save flusha o buffer da aba anterior em troca de arquivo (via
- * subscribe em useAutoSave + flushEditor() em openFile), entao trocar de
- * aba e' seguro mesmo com edits pendentes.
+ * subscribe em useAutoSave + flushEditor() em openFile), então trocar de
+ * aba é seguro mesmo com edits pendentes.
  */
 export function TabBar() {
   const tabs = useAppStore((s) => s.openTabs);
@@ -43,7 +43,7 @@ export function TabBar() {
   const setActiveView = useAppStore((s) => s.setActiveView);
   const { openFile } = useFileSystem();
 
-  // Scroll automatico pra aba ativa quando ela esta off-screen — comum em
+  // Scroll automático pra aba ativa quando ela esta off-screen — comum em
   // Ctrl+Tab que cicla pra abas fora da viewport horizontal.
   const containerRef = useRef<HTMLDivElement | null>(null);
   const activeTabRef = useRef<HTMLDivElement | null>(null);
@@ -59,13 +59,13 @@ export function TabBar() {
   // convencao de browsers/IDEs com tabbar. Sem isso, user precisa
   // segurar Shift ou clicar e arrastar a scrollbar minuscula pra
   // chegar em abas off-screen. `passive: false` pra poder preventDefault
-  // o scroll vertical default; sem isso o webview rola a pagina toda.
+  // o scroll vertical default; sem isso o webview rola a página toda.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       // So' age se a tabbar de fato overflow-a horizontalmente (scrollLeft
-      // funcional) e o user nao esta usando shift (que ja' significa horiz).
+      // funcional) e o user não esta usando shift (que já significa horiz).
       if (e.shiftKey) return;
       if (el.scrollWidth <= el.clientWidth) return;
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
@@ -151,7 +151,7 @@ export function TabBar() {
     if (path === activePath) return;
     void openFile(path, name, { tab: "preserve" });
     // Se o user clicou numa aba enquanto estava no canvas/home, a
-    // expectativa e' "abrir o arquivo" — e arquivo eh editor.
+    // expectativa é "abrir o arquivo" — e arquivo eh editor.
     const view = useAppStore.getState().activeView;
     if (view === "home") setActiveView("editor");
   };
@@ -164,7 +164,7 @@ export function TabBar() {
         if (tab) void openFile(tab.path, tab.name, { tab: "preserve" });
       } else {
         // Sem aba pra ativar — flush antes de zerar pra preservar a
-        // ultima janela de digitacao via useAutoSave subscribe.
+        // última janela de digitacao via useAutoSave subscribe.
         flushEditor();
         useAppStore.setState({
           activeFilePath: null,
@@ -331,7 +331,7 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
         try {
           e.dataTransfer.setData("text/plain", payload);
         } catch {
-          /* alguns ambientes nao permitem setData duplicado */
+          /* alguns ambientes não permitem setData duplicado */
         }
       }}
       onDragOver={(e) => {
@@ -364,7 +364,7 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
       onDragEnd={(e) => {
         // Detach só se o drag terminou GENUINAMENTE fora da janela —
         // dropEffect = "none" quando o drop foi cancelado ou em lugar
-        // invalido; "move" quando o reorder aconteceu (entao nao
+        // inválido; "move" quando o reorder aconteceu (então não
         // detach). Coordenadas (0,0) ou negativas as vezes aparecem em
         // cancelamentos no Tauri webview e disparariam detach falso.
         const droppedSomewhere = e.dataTransfer.dropEffect === "move";
@@ -390,36 +390,36 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
         }
       }}
       onClick={(e) => {
-        // Botao ✕ tem stopPropagation proprio, entao chegar aqui e' click
-        // no rotulo da aba.
+        // Botao ✕ tem stopPropagation próprio, então chegar aqui é click
+        // no rótulo da aba.
         if (e.button !== 0) return;
         onActivate();
       }}
       className={clsx(
         "solon-tab group relative flex items-center gap-1.5 cursor-pointer flex-shrink-0",
-        "select-none transition-all",
+        "select-none transition-[background-color,color,opacity]",
         isActive && "solon-tab--active",
         dragging && "opacity-55",
       )}
       style={{
         // Padding lateral assimetrico — mais a' direita pra dar respiro
-        // pro botao ✕. minWidth garante que aba "x" curta nao some.
+        // pro botao ✕. minWidth garante que aba "x" curta não some.
         padding: "5px 9px",
         minWidth: 110,
         maxWidth: 240,
         fontSize: "0.82rem",
         fontFamily: "var(--font-ui)",
-        // Aba ativa "lifta" com o fundo da pagina (bg-app) e cantos
+        // Aba ativa "lifta" com o fundo da página (bg-app) e cantos
         // arredondados no topo — sem molduras. Inativas: transparentes,
-        // texto muted. drop-target so' tonifica suavemente.
+        // texto muted. drop-target só tonifica suavemente.
         background: isActive
           ? "var(--bg-app)"
           : dropTarget
           ? "var(--accent-soft)"
           : "transparent",
         color: isActive ? "var(--text-primary)" : "var(--text-muted)",
-        // Marcador accent fino so' na ativa (2px arredondado embaixo, como
-        // um sublinhado de selecao calmo). marginBottom -1 cola na folha.
+        // Marcador accent fino só na ativa (2px arredondado embaixo, como
+        // um sublinhado de seleção calmo). marginBottom -1 cola na folha.
         boxShadow: isActive ? "inset 0 -2px 0 0 var(--accent)" : undefined,
         marginBottom: "-1px",
         borderRadius: "var(--radius-sm) var(--radius-sm) 0 0",
@@ -451,7 +451,7 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
         style={{
           // Sem bold: ativa e inativa em weight normal. A distincao vem
           // do estilo (ativa reta, inativa italica) + cor/fundo/underline
-          // accent — nao mais do peso da fonte.
+          // accent — não mais do peso da fonte.
           fontWeight: 400,
           fontStyle: isActive ? "normal" : "italic",
           letterSpacing: isActive ? "0.01em" : 0,
@@ -463,7 +463,7 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
         type="button"
         onMouseDown={(e) => {
           // stopPropagation aqui evita que o mouseDown do tab pai dispare
-          // (que poderia interpretar middle-click como close, mas tambem
+          // (que poderia interpretar middle-click como close, mas também
           // dispara onActivate via click subsequente — ai entrava em race
           // com o close). Encerramos aqui mesmo.
           e.stopPropagation();
@@ -473,9 +473,9 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
           onClose();
         }}
         className={clsx(
-          "solon-tab__close flex-shrink-0 rounded transition-all flex items-center justify-center",
+          "solon-tab__close flex-shrink-0 rounded transition-[opacity,background-color,color] flex items-center justify-center",
           // Visivel na ativa, oculto nas outras ate o hover. Dirty deixa
-          // o ● sempre visivel pra feedback de pendencia.
+          // o ● sempre visível pra feedback de pendencia.
           isActive || isDirty
             ? "opacity-70"
             : "opacity-0 group-hover:opacity-70",
@@ -509,7 +509,7 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
 
 /**
  * Strip da extensao .md/.txt do nome de exibicao da aba — fica mais
- * limpo. Nome real (com extensao) continua no `title` pra usuario que
+ * limpo. Nome real (com extensao) continua no `title` pra usuário que
  * precisa identificar o arquivo de fato.
  */
 function stripExtension(name: string): string {

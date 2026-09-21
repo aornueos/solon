@@ -29,7 +29,7 @@ export function Inspector() {
   const setBacklinkIndex = useAppStore((s) => s.setBacklinkIndex);
   const { openFile } = useFileSystem();
 
-  // Indexa backlinks quando: (a) ainda nao indexou, OU (b) fileTree
+  // Indexa backlinks quando: (a) ainda não indexou, OU (b) fileTree
   // mudou (nova pasta, arquivos criados/deletados/renomeados). Cache
   // sobrevive enquanto a arvore for a mesma — re-indexar a cada
   // re-render do Inspector queimaria I/O.
@@ -38,7 +38,7 @@ export function Inspector() {
   // (delete/create/rename — frequente em sessoes de organizacao).
   // Sem debounce, criar 5 arquivos seguidos dispararia 5 builds de
   // index full em paralelo, cada um lendo todos os arquivos. Coalesce
-  // num unico build apos a ultima mudanca.
+  // num único build após a última mudanca.
   useEffect(() => {
     if (!activeFilePath) return;
     let cancelled = false;
@@ -220,9 +220,9 @@ export function Inspector() {
                 }}
               >
                 <div
-                  className="h-full transition-all"
+                  className="h-full w-full origin-left transition-transform"
                   style={{
-                    width: `${progress}%`,
+                    transform: `scaleX(${progress / 100})`,
                     background: onTarget
                       ? "var(--success)"
                       : "var(--accent-2)",
@@ -297,8 +297,8 @@ export function Inspector() {
           </Field>
         )}
 
-        {/* Histórico local — botão pra abrir o dialog. Antes so' via
-            Ctrl+Alt+H (escondido); agora visivel pra que o user saiba
+        {/* Histórico local — botão pra abrir o dialog. Antes só via
+            Ctrl+Alt+H (escondido); agora visível pra que o user saiba
             que pode voltar a versoes anteriores. Hint mostra quando a
             preferencia esta desligada nas Settings. */}
         <div className="pt-2">
@@ -340,7 +340,7 @@ function Header({
   return (
     <div className="flex items-center justify-between px-3.5 py-3 solon-plaque-bar">
       {/* Label "Cena" em small-caps. Mesma gramatica de Sidebar/Outline;
-          o conteudo abaixo (campos do frontmatter) e' a ficha da cena. */}
+          o conteudo abaixo (campos do frontmatter) é a ficha da cena. */}
       <span className="solon-plaque">Cena</span>
       <div className="flex items-center gap-1">
         <button

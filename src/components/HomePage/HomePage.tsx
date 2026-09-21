@@ -22,10 +22,10 @@ import { isTauriRuntime } from "../../lib/windows";
  *   I.  arquivo                           (roman + serif italic + path)
  *   II. arquivo
  *
- *   Novo arquivo  ·  Trocar pasta         (acoes secundarias)
+ *   Novo arquivo  ·  Trocar pasta         (ações secundarias)
  *
  * Metadados em caps lideram; o nome vem em display serif embaixo. Os
- * recents sao listagem numerada em romanos. Estado vazio segue a mesma
+ * recents são listagem numerada em romanos. Estado vazio segue a mesma
  * gramatica.
  */
 export function HomePage() {
@@ -54,7 +54,7 @@ export function HomePage() {
 
   // Computa stats agregados varrendo .md/.txt da pasta. Roda quando a
   // fileTree muda (boot, troca de pasta, create/delete). Cancellable
-  // pra nao race se user trocar de pasta no meio da varredura.
+  // pra não race se user trocar de pasta no meio da varredura.
   useEffect(() => {
     if (allFiles.length === 0) {
       setProjectStats(null);
@@ -186,7 +186,7 @@ function ProjectHero({
 }) {
   return (
     <>
-      {/* Meta-label acima do titulo: "PROJETO · 3 ARQUIVOS · 12.450 PALAVRAS".
+      {/* Meta-label acima do título: "PROJETO · 3 ARQUIVOS · 12.450 PALAVRAS".
           Small-caps (.solon-caps, Inter). Ficha de metadados antes do nome. */}
       <div
         className="solon-caps mb-5 flex items-center gap-3"
@@ -252,7 +252,7 @@ function ProjectHero({
         {folderName}
       </h1>
 
-      {/* Ornamento — ❦ central entre hairlines suaves. Marca a transicao
+      {/* Ornamento — ❦ central entre hairlines suaves. Marca a transição
           entre "ficha" e "CTA". Sem isso a hero parece dois blocos
           empilhados sem juncao. */}
       <div
@@ -370,10 +370,10 @@ function EmptyHero({ onOpenFolder }: { onOpenFolder: () => void }) {
 }
 
 /**
- * Lista catalografica dos ultimos arquivos abertos. Recents agora vem
+ * Lista catalografica dos últimos arquivos abertos. Recents agora vem
  * em formato editorial: plaqueta de seção + linhas numeradas em romanos
- * + nome em serif italic. Filtra entries cujo path nao começa com o
- * rootFolder atual (recents de projetos anteriores nao deveriam vazar
+ * + nome em serif italic. Filtra entries cujo path não começa com o
+ * rootFolder atual (recents de projetos anteriores não deveriam vazar
  * pra um projeto diferente). Cap visual em 5 entries.
  */
 function RecentsList({
@@ -459,7 +459,7 @@ function RecentsList({
 
 /**
  * Conversao decimal → algarismo romano. Limite implicito de ~10 itens
- * (lista de Recents tem cap em 5 visual). Sem dependencia externa.
+ * (lista de Recents tem cap em 5 visual). Sem dependência externa.
  */
 function toRoman(n: number): string {
   const table: [number, string][] = [

@@ -84,9 +84,9 @@ export async function listSnapshots(
           // Tauri @tauri-apps/plugin-fs `stat().size` em alguns builds do Windows
           // retorna 0 mesmo quando o arquivo existe — provavelmente porque o
           // metadata da CreationTime/Size vem com flags adicionais que o
-          // plugin nao desempacota. Fallback: ler o conteudo e computar
+          // plugin não desempacota. Fallback: ler o conteudo e computar
           // bytes via TextEncoder. Snapshots ficam em <= ~650KB cada
-          // (LARGE_NOTE_BYTES), entao o custo eh aceitavel pra dar feedback
+          // (LARGE_NOTE_BYTES), então o custo eh aceitavel pra dar feedback
           // correto no dialog.
           let size = 0;
           try {
@@ -99,7 +99,7 @@ export async function listSnapshots(
               const raw = await readTextFile(path);
               size = new TextEncoder().encode(raw).byteLength;
             } catch {
-              /* mantem 0 se nao da pra ler */
+              /* mantem 0 se não da pra ler */
             }
           }
           return {
@@ -168,12 +168,12 @@ export async function readSnapshot(path: string): Promise<string> {
 }
 
 /**
- * Limpa o texto bruto pra preview legivel no dialog:
+ * Limpa o texto bruto pra preview legível no dialog:
  *  - remove tags HTML inline (TipTap salva `<p style="text-align: justify">`
  *    em arquivos justificados — exibir isso cru polui a previa);
  *  - remove sintaxe de marcacao basica (heading hashes, listas, enfase,
  *    links/imagens, citacoes, code fences/inline) pra que o leitor veja
- *    o texto, nao a marcacao;
+ *    o texto, não a marcacao;
  *  - colapsa runs de espaco e quebra de linha excessivas.
  */
 function previewPlainText(raw: string): string {
@@ -220,7 +220,7 @@ export async function restoreSnapshot(filePath: string, snapshotPath: string): P
   const content = await readSnapshot(snapshotPath);
   // CRITICO: estamos sobrescrevendo o arquivo original com conteudo
   // do snapshot. Atomic write garante que crash no meio da escrita
-  // nao deixa o original truncado (perda dupla — versao atual + snapshot).
+  // não deixa o original truncado (perda dupla — versão atual + snapshot).
   const ok = await atomicWriteTextFile(filePath, content);
   if (!ok) {
     throw new Error("Falha ao restaurar snapshot — arquivo original preservado.");

@@ -75,8 +75,8 @@ function protectTextSpaces(text: string, atBlockStart: boolean): string {
  * alinhamento com espacos, e linhas com multiplos espacos. Antes de entregar
  * o HTML ao Turndown, transformamos apenas espacos significativos em NBSP.
  *
- * Markdown normal comeca com 4 espacos = code block; NBSP preserva visual sem
- * mudar a semantica do paragrafo.
+ * Markdown normal começa com 4 espacos = code block; NBSP preserva visual sem
+ * mudar a semântica do paragrafo.
  */
 function protectEditorSpaces(html: string): string {
   const tokens = html.split(/(<[^>]+>)/g);
@@ -150,7 +150,7 @@ const turndown = new TurndownService({
 // O default escapa `*` literal em texto pra `\*` (proteger contra
 // markdown unintended). Mas isso causa um ciclo destrutivo quando o
 // editor perde o bold mark por qualquer motivo (race entre setContent
-// e onUpdate, doc carregado de markdown ja' corrompido, etc):
+// e onUpdate, doc carregado de markdown já corrompido, etc):
 //
 //   1. Editor tem `<p>**Onirica**</p>` (texto literal, sem <strong>)
 //   2. turndown vê asteriscos em texto -> escapa -> `\*\*Onirica\*\*`
@@ -163,21 +163,21 @@ const turndown = new TurndownService({
 // No reload, marked vê `**Onirica**` e parseia como strong de novo —
 // **o bold se auto-recupera**.
 //
-// Trade-off: usuario que digita `*` ou `**` LITERAL como texto pode
-// ter parse acidental como bold/italic. Em ficcao isso e' raro
+// Trade-off: usuário que digita `*` ou `**` LITERAL como texto pode
+// ter parse acidental como bold/italic. Em ficcao isso é raro
 // (raramente se escreve "* asterisco" em prosa). O ganho — bold
-// estavel no roundtrip — supera o risco.
+// estável no roundtrip — supera o risco.
 //
 // Tambem mantemos escape de `_` (italic markdown alternativo) por
 // motivo similar; underscores em palavras como `meta_data` no texto
-// nao devem virar italic. Hash, backtick, brackets, etc continuam
-// escapados — eles tem sintaxe markdown clara que nao bate com prosa.
+// não devem virar italic. Hash, backtick, brackets, etc continuam
+// escapados — eles tem sintaxe markdown clara que não bate com prosa.
 const TurndownEscape = (
   TurndownService.prototype as unknown as { escape: (s: string) => string }
 ).escape;
 turndown.escape = function (string: string): string {
   // Aplica o escape default e desfaz escapes dos marcadores inline que o
-  // proprio editor gera. Runs antigos de barras antes de `*` eram a causa
+  // próprio editor gera. Runs antigos de barras antes de `*` eram a causa
   // do bug visual `\\\\\*` ao trocar de arquivo.
   const escaped = TurndownEscape.call(this, string);
   return repairEscapedInlineMarks(escaped);
@@ -236,7 +236,7 @@ turndown.addRule("editorImage", {
 // `data-wikilink="true"`). Capturamos antes do default link rule pra
 // emitir a sintaxe `[[...]]` em vez de `[name](href)`. Ordem importa:
 // essa rule tem que vir antes da default; turndown testa em ordem
-// inversa de adicao, entao adicionamos POR ULTIMO entre as link rules
+// inversa de adicao, então adicionamos POR ULTIMO entre as link rules
 // (qualquer rule de link aqui em cima dispara antes do default).
 turndown.addRule("wikilink", {
   filter: (node) => {
@@ -257,7 +257,7 @@ turndown.addRule("wikilink", {
 });
 
 // Headings com text-align: emite HTML literal (perde sintaxe `#` mas
-// preserva alinhamento). Turndown default nao suporta atributos em
+// preserva alinhamento). Turndown default não suporta atributos em
 // headings markdown.
 for (const level of [1, 2, 3, 4, 5, 6] as const) {
   turndown.addRule(`heading${level}WithAlign`, {
@@ -287,12 +287,12 @@ export const ALLOWED_TAGS = [
   "ul", "ol", "li",
   "blockquote",
   "table", "thead", "tbody", "tr", "th", "td",
-  // <mark> e' usado pelo Highlight extension. Sem isso o grifo
+  // <mark> é usado pelo Highlight extension. Sem isso o grifo
   // colorido seria stripado no save/load roundtrip.
   "mark",
   "img",
   // <a> pra wikilinks (mark `[[name]]`). Roundtrip emite back pra
-  // `[[name]]`; durante a edicao o WikilinkExtension reconhece o
+  // `[[name]]`; durante a edição o WikilinkExtension reconhece o
   // <a.wikilink>.
   "a",
 ];
@@ -302,10 +302,10 @@ export const ALLOWED_TAGS = [
  *  - text-align (TextAlign extension)
  *  - background-color (Highlight extension, cores customizadas)
  *
- * O DOMPurify ja' sanitiza o conteudo do `style` internamente — bloqueia
+ * O DOMPurify já sanitiza o conteudo do `style` internamente — bloqueia
  * `expression()`, `javascript:`, `-moz-binding`, etc. Como o markdown
- * vem so' de input do proprio user (nao de fontes hostis externas no
- * caso desktop), o risco residual e' baixo.
+ * vem só de input do próprio user (não de fontes hostis externas no
+ * caso desktop), o risco residual é baixo.
  *
  * `data-indent` carrega indent do IndentExtension sem precisar de style.
  */
@@ -319,8 +319,8 @@ export const ALLOWED_ATTR = [
   // Wikilink: o `class="wikilink"` + `data-wikilink="true"` viaja
   // junto do <a>. `role` mantemos pra acessibilidade. `href` fica
   // FORBID porque o click eh interceptado pelo Editor (javascript:
-  // void(0) eh tratado como vazio pra que DOMPurify nao bloqueie
-  // a wikilink toda — `class` e' o seletor real).
+  // void(0) eh tratado como vazio pra que DOMPurify não bloqueie
+  // a wikilink toda — `class` é o seletor real).
   "class",
   "data-wikilink",
   // Alias `[[target|exibido]]`: o alvo real viaja aqui. Sem isso na
@@ -414,7 +414,7 @@ function repairEscapedInlineMarks(markdown: string): string {
  * roundtrip. Fazendo a substituicao primeiro, garantimos que o output
  * eh um `<a>` que a WikilinkExtension reconhece.
  *
- * Regra: `[[X]]` onde X nao tem `]` ou newline. Caso de uso comum:
+ * Regra: `[[X]]` onde X não tem `]` ou newline. Caso de uso comum:
  * nome de arquivo curto. Edge cases (markdown que quer LITERAL `[[`)
  * podem usar escape `\[\[` que esta fora do escopo agora.
  */
@@ -454,10 +454,10 @@ export function markdownToHtml(md: string): string {
   const withWikilinks = injectWikilinks(repairEscapedInlineMarks(md));
   const rawHtml = marked.parse(withWikilinks, { async: false }) as string;
   const withRepairedMarks = repairLiteralMarkdownMarksInHtml(rawHtml);
-  // Reverse do marker EM SPACE: paragrafos cujo conteudo comeca com EM
-  // SPACE sao identados. A regex pega `<p>` ou `<p ... >` (caso
+  // Reverse do marker EM SPACE: paragrafos cujo conteudo começa com EM
+  // SPACE são identados. A regex pega `<p>` ou `<p ... >` (caso
   // marked adicione atributos no futuro). Removemos o marker pra que
-  // ele nao apareca como texto literal no editor.
+  // ele não apareca como texto literal no editor.
   const withIndent = withRepairedMarks.replace(
     new RegExp(`<p([^>]*)>${EM_SPACE}`, "g"),
     '<p data-indent="true"$1>',
@@ -467,8 +467,8 @@ export function markdownToHtml(md: string): string {
 
 export function htmlToMarkdown(html: string): string {
   if (!html) return "";
-  // Trim CONSERVADOR: so' newlines e space ASCII. Nao usamos `.trim()`
-  // padrao porque ele considera EM SPACE como whitespace e come o
+  // Trim CONSERVADOR: só newlines e space ASCII. Nao usamos `.trim()`
+  // padrão porque ele considera EM SPACE como whitespace e come o
   // marker de indent do primeiro paragrafo.
   const markdown = turndown
     .turndown(protectEditorSpaces(html))

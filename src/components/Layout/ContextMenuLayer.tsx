@@ -24,7 +24,7 @@ export function ContextMenuLayer() {
   const [focused, setFocused] = useState(-1);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  // Posicao real (apos clamp pra caber na viewport). Calculado em layout
+  // Posicao real (após clamp pra caber na viewport). Calculado em layout
   // pra evitar flash de "fora da tela" no primeiro frame.
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
 
@@ -100,7 +100,7 @@ export function ContextMenuLayer() {
     return () => window.removeEventListener("keydown", onKey);
   }, [menu, focused, close]);
 
-  // Fecha em scroll/blur — comportamento padrao de menu nativo. Usuario
+  // Fecha em scroll/blur — comportamento padrão de menu nativo. Usuario
   // muda de contexto, menu sai do caminho.
   useEffect(() => {
     if (!menu) return;
@@ -118,7 +118,7 @@ export function ContextMenuLayer() {
   return (
     <div
       // Backdrop full-screen pra capturar click-fora e fechar.
-      // pointer-events-auto so' no backdrop; o menu tem o seu proprio.
+      // pointer-events-auto só no backdrop; o menu tem o seu próprio.
       className="fixed inset-0 z-[150]"
       style={{ pointerEvents: "auto" }}
       onMouseDown={(e) => {
@@ -126,7 +126,7 @@ export function ContextMenuLayer() {
         if (e.target === e.currentTarget) close();
       }}
       onContextMenu={(e) => {
-        // Bloqueia native context menu sobre o backdrop tambem (caso a
+        // Bloqueia native context menu sobre o backdrop também (caso a
         // pessoa clique direito DE NOVO em vez de fechar com Esc).
         e.preventDefault();
         close();
@@ -140,7 +140,7 @@ export function ContextMenuLayer() {
         style={{
           left: pos?.left ?? menu.x,
           top: pos?.top ?? menu.y,
-          // Se ainda nao foi medido, esconde via opacity pra nao piscar
+          // Se ainda não foi medido, esconde via opacity pra não piscar
           // off-screen no primeiro frame.
           opacity: pos ? 1 : 0,
           background: "var(--bg-panel)",
@@ -210,7 +210,7 @@ function ContextMenuItemView({
       role="menuitem"
       onMouseEnter={onHover}
       onMouseDown={(e) => {
-        // Previne perda de foco do editor durante a selecao do item —
+        // Previne perda de foco do editor durante a seleção do item —
         // alguns comandos (toggleBulletList, etc) precisam que o caret
         // ainda esteja onde estava.
         e.preventDefault();
@@ -237,7 +237,7 @@ function ContextMenuItemView({
       }}
     >
       {/* Slot fixo de 14px pra icon ou check — alinha colunas mesmo
-          quando alguns items tem icon e outros nao. */}
+          quando alguns items tem icon e outros não. */}
       <span
         className="w-4 flex-shrink-0 flex items-center justify-center"
         style={{ color: "var(--text-muted)" }}

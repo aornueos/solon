@@ -23,7 +23,13 @@ import {
   CANVAS_EMPTY_LINK_EVENT,
   CanvasEmptyLinkDetail,
 } from "../../lib/canvasLinkDrag";
-import { clientToSurface, fitAllViewport, zoomStep } from "../../lib/canvasViewport";
+import {
+  clientToSurface,
+  fitAllViewport,
+  zoomStep,
+  zoomToLevel,
+} from "../../lib/canvasViewport";
+import { isSelectionToggle } from "../../lib/canvasSelectionInput";
 
 /**
  * Canvas infinito do projeto.
@@ -37,8 +43,9 @@ import { clientToSurface, fitAllViewport, zoomStep } from "../../lib/canvasViewp
  *  - eraser: clicar num item o apaga.
  *
  * Atalhos: 1–5 (ferramentas, na ordem da toolbar), V/P/T/A/E, N (card),
- * F (enquadrar), +/− (zoom), Ctrl+D (duplicar), Ctrl+C/X/V, Ctrl+Z/Y,
- * Delete (apagar seleção), Esc (voltar para select).
+ * F (enquadrar), +/− (zoom), 0 (100%), Ctrl+D (duplicar), Ctrl+C/X/V,
+ * Ctrl+Z/Y, Delete (apagar seleção), Esc (voltar para select).
+ * Shift ou Ctrl/Cmd somam à seleção, no clique e no marquee.
  */
 export function CanvasView() {
   const viewport = useCanvasStore((s) => s.viewport);
@@ -311,6 +318,13 @@ export function CanvasView() {
       if (e.key === "-" || e.key === "_") {
         e.preventDefault();
         zoomStep(1, containerRef.current);
+        return;
+      }
+      // Volta a 100% sem perder o lugar: o que estava no centro continua no
+      // centro. Resetar o viewport (botão da toolbar) joga para a origem.
+      if (e.key === "0") {
+        e.preventDefault();
+        zoomToLevel(1, containerRef.current);
         return;
       }
     };
@@ -640,6 +654,9 @@ export function CanvasView() {
     const rect = el.getBoundingClientRect();
     const startX = e.clientX - rect.left;
     const startY = e.clientY - rect.top;
+    // Com o modificador, o retângulo SOMA à seleção em vez de substituí-la
+    // — permite juntar grupos distantes em duas passadas.
+    const additive = isSelectionToggle(e);
     // Daqui em diante o state não é mais tocado durante o arrasto: a
     // geometria vai direto para o DOM pela ref.
     setMarquee({ x: startX, y: startY, w: 0, h: 0 });
@@ -667,9 +684,10 @@ export function CanvasView() {
         const y1 = Math.max(startY, endY);
         setMarquee(null);
 
-        // Clique (sem drag real) = desseleção, não marquee
+        // Clique sem arrasto de verdade limpa a seleção — a não ser que o
+        // usuário esteja somando, quando não mexer é o esperado.
         if (x1 - x0 < 3 && y1 - y0 < 3) {
-          select(null);
+          if (!additive) select(null);
           return;
         }
 
@@ -729,7 +747,14 @@ export function CanvasView() {
           if (fromHit && toHit) ids.push(a.id);
         }
 
-        selectMany(ids, ids[0] ?? null);
+        if (additive) {
+          const merged = new Set(useCanvasStore.getState().selectedIds);
+          for (const id of ids) merged.add(id);
+          const next = [...merged];
+          selectMany(next, next.length === 1 ? next[0] : null);
+        } else {
+          selectMany(ids, ids[0] ?? null);
+        }
       },
       onCancel: () => {
         setMarquee(null);

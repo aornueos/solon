@@ -848,13 +848,9 @@
     color: var(--text-primary);
   }
 
-  button:focus-visible,
-  input:focus-visible,
-  textarea:focus-visible,
-  [role="button"]:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+  /* O anel de foco não mora aqui: ver "Foco visível" mais abaixo. Uma regra
+     em `@layer base` perde para a utility `outline-none`, que várias telas
+     usam para tirar a moldura padrão do campo. */
 
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -1188,14 +1184,27 @@
   border: 1px solid var(--border);
 }
 
-/* Anel de foco visivel em todo o chrome do canvas. Os controles eram
-   alcancaveis por Tab mas nao mostravam onde o foco estava. */
-.canvas-surface button:focus-visible,
-.canvas-surface [role="switch"]:focus-visible,
-.canvas-surface [role="button"]:focus-visible {
-  outline: 2px solid var(--accent);
+/* ─────────────────────────────────────────
+   Foco visível
+───────────────────────────────────────── */
+/* A utility `outline-none` do Tailwind vencia a regra de foco que ficava em
+   `@layer base`, e o anel sumia em todo campo que a usa: paleta de comandos,
+   busca global, find bar, inspector, rascunho, textarea do card. `!important`
+   é o que garante a precedência sobre a utility — verificado no app, com e
+   sem a regra.
+
+   Quem tem foco próprio desenhado se isenta explicitamente (`.solon-input`
+   abaixo), senão o campo ganha dois indicadores. */
+a[href]:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible,
+[role="switch"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent) !important;
   outline-offset: 2px;
-  border-radius: var(--radius-sm);
 }
 
 /* Inputs — cantos suaves, hairline, focus = borda accent + ring macio. */
@@ -1214,6 +1223,11 @@
 .solon-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* Já tem anel próprio (borda + sombra); sem o `!important` o fallback
+   acima venceria e o campo ficaria com dois indicadores. */
+.solon-input:focus-visible {
+  outline: none !important;
 }
 
 /* ─────────────────────────────────────────

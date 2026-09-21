@@ -128,13 +128,13 @@ export function useFileSystem() {
         if (selected && typeof selected === "string") {
           // Troca de projeto: invalida o cache de URLs de imagem (blob:)
           // do projeto anterior. Sem isso, blob URLs apontando pra
-          // arquivos de outro projeto vazam memoria ate' o app fechar
+          // arquivos de outro projeto vazam memória até o app fechar
           // E (pior) podem colidir se dois projetos tiverem nomes de
           // asset iguais.
           clearImageUrlCache();
           setRootFolder(selected);
           // Carrega a ordem manual ANTES do tree pra que o primeiro
-          // setFileTree ja' venha ordenado. Sem isso, user veria o
+          // setFileTree já venha ordenado. Sem isso, user veria o
           // sort alfabetico por 1 frame.
           const order = await loadOrder(selected);
           setSidebarOrder(order);
@@ -187,13 +187,13 @@ export function useFileSystem() {
       // de prev.fileBody no subscribe do useAutoSave.
       flushEditor();
 
-      // Saindo de um buffer untitled → guarda o conteudo em memoria pra nao
-      // perder ao voltar (so' um buffer fica em fileBody por vez).
+      // Saindo de um buffer untitled → guarda o conteudo em memória pra não
+      // perder ao voltar (só um buffer fica em fileBody por vez).
       const prev = useAppStore.getState();
       if (isUntitledPath(previousActivePath) && previousActivePath) {
         prev.stashUntitled(previousActivePath, prev.fileBody, prev.sceneMeta);
       }
-      // Alvo e' um buffer untitled → restaura da memoria (nao le do disco).
+      // Alvo é um buffer untitled → restaura da memória (não le do disco).
       if (isUntitledPath(path)) {
         const buf = useAppStore.getState().untitledBuffers[path];
         setActiveFile(path, name, buf?.body ?? "", buf?.meta ?? {});
@@ -202,7 +202,7 @@ export function useFileSystem() {
         } else if (tabMode === "new") {
           useAppStore.getState().addTab(path, name);
         }
-        return; // untitled nao entra em recents nem le disco
+        return; // untitled não entra em recents nem le disco
       }
 
       if (isTauriRuntime()) {
@@ -279,7 +279,7 @@ export function useFileSystem() {
           const { clearRecoveryDraft } = await import("../lib/crashRecovery");
           await clearRecoveryDraft(rootFolder, path);
         } catch {
-          /* recovery e' best-effort — falhas silenciosas */
+          /* recovery é best-effort — falhas silenciosas */
         }
       } catch (err) {
         console.error("Erro ao salvar arquivo:", err);
@@ -331,11 +331,11 @@ export function useFileSystem() {
       const tree = await buildFileTree(last);
       setFileTree(applyOrder(last, tree, order));
 
-      // Restaura tambem o ultimo arquivo aberto. Importante: NAO mudamos
+      // Restaura também o último arquivo aberto. Importante: NAO mudamos
       // activeView aqui — a HomePage continua sendo o landing inicial,
       // mas com `activeFilePath` ja settado o botao "Continuar" tem alvo.
       // Silent: erro de leitura limpa a chave pra evitar pop-up vermelho
-      // toda vez que o app abre apos um arquivo ter sido movido/apagado.
+      // toda vez que o app abre após um arquivo ter sido movido/apagado.
       const { openLastFileOnStartup } = useAppStore.getState();
       const lastFile = openLastFileOnStartup
         ? localStorage.getItem("solon:lastFile")
@@ -356,8 +356,8 @@ export function useFileSystem() {
         }
       }
       // Sanitiza abas restauradas do localStorage: arquivos que sumiram
-      // do disco entre sessoes nao devem entupir a barra. Em paralelo
-      // pra nao serializar 10 stat() calls.
+      // do disco entre sessoes não devem entupir a barra. Em paralelo
+      // pra não serializar 10 stat() calls.
       const tabs = useAppStore.getState().openTabs;
       if (tabs.length > 0) {
         const checks = await Promise.all(
@@ -381,9 +381,9 @@ export function useFileSystem() {
 
       // Crash recovery: varre .solon/.recovery em busca de drafts cujo
       // conteudo diverge do que esta no disco. Se houver, abre o dialog
-      // perguntando se o user quer recuperar. Roda apos restore do
+      // perguntando se o user quer recuperar. Roda após restore do
       // arquivo ativo pra que o dialog apareca por cima do estado
-      // estavel da app.
+      // estável da app.
       void scanRecoveryDrafts(last)
         .then((drafts) => {
           if (drafts.length > 0) {
@@ -391,7 +391,7 @@ export function useFileSystem() {
           }
         })
         .catch(() => {
-          /* recovery e' best-effort */
+          /* recovery é best-effort */
         });
     } catch (err) {
       console.error("Erro ao restaurar pasta:", err);
@@ -414,14 +414,14 @@ export function useFileSystem() {
           return;
         }
         // Arquivo nasce em branco — sem heading auto-injetado. O editor
-        // cuida da experiencia inicial via Placeholder ("Comece a escrever..."),
+        // cuida da experiência inicial via Placeholder ("Comece a escrever…"),
         // o que e mais respeitoso pra ficcao: nem sempre a primeira linha
-        // e um titulo de capitulo (cena curta, fragmento, nota).
+        // e um título de capitulo (cena curta, fragmento, nota).
         // Conteudo vazio mas usamos atomic write por consistencia —
         // garante que o arquivo aparece no FS apenas quando completo
         // (zero risco de stub corrompido em crash).
         await atomicWriteTextFile(full, "");
-        // Garante que a pasta destino fica EXPANDIDA apos refresh — sem
+        // Garante que a pasta destino fica EXPANDIDA após refresh — sem
         // isso, criar dentro de pasta fechada deixa o user sem ver o
         // novo arquivo. Adicionamos o parentDir ao expanded set ANTES
         // do refresh consumir.
@@ -447,12 +447,12 @@ export function useFileSystem() {
 
   /**
    * Duplica um arquivo `.md`/`.txt`. Nome do novo: `<base> (copia).<ext>`
-   * com sufixo numerico em colisao. Mesmo diretorio do original. Abre na
-   * aba ativa apos copiar — convencao "Duplicate" do macOS Finder.
+   * com sufixo numerico em colisão. Mesmo diretorio do original. Abre na
+   * aba ativa após copiar — convencao "Duplicate" do macOS Finder.
    *
    * NAO copia o sidecar de canvas (`.canvas.json`) — duplicar canvases
-   * confundiria scene cards que apontam pra arquivo unico. Quem
-   * precisar do canvas tambem, copia manualmente via FS.
+   * confundiria scene cards que apontam pra arquivo único. Quem
+   * precisar do canvas também, copia manualmente via FS.
    */
   const duplicateFile = useCallback(
     async (sourcePath: string) => {
@@ -543,10 +543,10 @@ export function useFileSystem() {
         assertInsideProject(rootFolder, newPath, "Destino");
         if (!isFolder) assertProjectNotePath(rootFolder, newPath, "Arquivo");
         // Em FS case-insensitive (Windows/macOS default), exists(newPath)
-        // retorna true pro PROPRIO arquivo quando so' a caixa muda ("um
+        // retorna true pro PROPRIO arquivo quando só a caixa muda ("um
         // nota" → "Um Nota"). Sem esse guard o rename de caixa era barrado
         // com "Ja' existe um item com esse nome". rename() direto de caixa
-        // funciona nessas plataformas — o guard so' evita o falso conflito.
+        // funciona nessas plataformas — o guard só evita o falso conflito.
         const isCaseOnlyRename =
           normalizedPath(oldPath).toLowerCase() ===
           normalizedPath(newPath).toLowerCase();
@@ -609,7 +609,7 @@ export function useFileSystem() {
         }
         await refresh();
         // Se renomeou o arquivo aberto ou uma pasta que o contem, reabre
-        // preservando o buffer em memoria que acabamos de salvar.
+        // preservando o buffer em memória que acabamos de salvar.
         if (activeSnapshot) {
           const nextActivePath = joinRelative(newPath, activeSnapshot.rel);
           setActiveFile(
@@ -642,7 +642,7 @@ export function useFileSystem() {
         await remove(path, isFolder ? { recursive: true } : undefined);
         if (!isFolder) await deleteCanvasSidecar(path);
         // Remove da ordem manual em qualquer pasta. Senao a entry no
-        // .solon/order.json fica orfa apontando pra um nome que nao
+        // .solon/order.json fica orfa apontando pra um nome que não
         // existe mais.
         const removedName = baseName(path);
         if (rootFolder) {
@@ -676,7 +676,7 @@ export function useFileSystem() {
         }
         if (activeFilePath && isSameOrDescendant(activeFilePath, path)) {
           // Limpa arquivo ativo se foi removido. Se ainda ha abas, ativa
-          // a primeira disponivel.
+          // a primeira disponível.
           const remaining = useAppStore.getState().openTabs[0];
           if (remaining) {
             await openFile(remaining.path, remaining.name, { tab: "preserve" });
@@ -704,13 +704,13 @@ export function useFileSystem() {
 
   /**
    * Reordena um item dentro da mesma pasta. `draggedPath` deve ficar
-   * antes de `targetPath`. Se `targetPath` e' null, vai pro FIM da
+   * antes de `targetPath`. Se `targetPath` é null, vai pro FIM da
    * pasta. Apenas reorder dentro da MESMA pasta — mover entre pastas
    * envolveria rename no filesystem (out-of-scope agora).
    *
-   * `siblingNamesUI` e' a lista atual de nomes naquela pasta na ordem
+   * `siblingNamesUI` é a lista atual de nomes naquela pasta na ordem
    * que o user esta vendo. Usado pra inicializar a entry do JSON
-   * caso a pasta ainda nao tinha custom order.
+   * caso a pasta ainda não tinha custom order.
    */
   const reorderItem = useCallback(
     async (
@@ -740,7 +740,7 @@ export function useFileSystem() {
       // disco). Re-render UI fica instantaneo.
       const tree = useAppStore.getState().fileTree;
       setFileTree(applyOrder(rootFolder, tree, updated));
-      // Persiste async (nao bloqueia a UI).
+      // Persiste async (não bloqueia a UI).
       saveOrder(rootFolder, updated);
     },
     [rootFolder, setSidebarOrder, setFileTree],
@@ -748,13 +748,13 @@ export function useFileSystem() {
 
   /**
    * Move um item (arquivo ou pasta) pra dentro de outra pasta. Faz
-   * fs.rename real no disco — diferente de `reorderItem` que so' mexe
+   * fs.rename real no disco — diferente de `reorderItem` que só mexe
    * no JSON da ordem.
    *
    * Validacoes:
    *  - Pasta destino deve existir
    *  - Nao pode mover pasta pra dentro de si mesma ou de uma filha
-   *  - Conflito de nomes: aborta com toast (nao sobrescreve)
+   *  - Conflito de nomes: aborta com toast (não sobrescreve)
    *
    * Side effects:
    *  - Renomeia sidecar de canvas
@@ -836,8 +836,8 @@ export function useFileSystem() {
         } else {
           useAppStore.getState().renameTab(sourcePath, newPath, name);
         }
-        // Remove do sidebarOrder do parent ANTIGO (nao chamamos
-        // renameInOrder porque o nome nao mudou — so' a pasta).
+        // Remove do sidebarOrder do parent ANTIGO (não chamamos
+        // renameInOrder porque o nome não mudou — só a pasta).
         const currentOrder = useAppStore.getState().sidebarOrder;
         const sourceParentKey = relPath(rootFolder, parentOfSource);
         let updated = removeFromOrder(currentOrder, name, sourceParentKey);
@@ -880,11 +880,11 @@ export function useFileSystem() {
   );
 
   /**
-   * Cria um arquivo "Sem titulo.md" (com sufixo numerico em colisao) na
+   * Cria um arquivo "Sem título.md" (com sufixo numerico em colisão) na
    * raiz do projeto e abre na aba ativa. Usado pelo atalho Ctrl+T.
    *
-   * Decisao: cria de fato no disco em vez de buffer untitled em memoria.
-   * Buffers untitled exigiriam infraestrutura nova (estado nao-persistido,
+   * Decisao: cria de fato no disco em vez de buffer untitled em memória.
+   * Buffers untitled exigiriam infraestrutura nova (estado não-persistido,
    * dialogo de "salvar onde?" no fechamento) sem ganho real pra escrita
    * — um arquivo .md em branco eh barato e funciona como ponto de partida.
    */
@@ -904,7 +904,7 @@ export function useFileSystem() {
       while (await exists(joinPath(rootFolder, name))) {
         n += 1;
         name = `${base} ${n}.md`;
-        if (n > 999) break; // sanity guard — quase impossivel mas evita loop
+        if (n > 999) break; // sanity guard — quase impossível mas evita loop
       }
       const full = joinPath(rootFolder, name);
       assertProjectNotePath(rootFolder, full);
@@ -922,8 +922,8 @@ export function useFileSystem() {
   /**
    * Materializa um buffer untitled (Ctrl+T) num arquivo real. Grava o
    * conteudo ATUAL (que esta em fileBody, ativo) com o nome dado, troca a aba
-   * untitled -> arquivo real e descarta o buffer da memoria. Usado no Ctrl+S
-   * quando a aba ativa e' untitled. Retorna `true` se salvou.
+   * untitled -> arquivo real e descarta o buffer da memória. Usado no Ctrl+S
+   * quando a aba ativa é untitled. Retorna `true` se salvou.
    */
   const materializeUntitled = useCallback(
     async (untitledPath: string, rawName: string): Promise<boolean> => {
@@ -949,7 +949,7 @@ export function useFileSystem() {
             .pushToast("error", "Já existe um arquivo com esse nome.");
           return false;
         }
-        // Garante que o ultimo trabalho do editor esta em fileBody.
+        // Garante que o último trabalho do editor esta em fileBody.
         flushEditor();
         const s = useAppStore.getState();
         const content = serializeDocument(s.sceneMeta, s.fileBody);
@@ -1005,7 +1005,7 @@ function collectExpandedPaths(nodes: FileNode[], out: Set<string>): void {
 }
 
 /**
- * Marca uma pasta especifica como expandida (e todos os ancestrais ate'
+ * Marca uma pasta especifica como expandida (e todos os ancestrais até
  * a raiz). Util quando criamos um arquivo dentro de pasta colapsada e
  * queremos garantir que o user veja o novo item sem ter que clicar pra
  * abrir.
@@ -1013,7 +1013,7 @@ function collectExpandedPaths(nodes: FileNode[], out: Set<string>): void {
 function forceExpandPath(nodes: FileNode[], targetPath: string): FileNode[] {
   return nodes.map((n) => {
     if (n.type !== "folder") return n;
-    // Se o target e' descendente desta pasta, expande ela e recursa.
+    // Se o target é descendente desta pasta, expande ela e recursa.
     const isAncestor =
       targetPath === n.path || targetPath.startsWith(n.path + "/") ||
       targetPath.startsWith(n.path + "\\");
@@ -1048,7 +1048,7 @@ async function buildFileTree(
           path: fullPath,
           type: "folder",
           // Preserva estado de expansao do tree anterior. Default false
-          // pra pastas novas (que ainda nao existiam no tree antigo).
+          // pra pastas novas (que ainda não existiam no tree antigo).
           expanded: preserveExpanded?.has(fullPath) ?? false,
           children,
         });

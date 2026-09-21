@@ -39,9 +39,9 @@ import type { Editor } from "@tiptap/react";
  *     worker. Se misspelled, atualiza items do menu prepending com
  *     sugestoes.
  *
- * Crucial: NADA na pipeline e' bloqueante. Menu abre instantaneo
+ * Crucial: NADA na pipeline é bloqueante. Menu abre instantaneo
  * mesmo quando o spellcheck ainda esta carregando o dicionario (o
- * que demora 8-10s na primeira vez, mas no worker nao trava a UI).
+ * que demora 8-10s na primeira vez, mas no worker não trava a UI).
  */
 export function ContextMenuProvider() {
   const openContextMenu = useAppStore((s) => s.openContextMenu);
@@ -90,11 +90,11 @@ export function ContextMenuProvider() {
       if (baseItems.length === 0) return;
 
       // Se for editor + spellcheck on + caiu numa palavra checavel,
-      // prepende um placeholder "Verificando ortografia..." enquanto o
-      // worker checa. Isso da feedback IMEDIATO ao usuario de que o
-      // sistema esta trabalhando — antes o menu abria sem nada de
-      // spellcheck mesmo quando a palavra estava errada, e o usuario
-      // pensava que a feature so' nao funcionava.
+      // prepende um placeholder "Verificando ortografia…" enquanto o
+      // worker checa. Isso da feedback IMEDIATO ao usuário de que o
+      // sistema está trabalhando, em vez de abrir o menu sem nada de
+      // spellcheck mesmo quando a palavra estava errada, e o usuário
+      // pensava que a feature só não funcionava.
       let menuItems = baseItems;
       let wordToCheck: { word: string; from: number; to: number } | null =
         null;
@@ -108,8 +108,8 @@ export function ContextMenuProvider() {
             e.clientX,
             e.clientY,
           );
-          // So' mostra placeholder se for uma palavra "checavel" — nao
-          // numero, nao no dict pessoal. Senao deixa o menu abrir
+          // So' mostra placeholder se for uma palavra "checavel" — não
+          // número, não no dict pessoal. Senao deixa o menu abrir
           // limpo (sem placeholder que ficaria pra sempre).
           if (wordInfo && shouldSpellcheckWord(wordInfo.word)) {
             wordToCheck = wordInfo;
@@ -162,11 +162,11 @@ export function ContextMenuProvider() {
  * estiver errada, atualiza o menu aberto prepending sugestoes +
  * "Adicionar ao dicionario".
  *
- * Como o menu ja' esta visivel quando entramos aqui, o usuario ve uma
- * "atualizacao" do menu quando as sugestoes chegam — UX equivalente a
- * loading inline. Tipicamente <100ms quando engine ja' carregada,
+ * Como o menu já esta visível quando entramos aqui, o usuário ve uma
+ * "atualização" do menu quando as sugestoes chegam — UX equivalente a
+ * loading inline. Tipicamente <100ms quando engine já carregada,
  * 8-10s na primeira vez (engine compilando o .dic). UI fica responsiva
- * porque worker nao bloqueia main thread.
+ * porque worker não bloqueia main thread.
  */
 async function attachSuggestionsAsync({
   editor,
@@ -188,9 +188,9 @@ async function attachSuggestionsAsync({
     message: string,
   ) => void;
 }): Promise<void> {
-  // Se engine nao esta pronta, kicka o init em background. A propria
+  // Se engine não esta pronta, kicka o init em background. A própria
   // chamada de isCorrect abaixo vai esperar (no worker) ate ficar
-  // pronta, entao o menu so' atualiza apos o load completar — mas SEM
+  // pronta, então o menu só atualiza após o load completar — mas SEM
   // travar UI no meio.
   if (!isSpellcheckerReady()) {
     ensureSpellchecker();
@@ -201,7 +201,7 @@ async function attachSuggestionsAsync({
     correct = await isCorrect(wordInfo.word);
   } catch (err) {
     console.warn("[spellcheck] isCorrect failed:", err);
-    // Remove placeholder restaurando baseItems pra nao deixar
+    // Remove placeholder restaurando baseItems pra não deixar
     // "Verificando ortografia…" la' pra sempre.
     updateContextMenuItems(menuId, baseItems);
     return;

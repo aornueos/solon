@@ -5,11 +5,11 @@ import { useAppStore } from "../../store/useAppStore";
  * Banner discreto que aparece na HomePage quando ha update.
  *
  * Tres apresentacoes:
- *  - `available`: convida a abrir o dialog (release notes + acoes).
+ *  - `available`: convida a abrir o dialog (release notes + ações).
  *  - `downloading`: mostra progress inline (sem call to action).
  *  - `ready`: convida a reiniciar.
  *
- * Em `idle/checking/error`, retorna null (nao polui a home).
+ * Em `idle/checking/error`, retorna null (não polui a home).
  */
 export function UpdateBanner() {
   const status = useAppStore((s) => s.updateStatus);
@@ -102,11 +102,11 @@ function BannerShell({
 }) {
   // Bloco hairline (1px) com cantos suaves e sombra macia; quando
   // interativo, levanta levemente no hover (translateY + shadow-md).
-  // Downloading nao tem hover — mostra progress bar 2px no bottom.
+  // Downloading não tem hover — mostra progress bar 2px no bottom.
   const interactive = !!onClick;
   const inner = (
     <div
-      className="relative flex items-center gap-3 px-4 py-3 w-full transition-all overflow-hidden"
+      className="relative flex items-center gap-3 px-4 py-3 w-full transition-colors overflow-hidden"
       style={{
         background: "var(--bg-panel)",
         border: "1px solid var(--border)",
@@ -146,10 +146,10 @@ function BannerShell({
       {typeof progress === "number" && (
         <div
           aria-hidden
-          className="absolute left-0 bottom-0 transition-all"
+          className="absolute left-0 bottom-0 w-full origin-left transition-transform"
           style={{
             height: 2,
-            width: `${Math.round(progress * 100)}%`,
+            transform: `scaleX(${progress})`,
             background: "var(--accent)",
           }}
         />

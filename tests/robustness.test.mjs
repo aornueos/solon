@@ -30,7 +30,12 @@ import {
 } from "../src/lib/docxExport.ts";
 import { isSafeAssetSrc } from "../src/lib/canvasImages.ts";
 import { useCanvasStore } from "../src/store/useCanvasStore.ts";
-import { clientToSurface, fitAllViewport } from "../src/lib/canvasViewport.ts";
+import {
+  clientToSurface,
+  fitAllViewport,
+  zoomToLevel,
+} from "../src/lib/canvasViewport.ts";
+import { isSelectionToggle } from "../src/lib/canvasSelectionInput.ts";
 
 describe("frontmatter", () => {
   it("keeps body separators out of the yaml parser", () => {
@@ -580,5 +585,54 @@ describe("canvas — referencial da superfície", () => {
 
   it("falls back to raw coordinates when there is no surface", () => {
     assert.deepEqual(clientToSurface(300, 100, null), { x: 300, y: 100 });
+  });
+});
+
+describe("canvas — modificador de seleção", () => {
+  const evt = (over = {}) => ({
+    shiftKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    ...over,
+  });
+
+  it("accepts shift, ctrl and cmd", () => {
+    // Shift é a convenção de Figma/Miro; Ctrl/Cmd já valia aqui. No macOS
+    // Ctrl+clique abre o menu do sistema, então Shift precisa funcionar.
+    assert.equal(isSelectionToggle(evt({ shiftKey: true })), true);
+    assert.equal(isSelectionToggle(evt({ ctrlKey: true })), true);
+    assert.equal(isSelectionToggle(evt({ metaKey: true })), true);
+  });
+
+  it("leaves a plain click replacing the selection", () => {
+    assert.equal(isSelectionToggle(evt()), false);
+  });
+});
+
+describe("canvas — zoom em nível exato", () => {
+  it("keeps the point at the centre of the surface fixed", () => {
+    const store = useCanvasStore.getState();
+    store.reset();
+    store.setViewport({ x: -340, y: 128, zoom: 2.5 });
+
+    // Sem DOM o helper cai em 0x0; o ponto de referencia e o mesmo antes e
+    // depois, que e a propriedade em teste.
+    const w = 0;
+    const h = 0;
+    const centre = () => {
+      const { viewport } = useCanvasStore.getState();
+      return {
+        x: (w / 2 - viewport.x) / viewport.zoom,
+        y: (h / 2 - viewport.y) / viewport.zoom,
+      };
+    };
+
+    const before = centre();
+    zoomToLevel(1);
+    const after = centre();
+
+    assert.equal(useCanvasStore.getState().viewport.zoom, 1);
+    assert.ok(Math.abs(after.x - before.x) < 1e-9);
+    assert.ok(Math.abs(after.y - before.y) < 1e-9);
   });
 });
