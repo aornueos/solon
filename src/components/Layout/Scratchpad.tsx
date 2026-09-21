@@ -3,9 +3,7 @@ import { FilePlus2, Send, X } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { atomicWriteTextFile } from "../../lib/atomicWrite";
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+import { isTauriRuntime } from "../../lib/windows";
 
 function joinPath(dir: string, name: string): string {
   const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
@@ -39,7 +37,7 @@ export function Scratchpad() {
 
   const saveAsNote = async () => {
     if (!rootFolder || !text.trim()) return;
-    if (!isTauri) return;
+    if (!isTauriRuntime()) return;
     setSaving(true);
     try {
       const { exists } = await import("@tauri-apps/plugin-fs");

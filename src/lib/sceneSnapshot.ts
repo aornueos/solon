@@ -1,9 +1,7 @@
 import { parseDocument } from "./frontmatter";
 import { SceneCardSnapshot } from "../types/canvas";
 import { SceneMeta } from "../types/scene";
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+import { isTauriRuntime } from "./runtime";
 
 /**
  * Lê um `.md` do disco e devolve um snapshot pronto para o card de cena.
@@ -13,7 +11,7 @@ export async function readSceneSnapshot(
   path: string,
   name: string,
 ): Promise<SceneCardSnapshot | null> {
-  if (!isTauri) {
+  if (!isTauriRuntime()) {
     // Browser mock: sem fs, devolve snapshot mínimo
     return { title: titleFromName(name) };
   }

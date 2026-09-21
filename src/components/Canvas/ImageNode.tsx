@@ -26,11 +26,17 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
   const removeImage = useCanvasStore((s) => s.removeImage);
   const select = useCanvasStore((s) => s.select);
   const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
-  const selectedId = useCanvasStore((s) => s.selectedId);
-  const selectedIds = useCanvasStore((s) => s.selectedIds);
+  // Seletores derivados, pelo mesmo motivo que em `Card`: assinar
+  // `selectedIds` (um Set novo a cada mudança) ou o objeto `viewport`
+  // inteiro faz toda imagem re-renderizar a cada clique e a cada frame de
+  // pan. Só o zoom muda o que este componente desenha.
+  const isSelected = useCanvasStore((s) => s.selectedId === image.id);
+  const isInGroup = useCanvasStore(
+    (s) => s.selectedId !== image.id && s.selectedIds.has(image.id),
+  );
   const snapshotSelection = useCanvasStore((s) => s.snapshotSelection);
   const translateSelection = useCanvasStore((s) => s.translateSelection);
-  const viewport = useCanvasStore((s) => s.viewport);
+  const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
   const tool = useCanvasStore((s) => s.tool);
   const linkingFromId = useCanvasStore((s) => s.linkingFromId);
   const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
@@ -43,8 +49,6 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
   const [url, setUrl] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
 
-  const isSelected = selectedId === image.id;
-  const isInGroup = selectedId !== image.id && selectedIds.has(image.id);
   const isLinkSource = linkingFromId === image.id;
   const isLinkCandidate = linkingFromId !== null && linkingFromId !== image.id;
 
@@ -113,7 +117,7 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
       return;
     }
 
-    // Group drag: preserva a selecao multipla e translada tudo junto.
+    // Group drag: preserva a seleção múltipla e translada tudo junto.
     const currentIds = useCanvasStore.getState().selectedIds;
     const isGroupDrag = currentIds.size > 1 && currentIds.has(image.id);
 
@@ -146,14 +150,14 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
       };
       startDrag({
         onMove: (ev) => {
-          const dx = (ev.clientX - orig.startX) / viewport.zoom;
-          const dy = (ev.clientY - orig.startY) / viewport.zoom;
+          const dx = (ev.clientX - orig.startX) / zoom;
+          const dy = (ev.clientY - orig.startY) / zoom;
           scheduleMove(dx, dy);
         },
         onEnd: (ev) => {
           cancelMove();
-          const dx = (ev.clientX - orig.startX) / viewport.zoom;
-          const dy = (ev.clientY - orig.startY) / viewport.zoom;
+          const dx = (ev.clientX - orig.startX) / zoom;
+          const dy = (ev.clientY - orig.startY) / zoom;
           translateSelection(snapshot, dx, dy);
           dragState.current = null;
         },
@@ -198,8 +202,8 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
     startDrag({
       onMove: (ev) => {
         if (!dragState.current) return;
-        const dx = (ev.clientX - orig.startX) / viewport.zoom;
-        const dy = (ev.clientY - orig.startY) / viewport.zoom;
+        const dx = (ev.clientX - orig.startX) / zoom;
+        const dy = (ev.clientY - orig.startY) / zoom;
         scheduleMove({
           x: snap(orig.origX + dx),
           y: snap(orig.origY + dy),
@@ -207,8 +211,8 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
       },
       onEnd: (ev) => {
         cancelMove();
-        const dx = (ev.clientX - orig.startX) / viewport.zoom;
-        const dy = (ev.clientY - orig.startY) / viewport.zoom;
+        const dx = (ev.clientX - orig.startX) / zoom;
+        const dy = (ev.clientY - orig.startY) / zoom;
         updateImage(image.id, {
           x: snap(orig.origX + dx),
           y: snap(orig.origY + dy),
@@ -325,11 +329,15 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
           style={{
             borderRadius: "var(--radius-sm)",
             boxShadow: "var(--shadow-sm)",
-            ...(isSelected
-              ? { outline: "2px solid var(--accent)" }
-              : isInGroup
-              ? { outline: "2px dashed var(--selection-ring)" }
-              : null),
+            // Durante um linking, alvos válidos ganham o mesmo anel verde
+            // dos cards — antes só o card sinalizava "pode soltar aqui".
+            ...(isLinkCandidate
+              ? { outline: "2px solid var(--success)" }
+              : isSelected
+                ? { outline: "2px solid var(--accent)" }
+                : isInGroup
+                  ? { outline: "2px dashed var(--selection-ring)" }
+                  : null),
           }}
         />
       ) : (
@@ -344,9 +352,9 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
           data-image-action
           className="absolute flex gap-0.5 px-1 py-0.5"
           style={{
-            top: -28 / viewport.zoom,
+            top: -28 / zoom,
             left: 0,
-            transform: `scale(${1 / viewport.zoom})`,
+            transform: `scale(${1 / zoom})`,
             transformOrigin: "top left",
             background: "var(--bg-panel)",
             border: "1px solid var(--border)",
@@ -377,10 +385,10 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
         </div>
       )}
 
-      {/* Handles so' quando a imagem tem tamanho de tela suficiente pra
+      {/* Handles só quando a imagem tem tamanho de tela suficiente pra
           resizar — no zoom-out, uma imagem minuscula viraria uma sopa de
           marcadores. Mesmo criterio do FloatingText. */}
-      {isSelected && image.w * viewport.zoom >= 44 && (
+      {isSelected && image.w * zoom >= 44 && (
         <div
           data-image-action
           onMouseDown={(e) => onResizeDown("se", e)}
@@ -394,13 +402,13 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
           }}
         />
       )}
-      {isSelected && image.w * viewport.zoom >= 44 &&
+      {isSelected && image.w * zoom >= 44 &&
         RESIZE_HANDLES.filter((handle) => handle.dir !== "se").map((handle) => (
           <ImageResizeHandle
             key={handle.dir}
             dir={handle.dir}
             cursor={handle.cursor}
-            zoom={viewport.zoom}
+            zoom={zoom}
             onMouseDown={(e) => onResizeDown(handle.dir, e)}
           />
         ))}
@@ -409,9 +417,9 @@ export const ImageNode = memo(function ImageNode({ image }: Props) {
         <ConnectionDots
           entityId={image.id}
           isLinkSource={isLinkSource}
-          isLinkCandidate={isLinkCandidate}
+
           linkingFromSide={linkingFromSide}
-          isSelected={isSelected}
+
           onPick={(side) => {
             if (linkingFromId && linkingFromId !== image.id) {
               completeLink(image.id, side);

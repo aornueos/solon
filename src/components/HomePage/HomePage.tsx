@@ -1,9 +1,10 @@
-import { ArrowRight, FolderOpen } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useAppStore, FileNode } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { parseDocument } from "../../lib/frontmatter";
 import { UpdateBanner } from "./UpdateBanner";
+import { isTauriRuntime } from "../../lib/windows";
 
 /**
  * Landing editorial centrada num eixo vertical (Quiet Editorial):
@@ -15,7 +16,7 @@ import { UpdateBanner } from "./UpdateBanner";
  *
  *   ─────  ❦  ─────                       (ornamento hairline)
  *
- *   ⟶ Continuar {arquivo}                 (CTA pill hairline)
+ *   Continuar {arquivo}                   (CTA pill hairline)
  *
  *   RECENTES
  *   I.  arquivo                           (roman + serif italic + path)
@@ -59,11 +60,7 @@ export function HomePage() {
       setProjectStats(null);
       return;
     }
-    const isTauri =
-      typeof window !== "undefined" &&
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__TAURI_INTERNALS__ !== undefined;
-    if (!isTauri) {
+    if (!isTauriRuntime()) {
       setProjectStats({ wordCount: 0, fileCount: allFiles.length });
       return;
     }
@@ -265,8 +262,7 @@ function ProjectHero({
         <span style={{ color: "var(--accent)" }}>❦</span>
       </div>
 
-      {/* CTA editorial (.solon-cta) — pill hairline que preenche
-          suavemente no hover. Texto em serif, sem caps gritante. */}
+      {/* CTA em pílula hairline que preenche no hover, em serif. */}
       <button
         onClick={onContinue}
         className="solon-cta mb-10 group"
@@ -277,9 +273,6 @@ function ProjectHero({
             : "Ir para a escrita"
         }
       >
-        <span style={{ color: "var(--accent)" }} aria-hidden>
-          ⟶
-        </span>
         <span className="truncate">
           {continueLabel ? (
             <>
@@ -341,20 +334,19 @@ function ProjectHero({
   );
 }
 
+/**
+ * Primeira tela, sem projeto aberto. O lugar do nome da pasta na
+ * `ProjectHero` fica com a frase que explica o que uma pasta é aqui: é a
+ * única coisa que o leitor precisa entender antes do único botão da tela.
+ */
 function EmptyHero({ onOpenFolder }: { onOpenFolder: () => void }) {
   return (
     <>
-      <div
-        className="solon-caps mb-5"
-        style={{ color: "var(--text-muted)" }}
-      >
-        Solon — Editor de Escrita
-      </div>
       <h1
         className="solon-display mb-6"
-        style={{ fontSize: "clamp(2.75rem, 7.5vw, 5rem)" }}
+        style={{ fontSize: "clamp(2.5rem, 6.5vw, 4.25rem)" }}
       >
-        Bem-vindo
+        Uma pasta, um livro
       </h1>
       <div
         className="solon-divider-ornate w-full max-w-[18rem] mb-10"
@@ -364,15 +356,14 @@ function EmptyHero({ onOpenFolder }: { onOpenFolder: () => void }) {
       </div>
       <p
         className="italic text-base mb-10 leading-relaxed"
-        style={{ color: "var(--text-muted)", maxWidth: "34ch" }}
+        style={{ color: "var(--text-muted)", maxWidth: "38ch" }}
       >
-        Cada arquivo é uma cena. Cada pasta, um livro. Comece abrindo um
-        diretório de trabalho.
+        O Solon abre uma pasta do seu disco e trata cada arquivo Markdown
+        como uma cena. Nada é importado, nada muda de lugar.
       </p>
       <button onClick={onOpenFolder} className="solon-cta">
         <FolderOpen size={16} aria-hidden />
         <span>Abrir pasta</span>
-        <ArrowRight size={16} aria-hidden />
       </button>
     </>
   );

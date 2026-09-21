@@ -23,18 +23,22 @@ import {
   CANVAS_EMPTY_LINK_EVENT,
   CanvasEmptyLinkDetail,
 } from "../../lib/canvasLinkDrag";
+import { clientToSurface, fitAllViewport, zoomStep } from "../../lib/canvasViewport";
 
 /**
- * Infinite canvas Miro-inspired.
+ * Canvas infinito do projeto.
  *
- * Modos (tool):
- *  - select (default): drag bg = pan, dblclick = novo card, drag cards/texts/imagens
- *  - draw: mousedown no bg inicia um stroke; arrasta e solta pra commitar
- *  - text: click no bg cria um texto flutuante pronto pra editar
+ * Ferramentas:
+ *  - select: arrastar o fundo dá pan, duplo clique cria, arrastar um item
+ *    o move;
+ *  - draw: pressionar no fundo começa um traço, soltar o grava;
+ *  - text: clicar no fundo cria um texto flutuante já em edição;
+ *  - arrow: clicar em dois itens os conecta;
+ *  - eraser: clicar num item o apaga.
  *
- * Atalhos: 1..5 (tools pela ordem da toolbar), V/P/T/A/E (tools),
- * N (novo card), F (fit), Ctrl+D (duplicar card),
- * Delete/Backspace (remove selecionado), Esc (volta pra select).
+ * Atalhos: 1–5 (ferramentas, na ordem da toolbar), V/P/T/A/E, N (card),
+ * F (enquadrar), +/− (zoom), Ctrl+D (duplicar), Ctrl+C/X/V, Ctrl+Z/Y,
+ * Delete (apagar seleção), Esc (voltar para select).
  */
 export function CanvasView() {
   const viewport = useCanvasStore((s) => s.viewport);
@@ -82,8 +86,8 @@ export function CanvasView() {
   const zoomFrame = useRef<number | null>(null);
   const pendingZoom = useRef({ x: 0, y: 0, delta: 0 });
 
-  // Stroke em progresso (live) — estado local pra não re-render a store a
-  // cada pixel. Commitamos no `mouseup`.
+  // Traço em progresso. Fica no estado local para não gravar na store a
+  // cada pixel; só o mouseup faz o commit.
   const [liveStroke, setLiveStroke] = useState<CanvasStroke | null>(null);
   const liveStrokeRef = useRef<CanvasStroke | null>(null);
   const [justCreatedTextId, setJustCreatedTextId] = useState<string | null>(null);
@@ -102,11 +106,10 @@ export function CanvasView() {
     h: number;
   } | null>(null);
 
-  // Ref pro retangulo do marquee — posicionamos ele imperativamente durante
-  // o arrasto (escrita direta no DOM) em vez de setState por frame. Isso
-  // evita re-render da CanvasView inteira (e de todos os cards/setas/tracos)
-  // a cada pointermove — era a causa do stutter. O state `marquee` acima so'
-  // controla mount/unmount do elemento; a geometria vive no DOM.
+  // A geometria do marquee é escrita direto no DOM durante o arrasto, não
+  // via setState: um re-render da CanvasView por pointermove arrasta junto
+  // todos os cards, setas e traços. O state marquee acima só controla o
+  // mount do elemento.
   const marqueeRef = useRef<HTMLDivElement | null>(null);
 
   const snap = (value: number) =>
@@ -126,11 +129,11 @@ export function CanvasView() {
     });
   };
 
-  // Zoom coalescido em rAF — espelha schedulePanBy. O wheel (trackpad
-  // pinch / mouse notch) dispara dezenas de eventos/seg; sem isso cada
-  // um fazia um `zoomAt` → re-render do CanvasView + todo StrokeNode +
-  // ArrowLayer. `zoomAt` e' exponencial em delta, entao somar os deltas
-  // e aplicar 1x/frame da' o MESMO zoom (exp(-(d1+d2)k)=exp(-d1k)exp(-d2k)).
+  // Zoom coalescido em rAF, espelhando `schedulePanBy`. O wheel dispara
+  // dezenas de eventos por segundo; aplicar um `zoomAt` por evento
+  // re-renderizava o canvas inteiro. Como `zoomAt` e exponencial no delta,
+  // somar os deltas e aplicar uma vez por frame da o mesmo resultado:
+  // exp(-(d1+d2)k) = exp(-d1 k) · exp(-d2 k).
   const scheduleZoom = (clientX: number, clientY: number, deltaY: number) => {
     pendingZoom.current.x = clientX;
     pendingZoom.current.y = clientY;
@@ -140,7 +143,13 @@ export function CanvasView() {
       zoomFrame.current = null;
       const { x, y, delta } = pendingZoom.current;
       pendingZoom.current = { x: 0, y: 0, delta: 0 };
-      if (delta) zoomAt(x, y, delta);
+      if (!delta) return;
+      // O retangulo e lido uma vez por frame: durante o pan o transform
+      // ja invalidou o layout, e um getBoundingClientRect por evento de
+      // wheel forcaria um reflow sincrono a cada notch.
+      const rect = containerRef.current?.getBoundingClientRect() ?? null;
+      const point = clientToSurface(x, y, rect);
+      zoomAt(point.x, point.y, delta);
     });
   };
 
@@ -209,8 +218,8 @@ export function CanvasView() {
         setTool("select");
       }
       if (e.key === "Delete" || e.key === "Backspace") {
-        // Le estado FRESCO (nao o closure do effect, que pode estar stale) —
-        // considera selecao primaria E grupo de marquee.
+        // Le estado FRESCO (não o closure do effect, que pode estar stale) —
+        // considera seleção primaria E grupo de marquee.
         const st = useCanvasStore.getState();
         if (!st.selectedId && st.selectedIds.size === 0) return;
         removeSelected();
@@ -228,9 +237,8 @@ export function CanvasView() {
         state.selectMany(ids, ids[0] ?? null);
         return;
       }
-      // Undo/Redo. Ctrl+Z = undo; Ctrl+Shift+Z OU Ctrl+Y = redo.
-      // Convencao multi-plataforma — Windows usa Ctrl+Y, Mac usa Cmd+Shift+Z;
-      // a gente aceita os dois pra nao surpreender ninguem.
+      // Refazer aceita Ctrl+Shift+Z e Ctrl+Y: a convenção difere entre
+      // Windows e macOS e não custa atender às duas.
       if ((e.key === "z" || e.key === "Z") && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         if (e.shiftKey) useCanvasStore.getState().redo();
@@ -243,16 +251,12 @@ export function CanvasView() {
         return;
       }
       if ((e.key === "d" || e.key === "D") && (e.ctrlKey || e.metaKey)) {
-        // Ctrl+D duplica cards; em multi-selecao, duplica todos os cards
-        // do grupo (outros kinds sao ignorados — stroke/text/image/arrow
-        // nao tem "duplicate" no modelo atual).
         e.preventDefault();
         duplicateSelected();
         return;
       }
-      // Ctrl+C / Ctrl+V — copia/cola blocos do canvas (texto, card, imagem,
-      // traco). So' age fora de edicao de texto (guard `typing` acima ja'
-      // deixa o Ctrl+C/V nativo pra textarea). Ctrl+X = copia + remove.
+      // Copiar e recortar blocos do canvas. O guard typing acima já devolve
+      // o comportamento nativo durante a edição de texto.
       if ((e.key === "c" || e.key === "C") && (e.ctrlKey || e.metaKey)) {
         const st = useCanvasStore.getState();
         if (!st.selectedId && st.selectedIds.size === 0) return;
@@ -268,11 +272,10 @@ export function CanvasView() {
         st.removeSelected();
         return;
       }
-      // Ctrl+V NAO e' tratado aqui de proposito: deixamos o evento `paste`
-      // nativo (onPaste) cuidar dele — imagem do SO tem prioridade e, se nao
-      // houver, ele cola o clipboard INTERNO do canvas. Assim uma imagem da
-      // web copiada agora vence um bloco antigo no clipboard interno.
-      if (e.ctrlKey || e.metaKey) return; // ignora outros Ctrl+X
+      // Ctrl+V fica de fora de propósito: o listener de paste trata o caso,
+      // dando prioridade a uma imagem do sistema e caindo no clipboard
+      // interno do canvas quando não há nenhuma.
+      if (e.ctrlKey || e.metaKey) return;
 
       const numericTool = CANVAS_TOOL_ORDER[Number(e.key) - 1];
       if (numericTool) {
@@ -291,32 +294,24 @@ export function CanvasView() {
       if (e.key === "a" || e.key === "A") setTool("arrow");
       if (e.key === "e" || e.key === "E") setTool("eraser");
       if (e.key === "f" || e.key === "F") {
-        const state = useCanvasStore.getState();
-        const boxes = [
-          ...state.cards,
-          ...state.images,
-          ...state.texts.map(textRect),
-        ];
-        if (boxes.length === 0) {
-          state.setViewport({ x: 0, y: 0, zoom: 1 });
-          return;
-        }
-        const minX = Math.min(...boxes.map((b) => b.x));
-        const minY = Math.min(...boxes.map((b) => b.y));
-        const maxX = Math.max(...boxes.map((b) => b.x + b.w));
-        const maxY = Math.max(...boxes.map((b) => b.y + b.h));
-        const padding = 80;
-        const w = maxX - minX + padding * 2;
-        const h = maxY - minY + padding * 2;
         const el = containerRef.current;
         if (!el) return;
-        const rect = el.getBoundingClientRect();
-        const zoom = Math.min(1.2, Math.min(rect.width / w, rect.height / h));
-        state.setViewport({
-          zoom,
-          x: -(minX - padding) * zoom + (rect.width - w * zoom) / 2,
-          y: -(minY - padding) * zoom + (rect.height - h * zoom) / 2,
-        });
+        useCanvasStore
+          .getState()
+          .setViewport(fitAllViewport(el.getBoundingClientRect()));
+        return;
+      }
+      // Zoom pelo teclado, ancorado no centro da superficie. `=` cobre o
+      // teclado onde `+` exige Shift.
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        zoomStep(-1, containerRef.current);
+        return;
+      }
+      if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        zoomStep(1, containerRef.current);
+        return;
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -399,8 +394,8 @@ export function CanvasView() {
       }
       if (!rootFolder) return;
 
-      // 1) Bitmap direto no clipboard — "Copiar imagem" (botao direito),
-      //    screenshots, apps de imagem.
+      // 1) Bitmap direto no clipboard: "Copiar imagem", capturas de tela,
+      //    editores de imagem.
       const items = e.clipboardData?.items;
       if (items) {
         for (const item of items) {
@@ -417,13 +412,13 @@ export function CanvasView() {
               err instanceof Error ? err.message : "Não foi possível colar a imagem.",
             );
           }
-          return; // so' a primeira
+          return; // só a primeira
         }
       }
 
-      // 2) Sem bitmap — imagem da WEB copiada como `<img src>` (text/html) ou
-      //    uma URL / data-uri (text/plain). Copiar imagem do navegador com
-      //    Ctrl+C geralmente cai aqui, nao no caso 1. Baixa e coloca.
+      // 2) Sem bitmap: imagem da web copiada como <img src> (text/html) ou
+      //    como URL/data-uri (text/plain). Copiar do navegador com Ctrl+C
+      //    costuma cair aqui. Baixa e posiciona.
       const html = e.clipboardData?.getData("text/html") ?? "";
       const plain = (e.clipboardData?.getData("text/plain") ?? "").trim();
       let url: string | null = null;
@@ -433,8 +428,7 @@ export function CanvasView() {
       else if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|bmp|svg|avif)(\?\S*)?$/i.test(plain))
         url = plain;
       if (!url) {
-        // 3) Sem imagem no clipboard do SO — cola o clipboard INTERNO do canvas
-        //    (blocos copiados com Ctrl+C), se houver.
+        // 3) Nada de imagem no sistema: cola os blocos copiados no canvas.
         useCanvasStore.getState().pasteClipboard();
         return;
       }
@@ -502,11 +496,8 @@ export function CanvasView() {
     };
   };
 
-  // Bug antigo: o useEffect estava sem array de dependencias, entao
-  // re-registrava o listener a cada render do CanvasView (que acontece
-  // a cada pan/zoom/seleção). `screenToWorld` e `snap` sao closures sobre
-  // viewport/canvasSnapToGrid/canvasGridSize — usamos getState pra ler
-  // o viewport mais recente sem precisar do listener depender dele.
+  // O viewport é lido por getState em vez de entrar nas dependências: ele
+  // muda a cada pan, e re-registrar o listener por frame é caro.
   useEffect(() => {
     const onEmptyLink = (event: Event) => {
       const { clientX, clientY } = (event as CustomEvent<CanvasEmptyLinkDetail>).detail;
@@ -579,11 +570,8 @@ export function CanvasView() {
   const startDrawStroke = (e: React.MouseEvent) => {
     e.preventDefault();
     const start = screenToWorld(e.clientX, e.clientY);
-    // Cor "" (Auto) tambem vale pra strokes — o StrokeLayer resolve
-    // empty/"#2a2420" → var(--text-primary) na hora de renderizar, entao
-    // o stroke fica theme-aware igual texto. Antes a gente forcava Tinta
-    // aqui, mas isso "pintava" o stroke deliberadamente em sepia escuro,
-    // perdendo a adaptacao ao dark theme.
+    // A cor vazia ("Auto") é preservada: o StrokeLayer a resolve para
+    // var(--text-primary) ao renderizar, então o traço acompanha o tema.
     const stroke: CanvasStroke = {
       id: "__live__",
       points: [start.x, start.y],
@@ -652,8 +640,8 @@ export function CanvasView() {
     const rect = el.getBoundingClientRect();
     const startX = e.clientX - rect.left;
     const startY = e.clientY - rect.top;
-    // Monta o retangulo (0x0). A partir daqui NAO tocamos mais o state
-    // durante o arrasto — a geometria e' escrita direto no DOM via ref.
+    // Daqui em diante o state não é mais tocado durante o arrasto: a
+    // geometria vai direto para o DOM pela ref.
     setMarquee({ x: startX, y: startY, w: 0, h: 0 });
 
     startDrag({
@@ -662,8 +650,6 @@ export function CanvasView() {
         const y = Math.min(startY, ev.clientY - rect.top);
         const w = Math.abs(ev.clientX - rect.left - startX);
         const h = Math.abs(ev.clientY - rect.top - startY);
-        // Escrita imperativa: sem setState, sem re-render da arvore. O
-        // browser coalesce as mudancas de style ate' o proximo paint.
         const node = marqueeRef.current;
         if (node) {
           node.style.left = `${x}px`;
@@ -729,13 +715,10 @@ export function CanvasView() {
           const bb = strokeBBox(s.points);
           if (bb && hit(bb.x, bb.y, bb.w, bb.h)) ids.push(s.id);
         }
-        // Arrows: seleciona quando ambos os cards-endpoint estão (ao menos
-        // parcialmente) dentro do marquee. É o mesmo critério do Figma/Miro
-        // — "se os dois nós entraram na seleção, a aresta veio junto". Evita
-        // o problema de marquee sobre espaço vazio entre cards distantes
-        // acidentalmente selecionar a seta que passa por cima.
-        // Mapa por id pra evitar O(arrows · cards) — antes era find() por
-        // arrow. Em canvas com 200 cards e 100 arrows, virava 20k lookups.
+        // Uma seta entra na seleção quando os dois cards-extremo entram: um
+        // marquee sobre o espaço vazio entre cards distantes não deve
+        // arrastar junto a seta que passa por cima. O mapa por id evita um
+        // find() por seta.
         const cardById = new Map(cards.map((c) => [c.id, c]));
         for (const a of arrows) {
           const fromCard = cardById.get(a.from);
@@ -760,22 +743,16 @@ export function CanvasView() {
       cancelLink();
     }
 
-    // Commit explicito de qualquer textarea/input em edicao no canvas
-    // (FloatingText editing, label de card etc.). Sem isso, o
-    // `e.preventDefault()` que viria abaixo (em startMarquee/startDraw)
-    // cancela o focus-change do click e o textarea NAO perde o foco —
-    // o usuario via "texto continua em edicao mesmo clicando fora".
-    // Forcar blur antes do preventDefault dispara o `onBlur` do textarea
-    // (que ja faz o commit) e remove o caret antes de processarmos o
-    // mousedown como pan/marquee/draw.
+    // Fecha qualquer edição de texto em curso antes de tratar o mousedown.
+    // O preventDefault de startMarquee/startDrawStroke cancelaria a troca de
+    // foco do clique e o campo continuaria em edição; o blur explícito
+    // dispara o commit e tira o caret antes disso.
     const active = document.activeElement;
     if (
       active instanceof HTMLElement &&
       (active.tagName === "TEXTAREA" ||
         active.tagName === "INPUT" ||
-        // FloatingText agora edita num contenteditable DIV, nao textarea —
-        // sem este caso, clicar fora NAO tirava o foco e o texto "nao saia"
-        // da edicao (e o Delete depois era engolido pelo guard `typing`).
+        // O texto flutuante edita num contenteditable, não num textarea.
         active.isContentEditable) &&
       active.closest(".canvas-surface")
     ) {
@@ -790,9 +767,8 @@ export function CanvasView() {
     if (tool === "text") {
       e.preventDefault();
       const { x, y } = screenToWorld(e.clientX, e.clientY);
-      // Passa `drawColor` (que pode ser "" / Auto, ou um hex deliberado
-      // escolhido pelo usuario na toolbar). O FloatingText resolve "" →
-      // var(--text-primary) na hora de renderizar.
+      // A cor pode ser "" (Auto): o FloatingText a resolve para
+      // var(--text-primary) ao renderizar.
       const id = addText({
         x: snap(x),
         y: snap(y),
@@ -812,10 +788,8 @@ export function CanvasView() {
       return;
     }
 
-    // Em modo borracha, click no vazio nao faz nada — eraser so afeta
-    // items existentes (clique direto). Marquee aqui daria a sensacao de
-    // "estou tentando apagar mas o cursor ta selecionando area" e poluiria
-    // o mental model de "borracha = clique pra apagar".
+    // Com a borracha, clicar no vazio não faz nada: abrir um marquee aqui
+    // contradiz o modelo de "borracha = clique no item para apagar".
     if (tool === "eraser") {
       return;
     }
@@ -835,9 +809,8 @@ export function CanvasView() {
       addCard({ x: snap(x - 110), y: snap(y - 60) });
       return;
     }
-    // Padrão a partir do 0.9.21: duplo clique cria texto solto pronto pra
-    // editar inline. Mais leve que card pra anotações no canvas. O card
-    // segue acessível por "N" / botão da toolbar / Ajustes → Canvas.
+    // Duplo clique cria um texto solto: mais leve que um card para uma
+    // anotação. O card continua em N, na toolbar e nos ajustes.
     const id = addText({
       x: snap(x),
       y: snap(y),
@@ -896,9 +869,15 @@ export function CanvasView() {
         </div>
       )}
 
-      <CanvasToolbar />
-      <CanvasSidePanel />
-      <CanvasMinimap />
+      {/* Sem arquivo aberto não ha canvas pra editar — mostrar ferramentas
+          sobre a mensagem de "abra uma pasta" so oferece controles inertes. */}
+      {activeFilePath && (
+        <>
+          <CanvasToolbar />
+          <CanvasSidePanel />
+          <CanvasMinimap />
+        </>
+      )}
 
       {/* World container */}
       <div
@@ -917,16 +896,16 @@ export function CanvasView() {
             compositor, sem repaint). Antes ficava no .canvas-surface com
             background-position atualizado a cada frame de pan — repintava
             o radial-gradient fullscreen 60x/s, causando o stutter. Agora
-            e' uma layer estatica gigante; o pan e' so' translate na GPU.
+            é uma layer estática gigante; o pan é só translate na GPU.
             O quadrado cobre +-100k unidades de mundo (suficiente pra
             qualquer projeto real).
 
-            `translateZ(0)` promove o grid a uma CAMADA COMPOSTA propria,
+            `translateZ(0)` promove o grid a uma CAMADA COMPOSTA própria,
             separada da camada de conteudo (cards/setas/textos). Sem isso, os
             200000x200000px do grid inchavam a camada do container do mundo, e
             QUALQUER update dentro dela (arrastar seta/card) re-rasterizava uma
             textura gigantesca → stutter. Isolado, o conteudo re-rasteriza numa
-            camada pequena e o grid so' repinta em zoom. */}
+            camada pequena e o grid só repinta em zoom. */}
         {canvasGridEnabled && (
           <div
             aria-hidden

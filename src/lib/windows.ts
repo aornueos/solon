@@ -1,7 +1,9 @@
 import type { OpenTab } from "../store/useAppStore";
+import { isTauriRuntime } from "./runtime";
 
-export const isTauriRuntime = (): boolean =>
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+// Re-exportado por conveniência: quem já depende de windows.ts não precisa
+// de um segundo import só para checar o runtime.
+export { isTauriRuntime };
 
 function safeLabelPart(value: string): string {
   return value.replace(/[^a-zA-Z0-9-_:]/g, "_").slice(0, 40) || "file";

@@ -71,7 +71,7 @@ export function StatusBar() {
       </div>
       <div className="flex items-center gap-3">
         <UpdateIndicator status={updateStatus} onClick={openUpdateDialog} />
-        {showStatusStats && (
+        {showStatusStats && activeFilePath && (
           <>
             {target > 0 ? (
               <div className="flex items-center gap-2">

@@ -12,9 +12,7 @@
  */
 import { parseDocument } from "./frontmatter";
 import type { FileNode } from "../store/useAppStore";
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+import { isTauriRuntime } from "./runtime";
 
 const CHUNK = 16;
 
@@ -36,7 +34,7 @@ function flatten(nodes: FileNode[]): FileNode[] {
  */
 export async function buildTagIndex(tree: FileNode[]): Promise<TagIndex> {
   const result: TagIndex = new Map();
-  if (!isTauri) return result;
+  if (!isTauriRuntime()) return result;
   const files = flatten(tree).filter((f) =>
     /\.(md|txt)$/i.test(f.name),
   );

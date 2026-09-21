@@ -26,11 +26,9 @@
  */
 
 import { isProjectNotePath } from "./pathSecurity";
+import { isTauriRuntime } from "./runtime";
 
 const RECOVERY_DIR = ".solon/.recovery";
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export interface RecoveryDraft {
   /** Path absoluto do arquivo original. */
@@ -61,7 +59,7 @@ function recoveryPathFor(rootFolder: string, filePath: string): string {
 }
 
 async function ensureRecoveryDir(rootFolder: string): Promise<void> {
-  if (!isTauri) return;
+  if (!isTauriRuntime()) return;
   try {
     const { mkdir, exists } = await import("@tauri-apps/plugin-fs");
     const sep =
@@ -84,7 +82,7 @@ export async function saveRecoveryDraft(
   filePath: string,
   content: string,
 ): Promise<void> {
-  if (!isTauri || !rootFolder || !isProjectNotePath(rootFolder, filePath)) return;
+  if (!isTauriRuntime() || !rootFolder || !isProjectNotePath(rootFolder, filePath)) return;
   try {
     const { writeTextFile } = await import("@tauri-apps/plugin-fs");
     await ensureRecoveryDir(rootFolder);
@@ -106,7 +104,7 @@ export async function clearRecoveryDraft(
   rootFolder: string | null,
   filePath: string,
 ): Promise<void> {
-  if (!isTauri || !rootFolder || !isProjectNotePath(rootFolder, filePath)) return;
+  if (!isTauriRuntime() || !rootFolder || !isProjectNotePath(rootFolder, filePath)) return;
   try {
     const { remove, exists } = await import("@tauri-apps/plugin-fs");
     const draftPath = recoveryPathFor(rootFolder, filePath);
@@ -139,7 +137,7 @@ export async function clearRecoveryDraft(
 export async function scanRecoveryDrafts(
   rootFolder: string | null,
 ): Promise<RecoveryDraft[]> {
-  if (!isTauri || !rootFolder) return [];
+  if (!isTauriRuntime() || !rootFolder) return [];
   try {
     const { readDir, readTextFile, exists, remove, stat } = await import(
       "@tauri-apps/plugin-fs"
@@ -219,7 +217,7 @@ export async function scanRecoveryDrafts(
 export async function purgeAllRecoveryDrafts(
   rootFolder: string | null,
 ): Promise<void> {
-  if (!isTauri || !rootFolder) return;
+  if (!isTauriRuntime() || !rootFolder) return;
   try {
     const { readDir, remove, exists } = await import("@tauri-apps/plugin-fs");
     const sep =

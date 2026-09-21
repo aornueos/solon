@@ -3,6 +3,7 @@ import { FileText, FolderOpen, Search, X } from "lucide-react";
 import { FileNode, useAppStore } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { parseDocument, serializeDocument } from "../../lib/frontmatter";
+import { isTauriRuntime } from "../../lib/windows";
 
 interface SearchResult {
   kind: "file" | "folder" | "content";
@@ -11,9 +12,6 @@ interface SearchResult {
   line?: number;
   snippet: string;
 }
-
-const isTauri = (): boolean =>
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export function GlobalSearchDialog() {
   const open = useAppStore((s) => s.showGlobalSearch);
@@ -285,7 +283,7 @@ async function searchProject(
     });
     fileMatches += 1;
   }
-  if (!isTauri() || normalized.length < 2) return results.slice(0, 80);
+  if (!isTauriRuntime() || normalized.length < 2) return results.slice(0, 80);
   const { readTextFile } = await import("@tauri-apps/plugin-fs");
   const CHUNK = 16;
   outer: for (let i = 0; i < files.length; i += CHUNK) {

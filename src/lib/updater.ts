@@ -15,6 +15,7 @@
  * `cachedUpdate` durante o ciclo de vida do app.
  */
 import type { Update } from "@tauri-apps/plugin-updater";
+import { isTauriRuntime } from "./runtime";
 
 const LAST_CHECK_KEY = "solon:lastUpdateCheck";
 const SKIPPED_VERSION_KEY = "solon:skippedUpdate";
@@ -37,11 +38,6 @@ export type UpdateCheckResult =
   | { kind: "error"; message: string }
   | { kind: "unconfigured"; message: string }
   | { kind: "unsupported" };
-
-const isTauri = (): boolean =>
-  typeof window !== "undefined" &&
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).__TAURI_INTERNALS__ !== undefined;
 
 function readLastCheck(): number {
   try {
@@ -96,7 +92,7 @@ export function clearSkippedVersion(): void {
 export async function checkForUpdate(
   opts: { force?: boolean } = {},
 ): Promise<UpdateCheckResult> {
-  if (!isTauri()) return { kind: "unsupported" };
+  if (!isTauriRuntime()) return { kind: "unsupported" };
 
   if (!opts.force) {
     const last = readLastCheck();
@@ -132,14 +128,14 @@ export async function checkForUpdate(
       return {
         kind: "unconfigured",
         message:
-          "Canal de atualizacoes ausente: publique o latest.json assinado nos assets do release.",
+          "Canal de atualizações ausente: publique o latest.json assinado nos assets do release.",
       };
     }
     if (isSignatureOrManifestIssue(message)) {
       return {
         kind: "error",
         message:
-          "Manifesto de atualizacao invalido ou assinatura do bundle nao confere. Confira o latest.json gerado pela release.",
+          "A atualização baixada não confere com a assinatura do Solon e não foi aplicada. Sua versão atual segue intacta; tente de novo mais tarde.",
       };
     }
     if (isNetworkIssue(message)) {
@@ -211,7 +207,7 @@ function buildAvailable(update: Update): UpdateCheckResult {
 export async function downloadAndInstall(
   onProgress?: (pct: number) => void,
 ): Promise<void> {
-  if (!isTauri()) throw new Error("Updater não disponível neste ambiente.");
+  if (!isTauriRuntime()) throw new Error("Updater não disponível neste ambiente.");
   if (!cachedUpdate) {
     // Caller chamou direto sem ter cacheado. Refaz o check sem throttle.
     const result = await checkForUpdate({ force: true });
@@ -241,7 +237,7 @@ export async function downloadAndInstall(
  * call-sites mais legíveis.
  */
 export async function restartApp(): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauriRuntime()) return;
   const { relaunch } = await import("@tauri-apps/plugin-process");
   await relaunch();
 }

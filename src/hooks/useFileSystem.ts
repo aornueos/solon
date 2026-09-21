@@ -26,8 +26,8 @@ import {
   reorderInFolder,
   saveOrder,
 } from "../lib/sidebarOrder";
+import { isTauriRuntime } from "../lib/runtime";
 
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const IGNORED_TREE_DIRS = new Set(["node_modules", "target", "dist", "out"]);
 const MAX_TREE_DEPTH = 24;
 
@@ -121,7 +121,7 @@ export function useFileSystem() {
   const setSidebarOrder = useAppStore((s) => s.setSidebarOrder);
 
   const openFolder = useCallback(async () => {
-    if (isTauri) {
+    if (isTauriRuntime()) {
       try {
         const { open } = await import("@tauri-apps/plugin-dialog");
         const selected = await open({ directory: true, multiple: false });
@@ -205,7 +205,7 @@ export function useFileSystem() {
         return; // untitled nao entra em recents nem le disco
       }
 
-      if (isTauri) {
+      if (isTauriRuntime()) {
         try {
           assertProjectNotePath(useAppStore.getState().rootFolder, path);
           const { readTextFile } = await import("@tauri-apps/plugin-fs");
@@ -255,7 +255,7 @@ export function useFileSystem() {
 
   const saveFile = useCallback(
     async (path: string, content: string) => {
-      if (!isTauri) return;
+      if (!isTauriRuntime()) return;
       try {
         const { rootFolder, localHistoryEnabled } = useAppStore.getState();
         assertProjectNotePath(rootFolder, path);
@@ -301,7 +301,7 @@ export function useFileSystem() {
   );
 
   const refresh = useCallback(async () => {
-    if (!isTauri || !rootFolder) return;
+    if (!isTauriRuntime() || !rootFolder) return;
     const currentTree = useAppStore.getState().fileTree;
     const expanded = new Set<string>();
     collectExpandedPaths(currentTree, expanded);
@@ -313,7 +313,7 @@ export function useFileSystem() {
   }, [rootFolder, setFileTree]);
 
   const restoreLastFolder = useCallback(async () => {
-    if (!isTauri) return;
+    if (!isTauriRuntime()) return;
     try {
       const last = localStorage.getItem("solon:rootFolder");
       if (!last) return;
@@ -400,7 +400,7 @@ export function useFileSystem() {
 
   const createFile = useCallback(
     async (parentDir: string, name: string) => {
-      if (!isTauri) return;
+      if (!isTauriRuntime()) return;
       const finalName = name.endsWith(".md") || name.endsWith(".txt") ? name : `${name}.md`;
       const full = joinPath(parentDir, finalName);
       try {
@@ -456,7 +456,7 @@ export function useFileSystem() {
    */
   const duplicateFile = useCallback(
     async (sourcePath: string) => {
-      if (!isTauri) return;
+      if (!isTauriRuntime()) return;
       try {
         assertProjectNotePath(rootFolder, sourcePath, "Arquivo de origem");
         const { readTextFile, exists } = await import(
@@ -501,7 +501,7 @@ export function useFileSystem() {
 
   const createFolder = useCallback(
     async (parentDir: string, name: string) => {
-      if (!isTauri) return;
+      if (!isTauriRuntime()) return;
       const full = joinPath(parentDir, name);
       try {
         assertInsideProject(rootFolder, parentDir, "Pasta");
@@ -527,7 +527,7 @@ export function useFileSystem() {
 
   const renameNode = useCallback(
     async (oldPath: string, newName: string) => {
-      if (!isTauri) return;
+      if (!isTauriRuntime()) return;
       const parent = parentOf(oldPath);
       const newPath = joinPath(parent, newName);
       if (newPath === oldPath) return;
@@ -632,7 +632,7 @@ export function useFileSystem() {
 
   const deleteNode = useCallback(
     async (path: string, isFolder: boolean) => {
-      if (!isTauri) return;
+      if (!isTauriRuntime()) return;
       try {
         assertInsideProject(rootFolder, path, "Item");
         if (normalizedPath(path) === normalizedPath(rootFolder ?? "")) {
@@ -764,7 +764,7 @@ export function useFileSystem() {
    */
   const moveItem = useCallback(
     async (sourcePath: string, targetFolderPath: string) => {
-      if (!isTauri || !rootFolder) {
+      if (!isTauriRuntime() || !rootFolder) {
         return;
       }
       // Guards de sanidade
@@ -895,7 +895,7 @@ export function useFileSystem() {
         .pushToast("info", "Abra uma pasta antes de criar uma nota.");
       return;
     }
-    if (!isTauri) return;
+    if (!isTauriRuntime()) return;
     try {
       const { exists } = await import("@tauri-apps/plugin-fs");
       const base = "Sem título";
@@ -927,7 +927,7 @@ export function useFileSystem() {
    */
   const materializeUntitled = useCallback(
     async (untitledPath: string, rawName: string): Promise<boolean> => {
-      if (!isTauri) return false;
+      if (!isTauriRuntime()) return false;
       if (!rootFolder) {
         useAppStore
           .getState()
@@ -1031,7 +1031,7 @@ async function buildFileTree(
   preserveExpanded?: Set<string>,
   depth = 0,
 ): Promise<FileNode[]> {
-  if (!isTauri || depth > MAX_TREE_DEPTH) return [];
+  if (!isTauriRuntime() || depth > MAX_TREE_DEPTH) return [];
   try {
     const { readDir } = await import("@tauri-apps/plugin-fs");
     const entries = await readDir(dirPath);

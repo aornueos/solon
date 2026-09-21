@@ -25,7 +25,7 @@ import { ConnectionDots } from "./ConnectionDots";
 
 interface Props {
   text: CanvasText;
-  /** Forca entrar em modo edicao logo apos criacao (click-to-place). */
+  /** Forca entrar em modo edição logo após criação (click-to-place). */
   autoEdit?: boolean;
 }
 
@@ -43,13 +43,13 @@ const TEXT_SIZES = [12, 14, 18, 24, 32, 48] as const;
 const MIN_TEXT_SIZE = 8;
 const MAX_TEXT_SIZE = 160;
 // Amortece o resize (< 1 = menos sensivel). 0.6 = a caixa muda 60% do
-// movimento do mouse — pedido do usuario (estava "rapido demais").
+// movimento do mouse — pedido do usuário (estava "rapido demais").
 const RESIZE_SENSITIVITY = 0.6;
 
-// Rich text inline: so' as tags/estilos que o execCommand produz pra
+// Rich text inline: só as tags/estilos que o execCommand produz pra
 // negrito/italico/sublinhado/tachado/grifo/cor. DOMPurify limpa o resto e
-// sanitiza os valores de `style` (sem url()/expressions). Como e' dado local
-// do canvas o risco e' baixo, mas sanitizamos por higiene mesmo assim.
+// sanitiza os valores de `style` (sem url()/expressions). Como é dado local
+// do canvas o risco é baixo, mas sanitizamos por higiene mesmo assim.
 const RICH_TEXT_SANITIZE = {
   ALLOWED_TAGS: ["b", "strong", "i", "em", "u", "s", "strike", "mark", "span", "font", "br", "div", "p"],
   ALLOWED_ATTR: ["style", "color"],
@@ -63,10 +63,10 @@ function escapeHtml(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 }
-// Conteudo inicial ao ENTRAR em edicao. Se ja' e' rico, usa o html. Senao,
+// Conteudo inicial ao ENTRAR em edição. Se já é rico, usa o html. Senao,
 // converte os flags de BLOCO (bold/italic/underline/grifo) num span inicial —
-// assim um bloco todo negrito nao perde o negrito ao comecar a editar inline.
-// A cor NAO entra (Auto e' theme-aware; baka-la num hex quebraria o tema).
+// assim um bloco todo negrito não perde o negrito ao começar a editar inline.
+// A cor NAO entra (Auto é theme-aware; baka-la num hex quebraria o tema).
 function buildInitialEditHtml(t: CanvasText): string {
   if (t.html && t.html.trim()) return t.html;
   const esc = escapeHtml(t.text).replace(/\n/g, "<br>");
@@ -79,7 +79,7 @@ function buildInitialEditHtml(t: CanvasText): string {
 }
 // Le o texto puro de um contenteditable PRESERVANDO quebras de linha: <br> e
 // blocos (div/p, que o Chromium cria a cada Enter) viram \n. `textContent`
-// sozinho concatena tudo — as quebras sumiam ao sair da edicao.
+// sozinho concatena tudo — as quebras sumiam ao sair da edição.
 function contentEditableToPlain(root: HTMLElement): string {
   let out = "";
   const walk = (node: Node) => {
@@ -99,7 +99,7 @@ function contentEditableToPlain(root: HTMLElement): string {
   walk(root);
   return out.replace(/\n+$/, "");
 }
-// Detecta se o HTML tem alguma marcacao inline de verdade (nao so' texto/br).
+// Detecta se o HTML tem alguma marcacao inline de verdade (não só texto/br).
 function hasInlineMarkup(html: string): boolean {
   return /<(b|strong|i|em|u|s|strike|mark|span|font)\b/i.test(html);
 }
@@ -108,8 +108,8 @@ type ResizeDir = "n" | "e" | "s" | "w" | "ne" | "nw" | "se" | "sw";
 
 // So' os 4 CANTOS. Cada um resiza a largura (o texto reflui; altura auto).
 // Removidos os handles laterais e/w: eles ficavam no meio das bordas —
-// exatamente em cima dos dots de conexao (bolinha da seta), atrapalhando.
-// Removidos tambem n/s (altura e' automatica). Cantos resizam, laterais
+// exatamente em cima dos dots de conexão (bolinha da seta), atrapalhando.
+// Removidos também n/s (altura é automatica). Cantos resizam, laterais
 // conectam — igual Miro.
 const RESIZE_HANDLES: { dir: ResizeDir; cursor: string; title: string }[] = [
   { dir: "nw", cursor: "nwse-resize", title: "Largura — o texto reflui" },
@@ -123,11 +123,18 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   const removeText = useCanvasStore((s) => s.removeText);
   const select = useCanvasStore((s) => s.select);
   const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
-  const selectedId = useCanvasStore((s) => s.selectedId);
-  const selectedIds = useCanvasStore((s) => s.selectedIds);
+  // Seletores derivados, pelo mesmo motivo que em `Card`: assinar
+  // `selectedIds` (um Set novo a cada mudança) ou o objeto `viewport`
+  // inteiro faz todo texto do canvas re-renderizar a cada clique e a cada
+  // frame de pan. Só o zoom é lido daqui — o resto do viewport não muda
+  // nada no que este componente desenha.
+  const isSelected = useCanvasStore((s) => s.selectedId === text.id);
+  const isInGroup = useCanvasStore(
+    (s) => s.selectedId !== text.id && s.selectedIds.has(text.id),
+  );
   const snapshotSelection = useCanvasStore((s) => s.snapshotSelection);
   const translateSelection = useCanvasStore((s) => s.translateSelection);
-  const viewport = useCanvasStore((s) => s.viewport);
+  const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
   const tool = useCanvasStore((s) => s.tool);
   const linkingFromId = useCanvasStore((s) => s.linkingFromId);
   const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
@@ -139,8 +146,6 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   const canvasGridSize = useAppStore((s) => s.canvasGridSize);
   const editorFontFamily = useAppStore((s) => s.editorFontFamily);
 
-  const isSelected = selectedId === text.id;
-  const isInGroup = selectedId !== text.id && selectedIds.has(text.id);
   const isLinkSource = linkingFromId === text.id;
   const isLinkCandidate = linkingFromId !== null && linkingFromId !== text.id;
   const [editing, setEditing] = useState(!!autoEdit);
@@ -151,7 +156,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   const [toolbarPos, setToolbarPos] = useState<{ left: number; top: number } | null>(
     null,
   );
-  // Estado da selecao atual (B/I/U "aceso" conforme o trecho selecionado).
+  // Estado da seleção atual (B/I/U "aceso" conforme o trecho selecionado).
   const [inlineFmt, setInlineFmt] = useState({
     bold: false,
     italic: false,
@@ -159,12 +164,12 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   });
   const rootRef = useRef<HTMLDivElement>(null);
   const editRef = useRef<HTMLDivElement>(null);
-  // Ver `commitDraft` — salvam a edicao em andamento no unmount.
+  // Ver `commitDraft` — salvam a edição em andamento no unmount.
   const commitRef = useRef<() => void>(() => {});
   const editingRef = useRef(false);
   // Debounce do commit-durante-digitacao: mantem o store ~atual pra que
-  // qualquer flush (auto-save, minimizar, fechar app) capture a edicao mesmo
-  // sem o usuario sair da caixa (sem blur).
+  // qualquer flush (auto-save, minimizar, fechar app) capture a edição mesmo
+  // sem o usuário sair da caixa (sem blur).
   const inputCommitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragState = useRef<{
     startX: number;
@@ -201,11 +206,11 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     Math.round(text.height ?? measuredRect.h),
   );
 
-  // Ao entrar em edicao: injeta o conteudo (html rico ou texto puro) UMA vez,
-  // foca e seleciona tudo. Depois o contenteditable e' uncontrolled — NAO
-  // resetamos innerHTML em re-render (senao apagaria o que o usuario digita);
-  // so' lemos de volta no commit. O auto-grow e' natural (a div cresce com o
-  // conteudo; a caixa ja' tem height:auto).
+  // Ao entrar em edição: injeta o conteudo (html rico ou texto puro) UMA vez,
+  // foca e seleciona tudo. Depois o contenteditable é uncontrolled — NAO
+  // resetamos innerHTML em re-render (senao apagaria o que o usuário digita);
+  // só lemos de volta no commit. O auto-grow é natural (a div cresce com o
+  // conteudo; a caixa já tem height:auto).
   useEffect(() => {
     if (!editing) return;
     const el = editRef.current;
@@ -220,7 +225,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
-  // Commit da edicao no unmount (rede de seguranca — ver commitDraft).
+  // Commit da edição no unmount (rede de segurança — ver commitDraft).
   useEffect(() => {
     return () => {
       if (inputCommitTimer.current) clearTimeout(inputCommitTimer.current);
@@ -229,7 +234,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   }, []);
 
   // B/I/U reativo: enquanto edita, escuta selectionchange e reflete o estado
-  // do trecho selecionado (queryCommandState). So' atualiza se a selecao esta
+  // do trecho selecionado (queryCommandState). So' atualiza se a seleção esta
   // DENTRO deste editor — senao um clique em outra caixa mexeria aqui.
   useEffect(() => {
     if (!editing) return;
@@ -266,8 +271,8 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   }, [openMenu]);
 
   useLayoutEffect(() => {
-    // Mostra a toolbar quando selecionado OU editando (pra formatar a selecao
-    // inline — inclui texto novo que ainda nao esta "selecionado" como bloco).
+    // Mostra a toolbar quando selecionado OU editando (pra formatar a seleção
+    // inline — inclui texto novo que ainda não esta "selecionado" como bloco).
     if (!isSelected && !editing) {
       setToolbarPos(null);
       return;
@@ -303,7 +308,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     text.width,
     text.height,
     text.size,
-    viewport.zoom,
+    zoom,
   ]);
 
   const onMouseDown = (e: React.MouseEvent) => {
@@ -374,8 +379,8 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       };
       startDrag({
         onMove: (ev) => {
-          const dx = (ev.clientX - orig.startX) / viewport.zoom;
-          const dy = (ev.clientY - orig.startY) / viewport.zoom;
+          const dx = (ev.clientX - orig.startX) / zoom;
+          const dy = (ev.clientY - orig.startY) / zoom;
           if (dragState.current && (Math.abs(dx) > 1 || Math.abs(dy) > 1)) {
             dragState.current.moved = true;
           }
@@ -383,8 +388,8 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
         },
         onEnd: (ev) => {
           cancelMove();
-          const dx = (ev.clientX - orig.startX) / viewport.zoom;
-          const dy = (ev.clientY - orig.startY) / viewport.zoom;
+          const dx = (ev.clientX - orig.startX) / zoom;
+          const dy = (ev.clientY - orig.startY) / zoom;
           translateSelection(snapshot, dx, dy);
           dragState.current = null;
         },
@@ -429,8 +434,8 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     startDrag({
       onMove: (ev) => {
         if (!dragState.current) return;
-        const dx = (ev.clientX - orig.startX) / viewport.zoom;
-        const dy = (ev.clientY - orig.startY) / viewport.zoom;
+        const dx = (ev.clientX - orig.startX) / zoom;
+        const dy = (ev.clientY - orig.startY) / zoom;
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) dragState.current.moved = true;
         scheduleMove({
           x: snap(orig.origX + dx),
@@ -439,8 +444,8 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       },
       onEnd: (ev) => {
         cancelMove();
-        const dx = (ev.clientX - orig.startX) / viewport.zoom;
-        const dy = (ev.clientY - orig.startY) / viewport.zoom;
+        const dx = (ev.clientX - orig.startX) / zoom;
+        const dy = (ev.clientY - orig.startY) / zoom;
         updateText(text.id, {
           x: snap(orig.origX + dx),
           y: snap(orig.origY + dy),
@@ -462,8 +467,8 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     setEditing(true);
   };
 
-  // Le o conteudo do contenteditable e persiste. Se nao ha marcacao inline
-  // (so' texto), NAO guarda html — mantem o bloco no modelo simples/leve.
+  // Le o conteudo do contenteditable e persiste. Se não ha marcacao inline
+  // (só texto), NAO guarda html — mantem o bloco no modelo simples/leve.
   const commitDraft = () => {
     const el = editRef.current;
     if (!el) return;
@@ -475,16 +480,16 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     });
   };
 
-  // Rede de seguranca: se o componente desmontar ENQUANTO edita (trocar de
+  // Rede de segurança: se o componente desmontar ENQUANTO edita (trocar de
   // arquivo/aba por atalho, fechar o canvas — sem passar pelo blur), salva o
-  // que estava na caixa. Sem isso, a edicao nao-commitada se perdia. Refs pra
-  // que a limpeza (roda so' no unmount) leia os valores mais recentes.
+  // que estava na caixa. Sem isso, a edição não-commitada se perdia. Refs pra
+  // que a limpeza (roda só no unmount) leia os valores mais recentes.
   commitRef.current = commitDraft;
   editingRef.current = editing;
 
-  // Aplica formatacao INLINE na selecao atual do contenteditable (negrito,
-  // grifo, cor de trecho — igual Miro). Roda so' em edicao; o preventDefault
-  // no mousedown do botao (TinyBtn) preserva a selecao/foco. Persiste na hora.
+  // Aplica formatacao INLINE na seleção atual do contenteditable (negrito,
+  // grifo, cor de trecho — igual Miro). Roda só em edição; o preventDefault
+  // no mousedown do botao (TinyBtn) preserva a seleção/foco. Persiste na hora.
   const applyInline = (command: string, value?: string) => {
     const el = editRef.current;
     if (!el) return;
@@ -551,10 +556,10 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     ): Partial<CanvasText> => {
       // Fator de amortecimento: a caixa cresce ~60% do movimento do mouse.
       // Sem isso (1:1) o resize ficava sensivel demais — muita mudanca com
-      // pouco movimento. O handle nao gruda no cursor, mas o ajuste fica
-      // controlado (feedback do usuario).
-      const dx = ((clientX - startX) / viewport.zoom) * RESIZE_SENSITIVITY;
-      const dy = ((clientY - startY) / viewport.zoom) * RESIZE_SENSITIVITY;
+      // pouco movimento. O handle não gruda no cursor, mas o ajuste fica
+      // controlado (feedback do usuário).
+      const dx = ((clientX - startX) / zoom) * RESIZE_SENSITIVITY;
+      const dy = ((clientY - startY) / zoom) * RESIZE_SENSITIVITY;
       const minW = boxOnly ? minBoxW : minScaleW;
       const minH = boxOnly ? minBoxH : minScaleH;
 
@@ -586,7 +591,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       if (boxOnly) {
         // So' largura (+ x pros handles do lado esquerdo). Altura fica AUTO:
         // o texto reflui na nova largura e a caixa se ajusta ao conteudo.
-        // Nao mexemos em y/height nem escalamos a fonte — e' o resize
+        // Nao mexemos em y/height nem escalamos a fonte — é o resize
         // responsivo (tipo Miro); tamanho da fonte fica na toolbar.
         return {
           x: Math.round(x),
@@ -630,9 +635,9 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     };
 
     // Cantos ESCALAM o bloco todo (fonte + caixa, proporcional) — o resize de
-    // "tamanho" que o usuario espera ao arrastar um canto. Antes usavam so'
-    // largura (o texto refluia mas a fonte nao crescia), entao num texto curto
-    // arrastar o canto nao produzia mudanca visivel — parecia que nao
+    // "tamanho" que o usuário espera ao arrastar um canto. Antes usavam só
+    // largura (o texto refluia mas a fonte não crescia), então num texto curto
+    // arrastar o canto não produzia mudanca visível — parecia que não
     // funcionava. `computeResizePatch(..., false)` = escala size+width+height.
     startDrag({
       onMove: (ev) => {
@@ -661,7 +666,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       : text.color;
   const hasVisibleText = displayText.trim().length > 0;
   // Bloco rico: a formatacao vive no html inline; os flags de bloco viram
-  // so' o estilo-base (senao dobram — ex.: bold no bloco + <b> inline).
+  // só o estilo-base (senao dobram — ex.: bold no bloco + <b> inline).
   const hasHtml = !!(text.html && text.html.trim());
 
   const rootStyle: React.CSSProperties = {
@@ -669,9 +674,9 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     left: text.x,
     top: text.y,
     // Sem largura fixa (auto-grow): usa `max-content` — o PROPRIO DOM mede a
-    // largura do texto, entao ele nunca quebra "uma letra pra linha de baixo"
+    // largura do texto, então ele nunca quebra "uma letra pra linha de baixo"
     // (o bug era a medida canvas2d `implicitWidth` subestimar vs. o render
-    // real). So' quando o usuario resiza (text.width setado) usamos largura
+    // real). So' quando o usuário resiza (text.width setado) usamos largura
     // fixa e o texto reflui. maxWidth limita o crescimento horizontal.
     width: text.width != null ? boxWidth : "max-content",
     maxWidth: 800,
@@ -684,17 +689,24 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
       ? Math.max(28, text.size * 1.35)
       : Math.max(28, text.size * 1.35, Math.round(text.height ?? 0)),
     overflow: "visible",
-    ...(isSelected
+    // Durante um linking, alvos válidos ganham o mesmo anel verde dos
+    // cards — antes só o card sinalizava "pode soltar aqui".
+    ...(isLinkCandidate
       ? {
-          outline: `${1 / viewport.zoom}px solid var(--accent)`,
-          outlineOffset: `${1 / viewport.zoom}px`,
+          outline: `${2 / zoom}px solid var(--success)`,
+          outlineOffset: `${1 / zoom}px`,
         }
-      : isInGroup
+      : isSelected
         ? {
-            outline: `${1 / viewport.zoom}px dashed var(--selection-ring)`,
-            outlineOffset: `${1 / viewport.zoom}px`,
+            outline: `${1 / zoom}px solid var(--accent)`,
+            outlineOffset: `${1 / zoom}px`,
           }
-        : null),
+        : isInGroup
+          ? {
+              outline: `${1 / zoom}px dashed var(--selection-ring)`,
+              outlineOffset: `${1 / zoom}px`,
+            }
+          : null),
   };
 
   const contentStyle: React.CSSProperties = {
@@ -746,13 +758,13 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
           contentEditable
           suppressContentEditableWarning
           data-placeholder="Digite..."
-          // Uncontrolled: o conteudo e' injetado uma vez no effect de entrada
-          // em edicao. onInput so' atualiza o draft (medida), nunca reseta o
-          // innerHTML. Selecione um trecho e use a toolbar pra formatar so' ele.
+          // Uncontrolled: o conteudo é injetado uma vez no effect de entrada
+          // em edição. onInput só atualiza o draft (medida), nunca reseta o
+          // innerHTML. Selecione um trecho e use a toolbar pra formatar só ele.
           onInput={() => {
             const el = editRef.current;
             setDraftText(el ? contentEditableToPlain(el) : "");
-            // Persiste no store de forma debounced (rede de seguranca de
+            // Persiste no store de forma debounced (rede de segurança de
             // durabilidade — ver inputCommitTimer).
             if (inputCommitTimer.current) clearTimeout(inputCommitTimer.current);
             inputCommitTimer.current = setTimeout(() => commitDraft(), 400);
@@ -784,7 +796,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
             background: "transparent",
             caretColor: "var(--accent)",
             // Cursor de TEXTO (I-beam) enquanto edita — sobrescreve o
-            // cursor-grab da caixa (que e' pra arrastar o bloco).
+            // cursor-grab da caixa (que é pra arrastar o bloco).
             cursor: "text",
             minHeight: Math.max(28, text.size * 1.35),
           }}
@@ -804,9 +816,9 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
         <ConnectionDots
           entityId={text.id}
           isLinkSource={isLinkSource}
-          isLinkCandidate={isLinkCandidate}
+
           linkingFromSide={linkingFromSide}
-          isSelected={isSelected}
+
           onPick={(side) => {
             if (linkingFromId && linkingFromId !== text.id) {
               completeLink(text.id, side);
@@ -817,11 +829,11 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
         />
       )}
 
-      {/* Handles so' quando a caixa tem tamanho de tela suficiente pra
+      {/* Handles só quando a caixa tem tamanho de tela suficiente pra
           resizar — no zoom-out, uma caixa minuscula viraria uma sopa de
           marcadores sobre o texto (as "linhas" que apareciam). */}
       {isSelected && !editing && text.text.trim().length > 0 &&
-        boxWidth * viewport.zoom >= 44 && (
+        boxWidth * zoom >= 44 && (
         <>
           {RESIZE_HANDLES.map((h) => (
             <ResizeHandle
@@ -829,7 +841,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
               dir={h.dir}
               cursor={h.cursor}
               title={h.title}
-              zoom={viewport.zoom}
+              zoom={zoom}
               onMouseDown={(e) => onResizeMouseDown(h.dir, e)}
             />
           ))}
@@ -1006,8 +1018,8 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Editando + cor concreta → pinta so' a selecao. "Auto"
-                      // (vazio) ou fora de edicao → cor do bloco inteiro.
+                      // Editando + cor concreta → pinta só a seleção. "Auto"
+                      // (vazio) ou fora de edição → cor do bloco inteiro.
                       if (editing && c.value) applyInline("foreColor", c.value);
                       else updateText(text.id, { color: c.value });
                       setOpenMenu(null);
@@ -1045,8 +1057,8 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Editando → grifa so' a selecao (ou remove com
-                      // transparent). Fora de edicao → grifo do bloco inteiro.
+                      // Editando → grifa só a seleção (ou remove com
+                      // transparent). Fora de edição → grifo do bloco inteiro.
                       if (editing) applyInline("hiliteColor", c.value || "transparent");
                       else updateText(text.id, { highlight: c.value || undefined });
                       setOpenMenu(null);
@@ -1095,7 +1107,7 @@ function TextPreview({
   style,
 }: {
   text: string;
-  /** HTML rico ja' sanitizado. Quando presente, tem precedencia sobre o
+  /** HTML rico já sanitizado. Quando presente, tem precedencia sobre o
    *  texto puro / bullets (a formatacao inline vive nele). */
   html?: string;
   lines: string[];
@@ -1220,7 +1232,7 @@ function ResizeHandle({
   if (dir === "e" || dir === "w") {
     style.top = "50%";
     style.transform = "translateY(-50%)";
-    // Sobre a BORDA (straddle), nao inset pra dentro — senao vira uma barra
+    // Sobre a BORDA (straddle), não inset pra dentro — senao vira uma barra
     // vertical em cima do texto, pior em caixas estreitas e no zoom-out.
     if (dir === "e") style.right = -sideShort / 2;
     else style.left = -sideShort / 2;
@@ -1293,9 +1305,9 @@ function TinyBtn({
     <button
       title={title}
       onClick={onClick}
-      // preventDefault no mousedown mantem o foco/selecao no contenteditable —
-      // sem isso, clicar num botao da toolbar tirava a selecao e o execCommand
-      // de formatacao inline nao teria em que aplicar.
+      // preventDefault no mousedown mantem o foco/seleção no contenteditable —
+      // sem isso, clicar num botao da toolbar tirava a seleção e o execCommand
+      // de formatacao inline não teria em que aplicar.
       onMouseDown={(e) => e.preventDefault()}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}

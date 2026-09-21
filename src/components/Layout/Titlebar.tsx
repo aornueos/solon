@@ -22,21 +22,8 @@ import {
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { EDITOR_PAPERS, useAppStore, type EditorPaper } from "../../store/useAppStore";
 import { SCENE_STATUSES } from "../../types/scene";
-import { toggleAppFullscreen } from "../../lib/windows";
+import { isTauriRuntime, toggleAppFullscreen } from "../../lib/windows";
 import clsx from "clsx";
-
-/**
- * Detecta se estamos rodando dentro do Tauri (que injeta
- * `window.__TAURI_INTERNALS__` no preload). No vite dev em browser puro
- * essa global nao existe, e chamar `getCurrentWindow()` explode com
- * "Cannot read properties of undefined (reading 'metadata')". Guardamos
- * antes pra que dev em browser funcione e o build de producao (sempre
- * Tauri) tenha os controles.
- */
-const isTauri = (): boolean =>
-  typeof window !== "undefined" &&
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).__TAURI_INTERNALS__ !== undefined;
 
 /**
  * Tauri 2 com `decorations: false` esconde a barra nativa do SO. Esse
@@ -50,7 +37,9 @@ const isTauri = (): boolean =>
 function useWindowControls() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const available = isTauri();
+  // Fora do Tauri (vite dev no browser) as APIs de janela nao existem e
+  // `getCurrentWindow()` estoura; o caller esconde os controles.
+  const available = isTauriRuntime();
 
   useEffect(() => {
     if (!available) return;

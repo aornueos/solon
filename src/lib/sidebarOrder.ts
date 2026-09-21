@@ -22,6 +22,7 @@
  * abrir o JSON manualmente.
  */
 import type { FileNode } from "../store/useAppStore";
+import { isTauriRuntime } from "./runtime";
 
 export interface SidebarOrder {
   version: 1;
@@ -31,11 +32,6 @@ export interface SidebarOrder {
 
 const ORDER_FILENAME = "order.json";
 const ORDER_DIR = ".solon";
-
-const isTauri = (): boolean =>
-  typeof window !== "undefined" &&
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).__TAURI_INTERNALS__ !== undefined;
 
 /**
  * Path joining tolerante a separadores Windows/Unix. Tauri readDir
@@ -92,7 +88,7 @@ function replaceFolderKeyPrefix(
  * e' invalido — degrada graciosamente.
  */
 export async function loadOrder(rootFolder: string): Promise<SidebarOrder> {
-  if (!isTauri()) return { version: 1, folders: {} };
+  if (!isTauriRuntime()) return { version: 1, folders: {} };
   try {
     const { readTextFile, exists } = await import("@tauri-apps/plugin-fs");
     const orderPath = joinPath(rootFolder, ORDER_DIR, ORDER_FILENAME);
@@ -132,7 +128,7 @@ export async function saveOrder(
   rootFolder: string,
   order: SidebarOrder,
 ): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauriRuntime()) return;
   try {
     const { mkdir, exists } = await import("@tauri-apps/plugin-fs");
     const { atomicWriteTextFile } = await import("./atomicWrite");

@@ -1,19 +1,11 @@
 import {
-  CopyPlus,
-  Crosshair,
   Grid3X3,
   GripVertical,
   LocateFixed,
-  Maximize,
   PanelRightClose,
-  PanelRightOpen,
-  Palette,
-  RotateCcw,
-  Trash2,
-  ZoomIn,
-  ZoomOut,
+  SlidersHorizontal,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CANVAS_DRAW_WIDTHS,
   CANVAS_GRID_SIZES,
@@ -22,11 +14,11 @@ import {
 } from "../../store/useAppStore";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { startDrag } from "../../lib/drag";
-import { strokeRect, textRect } from "../../lib/canvasGeom";
 import { DRAW_COLORS } from "../../types/canvas";
 
 const PANEL_W = 236;
 const PANEL_STORAGE_KEY = "solon:canvasSidePanelPosition";
+const COLLAPSED_STORAGE_KEY = "solon:canvasSidePanelCollapsed";
 
 type PanelPosition = { x: number; y: number };
 
@@ -52,8 +44,25 @@ function savePosition(pos: PanelPosition | null) {
   localStorage.setItem(PANEL_STORAGE_KEY, JSON.stringify(pos));
 }
 
+/** Recolhido por padrão: o canvas abre inteiro e o painel entra sob demanda. */
+function loadCollapsed(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return localStorage.getItem(COLLAPSED_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Ajustes do canvas: grade e os valores usados por caneta, seta e texto.
+ *
+ * Zoom, enquadramento e ações de seleção ficam só na toolbar — este painel
+ * já os repetia botão a botão, e dois lugares para o mesmo controle é um
+ * lugar a mais para eles divergirem.
+ */
 export function CanvasSidePanel() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => loadCollapsed());
   const [position, setPosition] = useState<PanelPosition | null>(() =>
     loadPosition(),
   );
@@ -62,18 +71,9 @@ export function CanvasSidePanel() {
   const drawWidth = useCanvasStore((s) => s.drawWidth);
   const drawColor = useCanvasStore((s) => s.drawColor);
   const setDrawColor = useCanvasStore((s) => s.setDrawColor);
-  const selectedId = useCanvasStore((s) => s.selectedId);
-  const selectedIds = useCanvasStore((s) => s.selectedIds);
-  const cards = useCanvasStore((s) => s.cards);
-  const texts = useCanvasStore((s) => s.texts);
-  const images = useCanvasStore((s) => s.images);
-  const strokes = useCanvasStore((s) => s.strokes);
-  const viewport = useCanvasStore((s) => s.viewport);
-  const zoomAt = useCanvasStore((s) => s.zoomAt);
-  const setViewport = useCanvasStore((s) => s.setViewport);
-  const select = useCanvasStore((s) => s.select);
-  const duplicateSelected = useCanvasStore((s) => s.duplicateSelected);
-  const removeSelected = useCanvasStore((s) => s.removeSelected);
+  const selectionCount = useCanvasStore(
+    (s) => s.selectedIds.size || (s.selectedId ? 1 : 0),
+  );
 
   const canvasGridEnabled = useAppStore((s) => s.canvasGridEnabled);
   const setCanvasGridEnabled = useAppStore((s) => s.setCanvasGridEnabled);
@@ -84,11 +84,18 @@ export function CanvasSidePanel() {
   const canvasDefaultTextSize = useAppStore((s) => s.canvasDefaultTextSize);
   const setCanvasDefaultTextSize = useAppStore((s) => s.setCanvasDefaultTextSize);
   const canvasDefaultDrawWidth = useAppStore((s) => s.canvasDefaultDrawWidth);
-  const setCanvasDefaultDrawWidth = useAppStore((s) => s.setCanvasDefaultDrawWidth);
-  const canvasDefaultColor = useAppStore((s) => s.canvasDefaultColor);
+  const setCanvasDefaultDrawWidth = useAppStore(
+    (s) => s.setCanvasDefaultDrawWidth,
+  );
   const setCanvasDefaultColor = useAppStore((s) => s.setCanvasDefaultColor);
 
-  const selectionCount = selectedIds.size || (selectedId ? 1 : 0);
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSED_STORAGE_KEY, String(collapsed));
+    } catch {
+      // Sem localStorage o painel apenas não lembra o estado entre sessões.
+    }
+  }, [collapsed]);
 
   const floatingStyle: React.CSSProperties = position
     ? { left: position.x, top: position.y }
@@ -120,28 +127,24 @@ export function CanvasSidePanel() {
       clientX: e.clientX,
       clientY: e.clientY,
     };
+    const positionAt = (ev: MouseEvent) =>
+      clampPosition(
+        {
+          x: orig.x + ev.clientX - orig.clientX,
+          y: orig.y + ev.clientY - orig.clientY,
+        },
+        width,
+      );
 
     startDrag({
-      onMove: (ev) => {
-        const next = clampPosition(
-          {
-            x: orig.x + ev.clientX - orig.clientX,
-            y: orig.y + ev.clientY - orig.clientY,
-          },
-          width,
-        );
-        setPosition(next);
-      },
+      onMove: (ev) => setPosition(positionAt(ev)),
       onEnd: (ev) => {
-        const next = clampPosition(
-          {
-            x: orig.x + ev.clientX - orig.clientX,
-            y: orig.y + ev.clientY - orig.clientY,
-          },
-          width,
-        );
+        const next = positionAt(ev);
         setPosition(next);
         savePosition(next);
+      },
+      onCancel: () => {
+        setPosition(position);
       },
     });
   };
@@ -151,10 +154,15 @@ export function CanvasSidePanel() {
     savePosition(null);
   };
 
+  /**
+   * Os três controles abaixo gravam o padrão para novos itens e, quando há
+   * um item compatível selecionado, também o repintam. Daí o rótulo da
+   * seção mudar conforme a seleção.
+   */
   const applyWidth = (width: number) => {
     setCanvasDefaultDrawWidth(width);
-    useCanvasStore.getState().setDrawWidth(width);
     const s = useCanvasStore.getState();
+    s.setDrawWidth(width);
     if (!s.selectedId) return;
     const kind = s.findSelectionKind(s.selectedId);
     if (kind !== "arrow" && kind !== "stroke") return;
@@ -183,50 +191,6 @@ export function CanvasSidePanel() {
     else s.updateStroke(s.selectedId, { color });
   };
 
-  const getSurfaceRect = () => {
-    const surface = panelRef.current?.closest(".canvas-surface") as HTMLElement | null;
-    return surface?.getBoundingClientRect() ?? null;
-  };
-
-  const fitAll = () => {
-    const strokeBoxes = strokes
-      .map(strokeRect)
-      .filter((box): box is { x: number; y: number; w: number; h: number } => !!box);
-    const boxes = [
-      ...cards,
-      ...images,
-      ...texts.map(textRect),
-      ...strokeBoxes,
-    ];
-    if (boxes.length === 0) {
-      setViewport({ x: 0, y: 0, zoom: 1 });
-      return;
-    }
-    const minX = Math.min(...boxes.map((b) => b.x));
-    const minY = Math.min(...boxes.map((b) => b.y));
-    const maxX = Math.max(...boxes.map((b) => b.x + b.w));
-    const maxY = Math.max(...boxes.map((b) => b.y + b.h));
-    const padding = 90;
-    const rect = getSurfaceRect();
-    const screenW = rect?.width ?? window.innerWidth;
-    const screenH = rect?.height ?? window.innerHeight;
-    const w = maxX - minX + padding * 2;
-    const h = maxY - minY + padding * 2;
-    const zoom = Math.min(1.25, Math.max(0.15, Math.min(screenW / w, screenH / h)));
-    setViewport({
-      zoom,
-      x: -(minX - padding) * zoom + (screenW - w * zoom) / 2,
-      y: -(minY - padding) * zoom + (screenH - h * zoom) / 2,
-    });
-  };
-
-  const zoomStep = (direction: 1 | -1) => {
-    const rect = getSurfaceRect();
-    const cx = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
-    const cy = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
-    zoomAt(cx, cy, direction * 200);
-  };
-
   if (collapsed) {
     return (
       <button
@@ -236,29 +200,30 @@ export function CanvasSidePanel() {
         onMouseDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
         onClick={() => setCollapsed(false)}
-        title="Abrir ajustes do canvas"
-        aria-label="Abrir ajustes do canvas"
-        className="absolute z-20 h-9 w-9 flex items-center justify-center transition-colors"
+        title="Ajustes do canvas"
+        aria-label="Ajustes do canvas"
+        aria-expanded={false}
+        className="solon-canvas-btn solon-canvas-btn--outline absolute z-20 h-9 w-9 flex items-center justify-center"
         style={{
           ...floatingStyle,
           background: "var(--bg-panel)",
-          border: "1px solid var(--border)",
           borderRadius: "var(--radius)",
           boxShadow: "var(--shadow-md)",
-          color: "var(--text-secondary)",
         }}
       >
-        <PanelRightOpen size={15} />
+        <SlidersHorizontal size={15} />
       </button>
     );
   }
+
+  const scope = selectionCount === 1 ? "selection" : "default";
 
   return (
     <aside
       ref={panelRef}
       onMouseDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
-      className="absolute z-20 px-3 py-3 flex flex-col gap-3"
+      className="absolute z-20 px-3 py-3 flex flex-col gap-3.5"
       style={{
         ...floatingStyle,
         width: PANEL_W,
@@ -270,86 +235,49 @@ export function CanvasSidePanel() {
       }}
     >
       <div
-        className="flex items-center justify-between gap-2 -mx-3 -mt-3 px-3 py-2"
+        className="flex items-center gap-1 -mx-3 -mt-3 px-2 py-2"
         style={{ borderBottom: "1px solid var(--border-subtle)" }}
       >
         <button
           onMouseDown={(e) => startPanelDrag(e)}
           title="Mover painel"
           aria-label="Mover painel"
-          className="h-7 w-7 flex items-center justify-center transition-colors cursor-grab active:cursor-grabbing"
-          style={{
-            color: "var(--text-muted)",
-            borderRadius: "var(--radius-sm)",
-          }}
+          className="solon-canvas-btn h-7 w-7 flex items-center justify-center cursor-grab active:cursor-grabbing"
         >
           <GripVertical size={14} />
         </button>
         <div className="flex-1 text-center">
-          <span className="solon-plaque">Canvas</span>
+          <span className="solon-plaque">Ajustes</span>
         </div>
         <button
           onClick={resetPanelPosition}
-          title="Voltar para canto"
-          aria-label="Voltar para canto"
-          className="solon-dialog-close"
-          style={{ width: 26, height: 26 }}
+          title="Voltar o painel para o canto"
+          aria-label="Voltar o painel para o canto"
+          className="solon-canvas-btn h-7 w-7 flex items-center justify-center"
         >
           <LocateFixed size={13} />
         </button>
         <button
           onClick={() => setCollapsed(true)}
-          title="Recolher ajustes do canvas"
-          aria-label="Recolher ajustes do canvas"
-          className="solon-dialog-close"
-          style={{ width: 26, height: 26 }}
+          title="Recolher ajustes"
+          aria-label="Recolher ajustes"
+          aria-expanded
+          className="solon-canvas-btn h-7 w-7 flex items-center justify-center"
         >
           <PanelRightClose size={14} />
         </button>
       </div>
 
-      <PanelSection title="Vista">
-        <div className="grid grid-cols-4 gap-1">
-          <IconChoice title="Aproximar" onClick={() => zoomStep(-1)}>
-            <ZoomIn size={13} />
-          </IconChoice>
-          <IconChoice title="Afastar" onClick={() => zoomStep(1)}>
-            <ZoomOut size={13} />
-          </IconChoice>
-          <IconChoice title="Enquadrar tudo" onClick={fitAll}>
-            <Maximize size={13} />
-          </IconChoice>
-          <IconChoice
-            title="Resetar viewport"
-            onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })}
-          >
-            <Crosshair size={13} />
-          </IconChoice>
-        </div>
-        <div
-          className="tabular-nums text-center py-1"
-          style={{
-            background: "var(--bg-hover)",
-            color: "var(--text-primary)",
-            borderRadius: "var(--radius-sm)",
-            fontFamily: "var(--font-mono)",
-            fontSize: "0.72rem",
-          }}
-        >
-          {Math.round(viewport.zoom * 100)}%
-        </div>
-      </PanelSection>
-
       <PanelSection title="Grade">
         <div className="flex items-center justify-between gap-2">
           <Toggle
             icon={<Grid3X3 size={12} />}
-            label="Grade"
+            label="Mostrar"
             checked={canvasGridEnabled}
             onChange={setCanvasGridEnabled}
           />
           <Toggle
-            label="Snap"
+            label="Alinhar"
             checked={canvasSnapToGrid}
             onChange={setCanvasSnapToGrid}
           />
@@ -359,6 +287,7 @@ export function CanvasSidePanel() {
             <SmallChoice
               key={size}
               active={canvasGridSize === size}
+              label={`Grade de ${size} pixels`}
               onClick={() => setCanvasGridSize(size)}
             >
               {size}
@@ -367,43 +296,44 @@ export function CanvasSidePanel() {
         </div>
       </PanelSection>
 
-      <PanelSection title="Cor padrão">
+      <PanelSection
+        title="Cor"
+        note={scope === "selection" ? "aplica ao item selecionado" : undefined}
+      >
         <div className="flex items-center gap-1.5">
-          <Palette size={13} style={{ color: "var(--text-muted)" }} />
-          <div className="flex items-center gap-1">
-            {DRAW_COLORS.map((color) => {
-              const active =
-                drawColor === color.value || canvasDefaultColor === color.value;
-              return (
-                <button
-                  key={color.value || "auto"}
-                  title={color.label}
-                  aria-label={`Cor ${color.label}`}
-                  aria-pressed={active}
-                  onClick={() => applyColor(color.value)}
-                  className="h-5 w-5 rounded-full transition-transform"
-                  style={{
-                    background:
-                      color.value ||
-                      "linear-gradient(135deg, var(--text-primary) 0 50%, var(--bg-panel-2) 50% 100%)",
-                    border: active
-                      ? "2px solid var(--text-primary)"
-                      : "1px solid var(--border)",
-                    transform: active ? "scale(1.08)" : "scale(1)",
-                  }}
-                />
-              );
-            })}
-          </div>
+          {DRAW_COLORS.map((color) => (
+            <button
+              key={color.value || "auto"}
+              title={color.value ? color.label : "Auto — acompanha o tema"}
+              aria-label={`Cor ${color.label}`}
+              aria-pressed={drawColor === color.value}
+              onClick={() => applyColor(color.value)}
+              className="h-5 w-5 rounded-full transition-transform"
+              style={{
+                background:
+                  color.value ||
+                  "linear-gradient(135deg, var(--text-primary) 0 50%, var(--bg-panel-2) 50% 100%)",
+                border:
+                  drawColor === color.value
+                    ? "2px solid var(--text-primary)"
+                    : "1px solid var(--border)",
+                transform: drawColor === color.value ? "scale(1.08)" : "scale(1)",
+              }}
+            />
+          ))}
         </div>
       </PanelSection>
 
-      <PanelSection title="Linha e seta">
+      <PanelSection
+        title="Traço e seta"
+        note={scope === "selection" ? "aplica ao item selecionado" : undefined}
+      >
         <div className="grid grid-cols-4 gap-1">
           {CANVAS_DRAW_WIDTHS.map((width) => (
             <SmallChoice
               key={width}
-              active={canvasDefaultDrawWidth === width || drawWidth === width}
+              active={drawWidth === width || canvasDefaultDrawWidth === width}
+              label={`Traço de ${width} pixels`}
               onClick={() => applyWidth(width)}
             >
               {width}
@@ -412,12 +342,16 @@ export function CanvasSidePanel() {
         </div>
       </PanelSection>
 
-      <PanelSection title="Texto">
+      <PanelSection
+        title="Texto"
+        note={scope === "selection" ? "aplica ao item selecionado" : undefined}
+      >
         <div className="grid grid-cols-4 gap-1">
           {CANVAS_TEXT_SIZES.map((size) => (
             <SmallChoice
               key={size}
               active={canvasDefaultTextSize === size}
+              label={`Texto de ${size} pixels`}
               onClick={() => applyTextSize(size)}
             >
               {size}
@@ -425,40 +359,31 @@ export function CanvasSidePanel() {
           ))}
         </div>
       </PanelSection>
-
-      {selectionCount > 0 && (
-        <PanelSection title="Selecionado">
-          <div className="grid grid-cols-3 gap-1">
-            <IconChoice title="Duplicar seleção" onClick={duplicateSelected}>
-              <CopyPlus size={13} />
-            </IconChoice>
-            <IconChoice title="Limpar seleção" onClick={() => select(null)}>
-              <RotateCcw size={13} />
-            </IconChoice>
-            <IconChoice title="Excluir seleção" danger onClick={removeSelected}>
-              <Trash2 size={13} />
-            </IconChoice>
-          </div>
-          <span className="text-[0.66rem]" style={{ color: "var(--text-muted)" }}>
-            Cor, linha e texto também aplicam ao item selecionado.
-          </span>
-        </PanelSection>
-      )}
     </aside>
   );
 }
 
 function PanelSection({
   title,
+  note,
   children,
 }: {
   title: string;
+  note?: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-2">
-      <div>
+      <div className="flex items-baseline justify-between gap-2">
         <span className="solon-caps--sm">{title}</span>
+        {note && (
+          <span
+            className="text-[0.62rem] italic truncate"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {note}
+          </span>
+        )}
       </div>
       {children}
     </section>
@@ -468,67 +393,28 @@ function PanelSection({
 function SmallChoice({
   active,
   onClick,
+  label,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  label: string;
   children: React.ReactNode;
 }) {
   return (
     <button
       aria-pressed={active}
+      aria-label={label}
+      title={label}
       onClick={onClick}
       className="px-2 py-1 transition-colors tabular-nums"
       style={{
         background: active ? "var(--accent-soft)" : "transparent",
         color: active ? "var(--accent)" : "var(--text-muted)",
-        border: active
-          ? "1px solid var(--accent)"
-          : "1px solid var(--border)",
+        border: active ? "1px solid var(--accent)" : "1px solid var(--border)",
         borderRadius: "var(--radius-sm)",
         fontFamily: "var(--font-mono)",
         fontSize: "0.7rem",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function IconChoice({
-  children,
-  onClick,
-  title,
-  danger,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  title: string;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      title={title}
-      aria-label={title}
-      onClick={onClick}
-      className="h-8 flex items-center justify-center transition-colors"
-      style={{
-        background: "transparent",
-        color: danger ? "var(--danger)" : "var(--text-secondary)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius-sm)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = danger
-          ? "var(--danger)"
-          : "var(--bg-hover)";
-        if (danger) e.currentTarget.style.color = "var(--text-inverse)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = danger
-          ? "var(--danger)"
-          : "var(--text-secondary)";
       }}
     >
       {children}
@@ -547,8 +433,6 @@ function Toggle({
   label: string;
   icon?: React.ReactNode;
 }) {
-  // Switch arredondado minimalista (igual ao Settings) — track pill +
-  // knob deslizante, accent quando ligado.
   return (
     <button
       role="switch"

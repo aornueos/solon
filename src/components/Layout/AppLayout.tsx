@@ -408,14 +408,16 @@ export function AppLayout() {
   );
 }
 
+/** Placeholder enquanto a view (editor, canvas, home) carrega. Fica em
+ *  branco de propósito: o carregamento é de milissegundos e um texto que
+ *  pisca a cada troca de aba incomoda mais do que informa. */
 function ViewLoading() {
   return (
     <div
-      className="h-full w-full flex items-center justify-center text-[0.78rem]"
-      style={{ color: "var(--text-muted)", background: "var(--bg-app)" }}
-    >
-      Carregando...
-    </div>
+      className="h-full w-full"
+      style={{ background: "var(--bg-app)" }}
+      aria-busy
+    />
   );
 }
 

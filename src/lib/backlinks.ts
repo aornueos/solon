@@ -15,9 +15,7 @@
  */
 import { parseDocument } from "./frontmatter";
 import type { FileNode } from "../store/useAppStore";
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+import { isTauriRuntime } from "./runtime";
 
 const CHUNK = 16;
 const WIKILINK_RE = /\[\[([^\]\n]+)\]\]/g;
@@ -54,7 +52,7 @@ function flatten(nodes: FileNode[]): FileNode[] {
  */
 export async function buildBacklinkIndex(tree: FileNode[]): Promise<BacklinkIndex> {
   const idx: BacklinkIndex = new Map();
-  if (!isTauri) return idx;
+  if (!isTauriRuntime()) return idx;
   const files = flatten(tree);
   if (files.length === 0) return idx;
   try {

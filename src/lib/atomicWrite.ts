@@ -1,3 +1,4 @@
+import { isTauriRuntime } from "./runtime";
 /**
  * Escrita atomica de arquivos — garante que crash durante a escrita
  * NUNCA deixa o arquivo destino truncado/corrompido.
@@ -19,9 +20,6 @@
  * Best-effort: lib retorna sucesso/falha bool; caller decide o que
  * fazer com erro (toast, throw, etc).
  */
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 function tmpSuffix(): string {
   // 6 chars hex random — ~16M combinacoes. Suficiente pra evitar
@@ -46,7 +44,7 @@ export async function atomicWriteTextFile(
   path: string,
   content: string,
 ): Promise<boolean> {
-  if (!isTauri) return false;
+  if (!isTauriRuntime()) return false;
   const { writeTextFile, rename, remove, exists } = await import(
     "@tauri-apps/plugin-fs"
   );

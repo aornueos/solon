@@ -4,11 +4,11 @@ import { useCanvasStore } from "../../store/useCanvasStore";
 import { startCanvasLinkDrag } from "../../lib/canvasLinkDrag";
 
 /**
- * Posicoes dos dots — FORA da caixa (nao mais em cima da borda). Antes o
+ * Posicoes dos dots — FORA da caixa (não mais em cima da borda). Antes o
  * centro do dot ficava EXATAMENTE na borda (top:0/left:50%/etc + translate
  * -50%/-50%), o que colocava metade do dot sobre a caixa e, em itens
  * pequenos, fazia o dot colidir/sobrepor os handles de resize dos cantos —
- * dificil de clicar no alvo certo. Com `gap` o dot fica inteiramente fora,
+ * difícil de clicar no alvo certo. Com `gap` o dot fica inteiramente fora,
  * sem disputar espaco com resize.
  */
 function buildSides(
@@ -54,22 +54,18 @@ export function ConnectionDots({
 }: {
   entityId: string;
   isLinkSource: boolean;
-  isLinkCandidate: boolean;
   linkingFromSide: CardSide | null;
-  isSelected: boolean;
   onPick: (side: CardSide) => void;
 }) {
-  // So' a ORIGEM do link mantem os dots fixos. Candidatos (todos os outros
-  // itens durante um linking) e itens meramente selecionados mostram os dots
-  // apenas no HOVER — senao, com cards/linhas empilhados, os 4 dots de cada
-  // um aparecem juntos e viram uma sopa de bolinhas. Estilo Miro: voce passa
-  // o mouse no alvo e os pontos de conexao dele surgem.
+  // Só a origem do link mantém os pontos fixos na tela. Nos demais itens
+  // eles aparecem no hover: com blocos empilhados, quatro pontos por item
+  // viram uma sopa de bolinhas sobre o canvas inteiro.
   const alwaysShow = isLinkSource;
   const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
   const dotSize = 10 / zoom;
   const border = 1.8 / zoom;
   const mask = 1.5 / zoom;
-  // Distancia do dot ate' a borda — fora da caixa, sem disputar espaco com
+  // Distancia do dot até a borda — fora da caixa, sem disputar espaco com
   // os handles de resize dos cantos.
   const gap = 8 / zoom;
   const sides = buildSides(gap);

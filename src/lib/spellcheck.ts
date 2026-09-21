@@ -26,17 +26,13 @@
  *  - `removeFromPersonalDict(word)` — sync
  */
 import { invoke } from "@tauri-apps/api/core";
+import { isTauriRuntime } from "./runtime";
 
 const PERSONAL_DICT_KEY = "solon:spellcheck:personal";
 
 let isReady = false;
 let warmupPromise: Promise<void> | null = null;
 let personalDict = loadPersonalDict();
-
-const isTauri = (): boolean =>
-  typeof window !== "undefined" &&
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).__TAURI_INTERNALS__ !== undefined;
 
 function loadPersonalDict(): Set<string> {
   try {
@@ -79,7 +75,7 @@ function notifyPersonalDictChanged(): void {
  * ou nao fazem nada se ja' completou.
  */
 export function ensureSpellchecker(): void {
-  if (!isTauri()) return;
+  if (!isTauriRuntime()) return;
   if (isReady) return;
   if (warmupPromise) return;
 
@@ -129,7 +125,7 @@ export function shouldSpellcheckWord(word: string): boolean {
  * marcar tudo como erro).
  */
 export async function isCorrect(word: string): Promise<boolean> {
-  if (!isTauri()) return true;
+  if (!isTauriRuntime()) return true;
   const normalized = normalizeSpellWord(word);
   if (personalDict.has(normalized)) return true;
   try {
@@ -144,7 +140,7 @@ export async function checkWords(words: string[]): Promise<Map<string, boolean>>
   const unique = Array.from(new Set(words.map(normalizeSpellWord)));
   const result = new Map<string, boolean>();
   if (unique.length === 0) return result;
-  if (!isTauri()) {
+  if (!isTauriRuntime()) {
     for (const word of unique) result.set(word, true);
     return result;
   }
@@ -177,7 +173,7 @@ export async function checkWords(words: string[]): Promise<Map<string, boolean>>
  * extra aqui.
  */
 export async function suggest(word: string): Promise<string[]> {
-  if (!isTauri()) return [];
+  if (!isTauriRuntime()) return [];
   const normalized = normalizeSpellWord(word);
   if (personalDict.has(normalized)) return [];
   try {
@@ -196,7 +192,7 @@ export function addToPersonalDict(word: string): void {
   notifyPersonalDictChanged();
   // Notifica backend pra que checks subsequentes ja considerem essa
   // palavra como correta sem round-trip pelo localStorage.
-  if (isTauri()) {
+  if (isTauriRuntime()) {
     invoke("spell_add", { word: normalized }).catch((err) => {
       console.warn("[spellcheck] add falhou:", err);
     });
@@ -221,7 +217,7 @@ export function clearPersonalDict(): void {
   personalDict = new Set();
   savePersonalDict();
   notifyPersonalDictChanged();
-  if (isTauri()) {
+  if (isTauriRuntime()) {
     for (const word of words) {
       invoke("spell_remove", { word }).catch((err) => {
         console.warn("[spellcheck] remove falhou:", err);
@@ -236,7 +232,7 @@ export function removeFromPersonalDict(word: string): void {
   personalDict.delete(lower);
   savePersonalDict();
   notifyPersonalDictChanged();
-  if (isTauri()) {
+  if (isTauriRuntime()) {
     invoke("spell_remove", { word: lower }).catch((err) => {
       console.warn("[spellcheck] remove falhou:", err);
     });

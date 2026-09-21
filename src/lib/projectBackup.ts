@@ -1,6 +1,7 @@
 import type { FileNode } from "../store/useAppStore";
 import { atomicWriteTextFile } from "./atomicWrite";
 import { isProjectNotePath } from "./pathSecurity";
+import { isTauriRuntime } from "./runtime";
 
 export interface ProjectBackupResult {
   path: string;
@@ -13,9 +14,6 @@ export interface ProjectRestoreResult {
   fileCount: number;
   failedCount: number;
 }
-
-const isTauri = (): boolean =>
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 function joinPath(dir: string, name: string): string {
   const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
@@ -116,7 +114,7 @@ export async function createProjectBackup(
   rootFolder: string | null,
   fileTree: FileNode[],
 ): Promise<ProjectBackupResult> {
-  if (!isTauri() || !rootFolder) {
+  if (!isTauriRuntime() || !rootFolder) {
     throw new Error("Backup disponível apenas no app desktop com projeto aberto.");
   }
 
@@ -171,7 +169,7 @@ export async function createProjectBackup(
 export async function restoreLatestProjectBackup(
   rootFolder: string | null,
 ): Promise<ProjectRestoreResult> {
-  if (!isTauri() || !rootFolder) {
+  if (!isTauriRuntime() || !rootFolder) {
     throw new Error("Restauração disponível apenas no app desktop com projeto aberto.");
   }
 

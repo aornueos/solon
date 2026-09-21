@@ -939,15 +939,18 @@
   background: var(--border-subtle);
 }
 
-/* Display serif — HomePage hero e titulos editoriais. Lora carrega a
-   alma literaria do app. Peso 600 (nao 700) e tracking levemente
-   negativo: presente mas sem gritar. */
+/* Display serif — hero da HomePage e títulos editoriais. Peso 600, não
+   700, com tracking levemente negativo: presente sem gritar.
+   `text-wrap: balance` distribui as linhas em vez de deixar uma palavra
+   órfã na última — com duas ou três palavras num corpo grande, a quebra
+   padrão é quase sempre a pior possível. */
 .solon-display {
   font-family: var(--font-display);
   font-weight: 600;
   line-height: 0.98;
   letter-spacing: -0.02em;
   color: var(--text-primary);
+  text-wrap: balance;
 }
 
 /* Label small-caps compacto — metadados editoriais. Inter discreto. */
@@ -1154,6 +1157,45 @@
   background: var(--danger);
   border-color: var(--danger);
   color: var(--text-inverse);
+}
+
+/* ─────────────────────────────────────────
+   Canvas — chrome flutuante (toolbar, painel, minimapa)
+───────────────────────────────────────── */
+/* Botao de chrome do canvas. Hover em CSS, nao em onMouseEnter/Leave:
+   os handlers inline re-renderizavam a arvore a cada passagem do mouse
+   sobre a toolbar, durante pan e drag. */
+.solon-canvas-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: var(--radius-sm);
+  transition: background 140ms ease, color 140ms ease;
+}
+.solon-canvas-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.solon-canvas-btn[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.solon-canvas-btn--danger:hover {
+  background: var(--danger);
+  color: var(--text-inverse);
+}
+.solon-canvas-btn--outline {
+  border: 1px solid var(--border);
+}
+
+/* Anel de foco visivel em todo o chrome do canvas. Os controles eram
+   alcancaveis por Tab mas nao mostravam onde o foco estava. */
+.canvas-surface button:focus-visible,
+.canvas-surface [role="switch"]:focus-visible,
+.canvas-surface [role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 /* Inputs — cantos suaves, hairline, focus = borda accent + ring macio. */

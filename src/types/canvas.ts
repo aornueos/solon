@@ -1,9 +1,9 @@
 /**
- * Contrato do Canvas Miro-inspired.
+ * Contrato do canvas.
  *
- * O canvas é uma *visão* sobre o projeto — cards podem ser freeform
- * (texto livre) ou linkados a uma cena (`.md` com frontmatter). No MVP
- * v0.4.0 implementamos freeform; scene-link vem em passo futuro.
+ * O canvas é uma visão sobre o projeto: cards podem ser texto livre ou
+ * estar ligados a uma cena (um `.md` com frontmatter). Cada arquivo tem
+ * o seu, guardado ao lado dele como `<arquivo>.canvas.json`.
  */
 
 import { SceneStatus } from "./scene";
@@ -50,18 +50,19 @@ export type CardSide = "top" | "right" | "bottom" | "left";
 
 export interface CanvasArrow {
   id: string;
-  from: string; // card id
-  to: string;   // card id
-  label?: string;
+  /** id da entidade de origem: card, texto, imagem ou traço. */
+  from: string;
+  /** id da entidade de destino. */
+  to: string;
   /** Espessura visual da seta em world px. */
   width?: number;
   /** Offset (em world coords) do ponto de controle em relação ao ponto médio
    *  da reta from→to. Quando ausente, a arrow usa uma curva padrão sutil. */
   bend?: { dx: number; dy: number };
-  /** Lado específico do card de origem onde a seta se ancora.
+  /** Lado específico do card de origem onde a seta se âncora.
    *  Ausente = auto (lado que encara o outro card). */
   fromSide?: CardSide;
-  /** Lado específico do card de destino onde a seta se ancora.
+  /** Lado específico do card de destino onde a seta se âncora.
    *  Ausente = auto. */
   toSide?: CardSide;
 }
@@ -74,13 +75,13 @@ export interface CanvasText {
   id: string;
   x: number;
   y: number;
-  /** Texto puro (fallback + medida de largura + busca). Mantido em sync com
-   *  `html` (= textContent). Blocos antigos so' tem isto. */
+  /** Texto puro, usado para medir largura e para a busca. Mantido em
+   *  sincronia com `html` (é o `textContent` dele). */
   text: string;
-  /** Rich text opcional: formatacao inline (negrito/italico/grifo/cor por
-   *  trecho). Quando presente, e' o que se renderiza/edita. Os flags de bloco
-   *  (`bold`/`italic`/`underline`/`highlight`) viram so' o estilo-base pra
-   *  nao dobrar com o inline. */
+  /** Rich text opcional: formatação por trecho (negrito, itálico, grifo,
+   *  cor). Quando presente, é o que se renderiza e edita; os flags de
+   *  bloco abaixo passam a valer só como estilo-base, para não dobrar
+   *  com a formatação inline. */
   html?: string;
   size: number;   // em px (world coords)
   color: string;  // hex
@@ -92,10 +93,10 @@ export interface CanvasText {
   link?: string;
   /** Cor de grifo (background). Vazio/undefined = sem grifo. */
   highlight?: string;
-  /** Largura maxima da caixa (world px). Quando settada, texto quebra
-   *  linha em vez de cortar. Default: undefined = auto-grow horizontal. */
+  /** Largura máxima da caixa (world px). Definida, o texto quebra linha;
+   *  ausente, a caixa cresce na horizontal. */
   width?: number;
-  /** Altura da caixa (world px). Undefined = altura natural do conteudo. */
+  /** Altura da caixa (world px). Ausente = altura natural do conteúdo. */
   height?: number;
 }
 
@@ -113,7 +114,7 @@ export interface CanvasStroke {
 /**
  * Imagem no canvas. `src` é um caminho relativo à pasta `.solon/` do projeto
  * (ex: "assets/abc123.png"). Os bytes ficam em disco; o canvas.json só
- * referencia.
+ * referência.
  */
 export interface CanvasImage {
   id: string;
@@ -137,16 +138,13 @@ export const CANVAS_TOOL_ORDER: CanvasTool[] = [
 ];
 
 /**
- * Paleta de cores pro free-draw / textos flutuantes — simples e editorial,
- * sem saturação pura.
+ * Paleta do desenho livre e dos textos flutuantes — editorial, sem
+ * saturação pura.
  *
- * O primeiro item, "Auto", usa value vazio como sentinela: significa "siga
- * a cor do tema" (`var(--text-primary)`). Sem isso, textos criados em tema
- * claro (cor padrao "#2a2420" sépia escuro) viravam preto-em-grafite e
- * sumiam ao trocar pra dark theme. "Auto" e o default para FloatingText
- * exatamente por esse motivo — o usuario pode pintar deliberadamente
- * depois (sangue, indigo, etc) e o pigment fica fixo, mas o caso comum e
- * "tinta padrao que se adapta".
+ * "Auto" usa string vazia como sentinela e significa "siga a cor do tema"
+ * (`var(--text-primary)`). É o padrão porque uma cor fixa escolhida num
+ * tema claro some ao trocar para um tema escuro; quem quiser um pigmento
+ * fixo escolhe um dos outros.
  */
 export const DRAW_COLORS: { label: string; value: string }[] = [
   { label: "Auto", value: "" },

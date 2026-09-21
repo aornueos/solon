@@ -1,13 +1,10 @@
 import type { CanvasStroke, CanvasText } from "../types/canvas";
-import { useCanvasStore } from "../store/useCanvasStore";
 import { EDITOR_FONT_FAMILIES, useAppStore } from "../store/useAppStore";
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
-/**
- * Cache do contexto 2d pra medir texto. Reaproveitado entre chamadas
- * pra evitar criar elemento canvas a cada bbox de texto.
- */
+/** Contexto 2d reaproveitado entre medições, para não criar um elemento
+ *  canvas a cada bbox de texto. */
 let measureCtx: CanvasRenderingContext2D | null | undefined;
 
 function getCanvasTextFontFamily(): string {
@@ -30,9 +27,9 @@ function getMeasureCtx(): CanvasRenderingContext2D | null {
 }
 
 /**
- * Bbox real de um FloatingText. Usa Canvas2D `measureText` na mesma
- * fonte/peso/tamanho do FloatingText, igualando ao pixel a largura
- * renderizada. Fallback heuristico se canvas2d nao estiver disponivel.
+ * Bbox de um texto flutuante. Mede com `measureText` na mesma fonte, peso
+ * e tamanho usados na renderização, então a largura bate ao pixel. Cai
+ * numa heurística por contagem de caracteres se o canvas 2d faltar.
  */
 export function textRect(t: CanvasText): Rect {
   const lines = (t.text || " ").split("\n");
@@ -131,22 +128,3 @@ function wrapMeasuredLine(
   return { lines, maxW: Math.min(maxWidth, Math.max(24, maxW)) };
 }
 
-/**
- * Resolve qualquer id selecionavel para um Rect em world coords. Usado
- * pelo ArrowLayer pra rotear setas que comecam/terminam em textos ou
- * imagens (nao so cards). Retorna `null` quando o id nao corresponde a
- * nada que tenha bbox util (arrows nao tem; strokes ignoramos por agora
- * porque ancorar seta em traço de caneta nao tem semantica clara).
- */
-export function getEntityRect(id: string): Rect | null {
-  const s = useCanvasStore.getState();
-  const c = s.cards.find((x) => x.id === id);
-  if (c) return { x: c.x, y: c.y, w: c.w, h: c.h };
-  const im = s.images.find((x) => x.id === id);
-  if (im) return { x: im.x, y: im.y, w: im.w, h: im.h };
-  const t = s.texts.find((x) => x.id === id);
-  if (t) return textRect(t);
-  const st = s.strokes.find((x) => x.id === id);
-  if (st) return strokeRect(st);
-  return null;
-}

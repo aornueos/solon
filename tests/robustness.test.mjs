@@ -29,6 +29,8 @@ import {
   surnameOf,
 } from "../src/lib/docxExport.ts";
 import { isSafeAssetSrc } from "../src/lib/canvasImages.ts";
+import { useCanvasStore } from "../src/store/useCanvasStore.ts";
+import { clientToSurface, fitAllViewport } from "../src/lib/canvasViewport.ts";
 
 describe("frontmatter", () => {
   it("keeps body separators out of the yaml parser", () => {
@@ -463,5 +465,120 @@ describe("docx Shunn — cabeçalho corrido", () => {
     assert.equal(surnameOf("Ana Maria de Souza"), "Souza");
     assert.equal(surnameOf("  Clarice  "), "Clarice");
     assert.equal(surnameOf(""), "Autor");
+  });
+});
+
+describe("canvas — zoom ancorado no ponteiro", () => {
+  const surfacePoint = (x, y) => {
+    const { viewport } = useCanvasStore.getState();
+    return {
+      x: (x - viewport.x) / viewport.zoom,
+      y: (y - viewport.y) / viewport.zoom,
+    };
+  };
+
+  it("keeps the world point under the anchor fixed", () => {
+    useCanvasStore.getState().reset();
+    useCanvasStore.getState().setViewport({ x: -120, y: 40, zoom: 0.8 });
+
+    // Ponto da superfície sobre o qual o usuário está com o cursor.
+    const anchorX = 430;
+    const anchorY = 275;
+    const before = surfacePoint(anchorX, anchorY);
+
+    useCanvasStore.getState().zoomAt(anchorX, anchorY, -200);
+    const after = surfacePoint(anchorX, anchorY);
+
+    assert.ok(useCanvasStore.getState().viewport.zoom > 0.8);
+    assert.ok(Math.abs(after.x - before.x) < 1e-9);
+    assert.ok(Math.abs(after.y - before.y) < 1e-9);
+  });
+
+  it("clamps zoom to the supported range", () => {
+    useCanvasStore.getState().reset();
+    for (let i = 0; i < 40; i += 1) useCanvasStore.getState().zoomAt(0, 0, -500);
+    assert.equal(useCanvasStore.getState().viewport.zoom, 3);
+    for (let i = 0; i < 80; i += 1) useCanvasStore.getState().zoomAt(0, 0, 500);
+    assert.equal(useCanvasStore.getState().viewport.zoom, 0.2);
+  });
+});
+
+describe("canvas — seleção primária e grupo andam juntos", () => {
+  it("replaces an active group when a new item is created", () => {
+    const store = useCanvasStore.getState();
+    store.reset();
+    const a = store.addCard({ x: 0, y: 0 });
+    const b = store.addCard({ x: 400, y: 0 });
+    useCanvasStore.getState().selectMany([a, b], a);
+    assert.equal(useCanvasStore.getState().selectedIds.size, 2);
+
+    const fresh = useCanvasStore.getState().addCard({ x: 800, y: 0 });
+    const after = useCanvasStore.getState();
+    assert.equal(after.selectedId, fresh);
+    assert.deepEqual([...after.selectedIds], [fresh]);
+
+    // Delete agora apaga o card recém-criado, não o grupo anterior.
+    useCanvasStore.getState().removeSelected();
+    const ids = useCanvasStore.getState().cards.map((c) => c.id);
+    assert.deepEqual(ids.sort(), [a, b].sort());
+  });
+
+  it("drops a removed item from the group without clearing the rest", () => {
+    const store = useCanvasStore.getState();
+    store.reset();
+    const a = store.addCard({ x: 0, y: 0 });
+    const b = store.addCard({ x: 400, y: 0 });
+    const c = store.addCard({ x: 800, y: 0 });
+    useCanvasStore.getState().selectMany([a, b, c], a);
+
+    useCanvasStore.getState().removeCard(b);
+    const after = useCanvasStore.getState();
+    assert.deepEqual([...after.selectedIds].sort(), [a, c].sort());
+    assert.equal(after.selectedId, a);
+
+    useCanvasStore.getState().removeCard(a);
+    assert.equal(useCanvasStore.getState().selectedId, null);
+    assert.deepEqual([...useCanvasStore.getState().selectedIds], [c]);
+  });
+});
+
+describe("canvas — enquadrar tudo", () => {
+  const surface = { width: 1000, height: 600 };
+
+  it("frames strokes, not only cards and images", () => {
+    const store = useCanvasStore.getState();
+    store.reset();
+    store.addCard({ x: 0, y: 0, w: 200, h: 100 });
+    store.addStroke({ points: [0, 0, 4000, 3000], color: "", width: 2 });
+
+    const viewport = fitAllViewport(surface);
+    // O traço é largo demais para caber em 1:1 — o enquadramento precisa
+    // afastar. Sem contar os traços, o zoom continuaria no teto (1.2).
+    assert.ok(viewport.zoom < 1);
+
+    // O canto inferior direito do traço cabe na superfície.
+    const screenX = 4000 * viewport.zoom + viewport.x;
+    const screenY = 3000 * viewport.zoom + viewport.y;
+    assert.ok(screenX <= surface.width + 1e-6);
+    assert.ok(screenY <= surface.height + 1e-6);
+  });
+
+  it("returns the neutral viewport for an empty canvas", () => {
+    useCanvasStore.getState().reset();
+    assert.deepEqual(fitAllViewport(surface), { x: 0, y: 0, zoom: 1 });
+  });
+});
+
+describe("canvas — referencial da superfície", () => {
+  it("converts pointer coordinates into the surface frame", () => {
+    // `viewport.x/y` é relativo à superfície do canvas, que começa depois
+    // da sidebar e abaixo do titlebar. Usar clientX/clientY cru ancorava o
+    // zoom deslocado por exatamente essa margem.
+    const rect = { left: 268, top: 72, width: 900, height: 500 };
+    assert.deepEqual(clientToSurface(300, 100, rect), { x: 32, y: 28 });
+  });
+
+  it("falls back to raw coordinates when there is no surface", () => {
+    assert.deepEqual(clientToSurface(300, 100, null), { x: 300, y: 100 });
   });
 });

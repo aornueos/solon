@@ -1,11 +1,9 @@
 import { marked } from "marked";
 import { parseDocument } from "./frontmatter";
 import type { FileNode } from "../store/useAppStore";
+import { isTauriRuntime } from "./runtime";
 
 type PdfDocument = import("jspdf").jsPDF;
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export type PrintSize = "a5" | "a4" | "book";
 export type PrintFont = "serif" | "sans";
@@ -61,7 +59,7 @@ async function prepareSingle(
   fileName: string,
   opts: PrintOptions,
 ): Promise<PreparedDoc> {
-  if (!isTauri) {
+  if (!isTauriRuntime()) {
     throw new Error("Export PDF disponivel apenas no app Tauri.");
   }
   const { readTextFile } = await import("@tauri-apps/plugin-fs");
@@ -79,7 +77,7 @@ async function prepareFolder(
   folderTitle: string,
   opts: PrintOptions,
 ): Promise<PreparedDoc> {
-  if (!isTauri) {
+  if (!isTauriRuntime()) {
     throw new Error("Export PDF disponivel apenas no app Tauri.");
   }
   const { readTextFile } = await import("@tauri-apps/plugin-fs");

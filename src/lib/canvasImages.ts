@@ -1,3 +1,4 @@
+import { isTauriRuntime } from "./runtime";
 /**
  * Persistência de imagens coladas no canvas.
  *
@@ -8,9 +9,6 @@
  *  - Web (dev): fallback em data URL — não há disco disponível, e escrever
  *    em `localStorage` bateria em quota pra imagens médias.
  */
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 const ASSETS_DIR = ".solon/assets";
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -84,7 +82,7 @@ export async function saveImageForCanvas(
   const dims = await readImageDimensions(file);
   const bytes = await fileToBytes(file);
 
-  if (!isTauri) {
+  if (!isTauriRuntime()) {
     return {
       src: bytesToDataUrl(bytes, mime),
       ...dims,
@@ -150,7 +148,7 @@ export async function resolveImageUrl(
   src: string,
 ): Promise<string | null> {
   if (src.startsWith("data:")) return src;
-  if (!isTauri || !rootFolder) return null;
+  if (!isTauriRuntime() || !rootFolder) return null;
   if (!isSafeAssetSrc(src)) return null;
 
   const key = cacheKey(rootFolder, src);

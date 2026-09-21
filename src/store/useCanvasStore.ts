@@ -33,13 +33,13 @@ import {
 export type SelectionKind = "card" | "arrow" | "text" | "stroke" | "image";
 
 /**
- * Snapshot das posicoes originais dos itens de uma selecao, capturado
- * no comeco de um drag de grupo. Usado pelo `translateSelection` para
+ * Snapshot das posições originais dos itens de uma seleção, capturado
+ * no começo de um drag de grupo. Usado pelo `translateSelection` para
  * aplicar o mesmo delta em todos os itens sem acumular erro de
- * arredondamento que o padrao "dx incremental por frame" produziria.
+ * arredondamento que o padrão "dx incremental por frame" produziria.
  *
  * Strokes guardam o array de `points` original inteiro (em world coords)
- * porque nao tem um par x/y — a translacao e aplicada ponto a ponto.
+ * porque não tem um par x/y — a translação e aplicada ponto a ponto.
  */
 export type SelectionSnapshot = Map<
   string,
@@ -48,9 +48,9 @@ export type SelectionSnapshot = Map<
 >;
 
 /**
- * Snapshot mínimo serializavel pra historico de undo/redo. Inclui só os
- * arrays de geometria — viewport (pan/zoom) e tool nao entram porque o
- * usuario nao espera que Ctrl+Z desfaca um zoom acidental ou volte de
+ * Snapshot mínimo serializavel pra histórico de undo/redo. Inclui só os
+ * arrays de geometria — viewport (pan/zoom) e tool não entram porque o
+ * usuário não espera que Ctrl+Z desfaca um zoom acidental ou volte de
  * eraser pra select.
  */
 interface CanvasSnapshot {
@@ -125,7 +125,7 @@ interface CanvasState {
   duplicateCard: (id: string) => string | null;
   bringToFront: (id: string) => void;
   duplicateSelected: () => void;
-  /** Copia a selecao atual pro clipboard interno do canvas (Ctrl+C). */
+  /** Copia a seleção atual pro clipboard interno do canvas (Ctrl+C). */
   copySelected: () => void;
   /** Cola o clipboard interno com novos ids e offset; seleciona os colados
    *  (Ctrl+V). Retorna `true` se colou algo — o caller usa isso pra decidir
@@ -165,7 +165,10 @@ interface CanvasState {
 
   setViewport: (v: Partial<CanvasViewport>) => void;
   panBy: (dx: number, dy: number) => void;
-  zoomAt: (clientX: number, clientY: number, delta: number) => void;
+  /** Zoom ancorado num ponto. `surfaceX`/`surfaceY` são relativos à
+   *  superfície do canvas — o mesmo referencial de `viewport.x/y` —, não
+   *  à janela. Use `clientToSurface` para converter um evento de mouse. */
+  zoomAt: (surfaceX: number, surfaceY: number, delta: number) => void;
 
   setTool: (tool: CanvasTool) => void;
   setDrawColor: (color: string) => void;
@@ -174,20 +177,20 @@ interface CanvasState {
   select: (id: string | null) => void;
   /** Seleciona múltiplos IDs (marquee result). `primary` vira `selectedId`. */
   selectMany: (ids: string[], primary?: string | null) => void;
-  /** Alterna um id do conjunto (Shift+click futuro). */
+  /** Alterna um id no conjunto (Ctrl+clique sobre um item). */
   toggleInSelection: (id: string) => void;
   /** Identifica a categoria de `id` na store. */
   findSelectionKind: (id: string) => SelectionKind | null;
   /** Remove um item por id, descobrindo o tipo dele. Usado pela
-   *  ferramenta borracha (que nao discrimina kind no UI). */
+   *  ferramenta borracha (que não discrimina kind no UI). */
   eraseById: (id: string) => void;
   /** Remove todas as entidades selecionadas (`selectedIds`). */
   removeSelected: () => void;
-  /** Captura as posicoes originais de todos os itens em `selectedIds`
-   *  num snapshot, pra servir de referencia num drag de grupo. */
+  /** Captura as posições originais de todos os itens em `selectedIds`
+   *  num snapshot, pra servir de referência num drag de grupo. */
   snapshotSelection: () => SelectionSnapshot;
-  /** Aplica delta (dx, dy) em cada item do snapshot. Reescreve posicoes
-   *  como `origem + delta` (nao incremental) pra evitar drift. */
+  /** Aplica delta (dx, dy) em cada item do snapshot. Reescreve posições
+   *  como `origem + delta` (não incremental) pra evitar drift. */
   translateSelection: (snapshot: SelectionSnapshot, dx: number, dy: number) => void;
   beginLink: (fromId: string, side?: CardSide) => void;
   cancelLink: () => void;
@@ -197,8 +200,8 @@ interface CanvasState {
   toDoc: () => CanvasDoc;
 
   /** Captura o estado atual no past — chame ANTES de mutar pra registrar
-   *  o "ponto de undo". Idempotente em snapshot identico (debounce: nao
-   *  empurra se o ultimo past ja e igual ao state atual). */
+   *  o "ponto de undo". Idempotente em snapshot identico (debounce: não
+   *  empurra se o último past ja e igual ao state atual). */
   pushHistory: () => void;
   /** Reverte ao snapshot mais recente do past. No-op se vazio. */
   undo: () => void;
@@ -207,14 +210,9 @@ interface CanvasState {
 }
 
 /**
- * Gera um id razoavelmente único. Tenta `crypto.randomUUID()` primeiro
- * (que entrega 122 bits de entropia e é suportado em Tauri/Chromium e
- * navegadores modernos); cai para um composto de timestamp + 64 bits de
- * `crypto.getRandomValues` como fallback.
- *
- * O antigo `Math.random().toString(36).slice(2, 8)` só dava 6 chars (~36⁶
- * ≈ 2B) o que, em picos de criação (paste rápido, duplicate repetido em
- * strict-mode dev), batia no birthday paradox perto de ~50k ids.
+ * Id com entropia suficiente para não colidir em rajadas de criação
+ * (colar repetido, duplicar em sequência). Prefere `crypto.randomUUID()`
+ * e cai para timestamp + 64 bits de `getRandomValues`.
  */
 const nanoid = () => {
   const c =
@@ -255,10 +253,10 @@ function rebasePath(
 }
 
 /**
- * Clipboard interno do canvas (nao usa a area de transferencia do SO — copiar
- * um bloco do canvas nao deve sobrescrever o que voce copiou de texto). Vive
- * em modulo (nao no state) porque nenhuma UI reage a ele. `pasteSeq` faz cada
- * colagem consecutiva sair mais deslocada, evitando empilhar em cima. */
+ * Clipboard próprio do canvas: copiar um bloco daqui não deve sobrescrever
+ * o que você copiou de texto no sistema. Vive no módulo, não no state,
+ * porque nenhuma UI reage a ele. `pasteSeq` desloca cada colagem
+ * consecutiva um pouco mais, para não empilharem no mesmo ponto. */
 let canvasClipboard: {
   cards: CanvasCard[];
   texts: CanvasText[];
@@ -267,6 +265,33 @@ let canvasClipboard: {
   arrows: CanvasArrow[];
 } | null = null;
 let pasteSeq = 0;
+
+/**
+ * `selectedId` (foco) e `selectedIds` (grupo) precisam andar juntos: o
+ * grupo é o que Delete, drag e Ctrl+C consomem. Criar um item com um
+ * grupo ainda ativo deixava o foco no item novo e o grupo no antigo —
+ * Delete apagava a seleção anterior em vez do item recém-criado.
+ */
+const focusOn = (id: string) => ({
+  selectedId: id,
+  selectedIds: new Set<string>([id]),
+});
+
+/** Tira `id` do grupo sem mexer nos outros membros. */
+const dropFromSelection = (
+  s: Pick<CanvasState, "selectedId" | "selectedIds">,
+  id: string,
+) => {
+  if (!s.selectedIds.has(id)) {
+    return s.selectedId === id ? { selectedId: null } : {};
+  }
+  const selectedIds = new Set(s.selectedIds);
+  selectedIds.delete(id);
+  return {
+    selectedIds,
+    selectedId: s.selectedId === id ? null : s.selectedId,
+  };
+};
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   filePath: null,
@@ -281,7 +306,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   // draw e tool `text`. Default e "" ("Auto", sentinela theme-aware). Pra
   // strokes, "" e tratado como "#2a2420" (Tinta) no `startDrawStroke` —
   // strokes precisam de cor concreta. Pra textos, "" significa "siga
-  // var(--text-primary)" e adapta ao tema light/dark — o usuario pode
+  // var(--text-primary)" e adapta ao tema light/dark — o usuário pode
   // pintar deliberadamente via palette depois.
   drawColor: "",
   drawWidth: DEFAULT_DRAW_WIDTH,
@@ -306,8 +331,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       linkingFromId: null,
       linkingFromSide: null,
       tool: "select",
-      // Trocar de arquivo zera o historico — Ctrl+Z apos abrir um canvas
-      // diferente nao deveria voltar pro estado do canvas anterior.
+      // Trocar de arquivo zera o histórico — Ctrl+Z após abrir um canvas
+      // diferente não deveria voltar pro estado do canvas anterior.
       past: [],
       future: [],
     }),
@@ -371,7 +396,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       ...(partial?.x == null ? { x } : {}),
       ...(partial?.y == null ? { y } : {}),
     };
-    set((s) => ({ cards: [...s.cards, card], selectedId: id }));
+    set((s) => ({ cards: [...s.cards, card], ...focusOn(id) }));
     return id;
   },
 
@@ -380,7 +405,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       (c) => c.kind === "scene" && c.scenePath === scenePath,
     );
     if (existing) {
-      set({ selectedId: existing.id });
+      set(focusOn(existing.id));
       return existing.id;
     }
     get().pushHistory();
@@ -396,7 +421,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       scenePath,
       scene: snapshot,
     };
-    set((s) => ({ cards: [...s.cards, card], selectedId: id }));
+    set((s) => ({ cards: [...s.cards, card], ...focusOn(id) }));
     return id;
   },
 
@@ -445,7 +470,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((s) => ({
       cards: s.cards.filter((c) => c.id !== id),
       arrows: s.arrows.filter((a) => a.from !== id && a.to !== id),
-      selectedId: s.selectedId === id ? null : s.selectedId,
+      ...dropFromSelection(s, id),
     }));
   },
 
@@ -463,7 +488,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       x: card.x + 24,
       y: card.y + 24,
     };
-    set((s) => ({ cards: [...s.cards, copy], selectedId: newId }));
+    set((s) => ({ cards: [...s.cards, copy], ...focusOn(newId) }));
     return newId;
   },
 
@@ -511,15 +536,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       if (!idSet.has(stroke.id)) continue;
       const id = nanoid();
       idMap.set(stroke.id, id);
-      const points = stroke.points.map((p, idx) => p + (idx % 2 === 0 ? 28 : 28));
-      strokes.push({ ...stroke, id, points });
+      strokes.push({ ...stroke, id, points: stroke.points.map((p) => p + 28) });
     }
 
     const nextIds = new Set(idMap.values());
     if (nextIds.size === 0) return;
-    // Setas entre itens duplicados sao clonadas e religadas aos novos ids —
-    // consistente com o copy/paste. Setas com so' uma ponta duplicada ficam
-    // de fora (o outro extremo nao existe no clone).
+    // Setas entre itens duplicados são clonadas e religadas aos novos ids —
+    // consistente com o copy/paste. Setas com só uma ponta duplicada ficam
+    // de fora (o outro extremo não existe no clone).
     const arrows = [...s.arrows];
     for (const a of s.arrows) {
       const from = idMap.get(a.from);
@@ -548,7 +572,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
           : new Set<string>();
     if (ids.size === 0) return;
     // Scene cards ficam de fora (apontam pra arquivo — colar geraria cards
-    // orfaos/duplicados apontando pro mesmo .md). Mesmo criterio do duplicate.
+    // órfãos/duplicados apontando pro mesmo .md). Mesmo criterio do duplicate.
     canvasClipboard = {
       cards: s.cards
         .filter((c) => ids.has(c.id) && c.kind !== "scene")
@@ -558,9 +582,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       strokes: s.strokes
         .filter((st) => ids.has(st.id))
         .map((st) => ({ ...st, points: [...st.points] })),
-      // Setas cujos DOIS extremos estao na selecao — colar um grupo conectado
-      // preserva as conexoes (remapeadas pros novos ids no paste). Setas com
-      // so' uma ponta na selecao ficam de fora (nao teriam onde ancorar).
+      // Setas cujos DOIS extremos estao na seleção — colar um grupo conectado
+      // preserva as conexões (remapeadas pros novos ids no paste). Setas com
+      // só uma ponta na seleção ficam de fora (não teriam onde ancorar).
       arrows: s.arrows.filter((a) => ids.has(a.from) && ids.has(a.to)).map((a) => ({ ...a })),
     };
     pasteSeq = 0;
@@ -612,7 +636,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       strokes.push({ ...st, id, points: st.points.map((p) => p + off) });
     }
     // Setas: religa aos ids novos. Ambos os extremos foram copiados (o copy
-    // ja' filtrou isso), entao o remap sempre acha os dois.
+    // já filtrou isso), então o remap sempre acha os dois.
     for (const a of clip.arrows) {
       const from = idMap.get(a.from);
       const to = idMap.get(a.to);
@@ -698,7 +722,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().pushHistory();
     set((s) => ({
       arrows: s.arrows.filter((a) => a.id !== id),
-      selectedId: s.selectedId === id ? null : s.selectedId,
+      ...dropFromSelection(s, id),
     }));
   },
 
@@ -737,7 +761,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   addText: (partial) => {
     get().pushHistory();
     const id = nanoid();
-    // Default color e "" (sentinela "Auto"), nao o `drawColor` da store.
+    // Default color e "" (sentinela "Auto"), não o `drawColor` da store.
     // Assim o texto recem-criado adapta a cor ao tema (light/dark) via
     // `var(--text-primary)` no FloatingText. Usuario pode trocar pra cor
     // fixa via palette depois (Sangue, Indigo, etc).
@@ -750,7 +774,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       color: partial.color ?? "",
       bold: partial.bold,
     };
-    set((s) => ({ texts: [...s.texts, text], selectedId: id }));
+    set((s) => ({ texts: [...s.texts, text], ...focusOn(id) }));
     return id;
   },
 
@@ -764,7 +788,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((s) => ({
       texts: s.texts.filter((t) => t.id !== id),
       arrows: s.arrows.filter((a) => a.from !== id && a.to !== id),
-      selectedId: s.selectedId === id ? null : s.selectedId,
+      ...dropFromSelection(s, id),
     }));
   },
 
@@ -783,16 +807,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   removeStroke: (id) => {
     get().pushHistory();
     set((s) => ({
-      strokes: s.strokes.filter((t) => t.id !== id),
+      strokes: s.strokes.filter((st) => st.id !== id),
       arrows: s.arrows.filter((a) => a.from !== id && a.to !== id),
-      selectedId: s.selectedId === id ? null : s.selectedId,
+      ...dropFromSelection(s, id),
     }));
   },
 
   addImage: (img) => {
     get().pushHistory();
     const id = nanoid();
-    set((s) => ({ images: [...s.images, { ...img, id }], selectedId: id }));
+    set((s) => ({ images: [...s.images, { ...img, id }], ...focusOn(id) }));
     return id;
   },
 
@@ -806,7 +830,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((s) => ({
       images: s.images.filter((i) => i.id !== id),
       arrows: s.arrows.filter((a) => a.from !== id && a.to !== id),
-      selectedId: s.selectedId === id ? null : s.selectedId,
+      ...dropFromSelection(s, id),
     }));
   },
 
@@ -817,18 +841,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       viewport: { ...s.viewport, x: s.viewport.x + dx, y: s.viewport.y + dy },
     })),
 
-  zoomAt: (clientX, clientY, delta) =>
+  zoomAt: (surfaceX, surfaceY, delta) =>
     set((s) => {
       const v = s.viewport;
       const factor = Math.exp(-delta * 0.0015);
       const newZoom = Math.max(0.2, Math.min(3, v.zoom * factor));
-      const worldX = (clientX - v.x) / v.zoom;
-      const worldY = (clientY - v.y) / v.zoom;
+      const worldX = (surfaceX - v.x) / v.zoom;
+      const worldY = (surfaceY - v.y) / v.zoom;
       return {
         viewport: {
           zoom: newZoom,
-          x: clientX - worldX * newZoom,
-          y: clientY - worldY * newZoom,
+          x: surfaceX - worldX * newZoom,
+          y: surfaceY - worldY * newZoom,
         },
       };
     }),
@@ -904,9 +928,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       ? [...s.selectedIds]
       : s.selectedId ? [s.selectedId] : [];
     if (ids.length === 0) return;
-    // Um unico push de history pra todo o batch — senao Delete em N cards
-    // viraria N entries no past e o usuario teria que apertar Ctrl+Z N
-    // vezes pra recuperar a selecao.
+    // Um único push de history pra todo o batch — senao Delete em N cards
+    // viraria N entries no past e o usuário teria que apertar Ctrl+Z N
+    // vezes pra recuperar a seleção.
     s.pushHistory();
     const idSet = new Set(ids);
     set((curr) => ({
@@ -936,8 +960,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       if (t) { snap.set(id, { kind: "text", x: t.x, y: t.y }); continue; }
       const st = s.strokes.find((x) => x.id === id);
       if (st) { snap.set(id, { kind: "stroke", points: st.points.slice() }); continue; }
-      // Arrows nao entram no snapshot — derivam da posicao dos cards
-      // endpoints, entao se ambos os cards estao no grupo a seta "se move"
+      // Arrows não entram no snapshot — derivam da posição dos cards
+      // endpoints, então se ambos os cards estao no grupo a seta "se move"
       // sozinha; se so uma ponta estiver selecionada, a seta reflow.
     }
     return snap;
@@ -983,7 +1007,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       linkingFromId: fromId,
       linkingFromSide: side ?? null,
-      selectedId: fromId,
+      ...focusOn(fromId),
     }),
 
   cancelLink: () => set({ linkingFromId: null, linkingFromSide: null }),
@@ -1012,7 +1036,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       strokes: s.strokes,
       images: s.images,
     };
-    // Debounce: se o ultimo snapshot tem as mesmas referencias, nao
+    // Debounce: se o último snapshot tem as mesmas referências, não
     // empurra de novo. Acontece quando duas mutacoes vem no mesmo tick
     // e ambas chamam pushHistory.
     const last = s.past[s.past.length - 1];
@@ -1024,7 +1048,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       last.strokes === snap.strokes &&
       last.images === snap.images
     ) {
-      // future tambem precisa morrer — qualquer nova acao invalida o redo
+      // future também precisa morrer — qualquer nova ação invalida o redo
       if (s.future.length > 0) set({ future: [] });
       return;
     }
@@ -1054,7 +1078,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       past: s.past.slice(0, -1),
       future: [...s.future, present],
       // Selecao pode referenciar items que sumiram no undo — limpa por
-      // seguranca. UX equivalente ao Figma/Excalidraw.
+      // segurança. UX equivalente ao Figma/Excalidraw.
       selectedId: null,
       selectedIds: new Set<string>(),
       linkingFromId: null,

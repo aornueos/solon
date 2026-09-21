@@ -2,32 +2,23 @@ import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { useAppStore } from "../../store/useAppStore";
 import { startDrag } from "../../lib/drag";
-import { CanvasText, CardSide } from "../../types/canvas";
+import { CardSide } from "../../types/canvas";
 import { strokeRect, textRect } from "../../lib/canvasGeom";
 
-// Re-export local com nome curto pra usar nos rects do componente sem
-// poluir o escopo principal com `textRect` do canvasGeom.
-const textRectInline = (t: CanvasText) => textRect(t);
-
 /**
- * SVG overlay com as arrows entre cards.
+ * Camada SVG com as setas entre os itens do canvas.
  *
- * Renderizado *dentro* do mesmo container transformado dos cards, para
- * que a escala/translate do viewport se aplique automaticamente.
+ * Vive dentro do mesmo container transformado dos cards, então a escala e
+ * o translate do viewport já se aplicam a ela.
  *
- * Roteamento estilo Miro/Excalidraw:
- *  - cada ponta se conecta no **midpoint do lado cardinal** do card (top,
- *    right, bottom, left) escolhido pelo eixo dominante entre os centros;
- *  - a curva é um *cubic bezier* com control points **extrudados
- *    perpendicularmente** ao lado de ancoragem — o resultado entra/sai
- *    do card em 90° e cria um arco natural mesmo sem o usuário dobrar a
- *    flecha manualmente;
- *  - `a.bend` desloca ambos os control points, arrastando o midpoint da
- *    curva (handle grab sobre a curva). Duplo clique reseta.
- *
- * Antes era um quadratic bezier reta-por-default saindo do edge-intersect
- * entre centros — somia quando os cards se sobrepunham e não dava
- * sensação de direção.
+ * Roteamento:
+ *  - cada ponta âncora no meio de um lado cardinal (topo, direita, base,
+ *    esquerda), escolhido pelo eixo dominante entre os centros;
+ *  - a curva é uma bézier cúbica com os pontos de controle extrudados
+ *    perpendicularmente ao lado de ancoragem, de forma que a seta entra e
+ *    sai em 90° e desenha um arco sem o usuário precisar curvá-la;
+ *  - `bend` desloca os dois pontos de controle de uma vez, arrastando o
+ *    meio da curva. Duplo clique no handle o zera.
  */
 export const ArrowLayer = memo(function ArrowLayer({
   worldWidth,
@@ -47,21 +38,19 @@ export const ArrowLayer = memo(function ArrowLayer({
   const tool = useCanvasStore((s) => s.tool);
   const linkingFromId = useCanvasStore((s) => s.linkingFromId);
   const linkingFromSide = useCanvasStore((s) => s.linkingFromSide);
-  // setArrowBend e' usado pelo handler de drag (`onBendMouseDown` definido
+  // setArrowBend é usado pelo handler de drag (`onBendMouseDown` definido
   // aqui no top-level, passado como prop pro ArrowNode pra evitar
-  // re-criar funcao por seta). Action refs sao estaveis entre renders.
+  // re-criar função por seta). Action refs são estáveis entre renders.
   const setArrowBend = useCanvasStore((s) => s.setArrowBend);
   const editorFontFamily = useAppStore((s) => s.editorFontFamily);
-  // Mapa de id → Rect cobrindo cards, texts e images. Antes a gente
-  // mapeava so cards, entao setas com endpoint em texto/imagem viravam
-  // null e desapareciam silenciosamente. `getEntityRect` resolve por
-  // tipo na hora — aqui pre-construimos o mapa pra evitar O(n) por
-  // arrow no render.
+  // Mapa id → Rect de tudo que pode ser extremo de uma seta: card, texto,
+  // imagem e traço. Pré-construído para não custar uma busca linear por
+  // seta a cada render.
   const rectById = useMemo(() => {
     const map = new Map<string, { x: number; y: number; w: number; h: number }>();
     for (const c of cards) map.set(c.id, { x: c.x, y: c.y, w: c.w, h: c.h });
     for (const im of images) map.set(im.id, { x: im.x, y: im.y, w: im.w, h: im.h });
-    for (const t of texts) map.set(t.id, textRectInline(t));
+    for (const t of texts) map.set(t.id, textRect(t));
     for (const st of strokes) {
       const rect = strokeRect(st);
       if (rect) map.set(st.id, rect);
@@ -69,10 +58,6 @@ export const ArrowLayer = memo(function ArrowLayer({
     return map;
   }, [cards, editorFontFamily, images, strokes, texts]);
 
-  // O preview tracejado do linking vive num componente proprio (<LinkPreview>)
-  // pra que o pointermove que o atualiza NAO re-renderize a ArrowLayer inteira
-  // (que mapeia TODAS as setas) a cada frame — era a fonte do stutter ao puxar
-  // uma seta. Isolado, so' o <LinkPreview> re-renderiza por frame.
   const dragRef = useRef<{
     id: string;
     startClientX: number;
@@ -81,10 +66,9 @@ export const ArrowLayer = memo(function ArrowLayer({
     origDy: number;
   } | null>(null);
 
-  // useCallback: sem isso, `onBendMouseDown` ganha identidade nova a cada
-  // render do ArrowLayer (ex.: trocar tool, linking, arrastar UM card que
-  // muda `cards`) e quebra o memo de TODOS os ArrowNode. setArrowBend e'
-  // ref estavel de store, entao o callback fica estavel de fato.
+  // Sem o useCallback este handler ganha identidade nova a cada render da
+  // camada e invalida o memo de todos os ArrowNode. setArrowBend é uma ref
+  // estável da store, então a identidade se mantém de fato.
   const onBendMouseDown = useCallback((
     e: React.MouseEvent,
     args: { id: string; origDx: number; origDy: number },
@@ -153,9 +137,9 @@ export const ArrowLayer = memo(function ArrowLayer({
     });
   }, [setArrowBend]);
 
-  // Larguras em world coords: dividimos por zoom pra manter o traço com
-  // espessura visual constante, independente de pan/zoom. Sem isso, em
-  // zoom-out (<1), 1.5 world px vira sub-pixel e a arrow some.
+  // Medidas em world coords divididas pelo zoom, para manter espessura e
+  // alvo de clique constantes na tela: a 50%, 1,5 world px viram menos de
+  // um pixel e a seta some.
   const hitStroke = 16 / zoom;
   const handleR = 6 / zoom;
   const handleStroke = 1.5 / zoom;
@@ -223,8 +207,6 @@ export const ArrowLayer = memo(function ArrowLayer({
         );
       })}
 
-      {/* Preview tracejado durante linking — isolado em componente proprio
-          pra nao re-renderizar a ArrowLayer a cada pointermove. */}
       {linkingFromId && (
         <LinkPreview
           sourceRect={rectById.get(linkingFromId)}
@@ -238,10 +220,10 @@ export const ArrowLayer = memo(function ArrowLayer({
 });
 
 /**
- * Preview tracejado enquanto o usuario puxa uma seta. Isolado da ArrowLayer:
- * o pointermove atualiza APENAS este componente (uma path), nao a lista
- * inteira de setas — elimina o stutter ao arrastar. Ancora no lado cardinal
- * escolhido (fromSide) ou auto pelo vetor origem→cursor.
+ * Prévia tracejada enquanto o usuário puxa uma seta. Vive fora da
+ * ArrowLayer de propósito: o pointermove atualiza só este path, não a lista
+ * inteira de setas. Ancora no lado escolhido em `fromSide` ou, sem ele, no
+ * lado que encara o cursor.
  */
 function LinkPreview({
   sourceRect,
@@ -254,8 +236,8 @@ function LinkPreview({
   zoom: number;
   frozenPreviewPoint?: { x: number; y: number } | null;
 }) {
-  // Path atualizado IMPERATIVAMENTE (setAttribute) no pointermove — sem
-  // setState, sem re-render por frame. Elimina o stutter ao puxar a seta.
+  // O path é atualizado por setAttribute no pointermove, sem setState e
+  // sem re-render por frame.
   const pathRef = useRef<SVGPathElement | null>(null);
 
   const buildD = useCallback(
@@ -272,7 +254,7 @@ function LinkPreview({
   );
 
   useEffect(() => {
-    // Preview congelado (menu de link-vazio aberto) e' estatico — sem listener.
+    // Com o menu de link-no-vazio aberto a prévia fica congelada.
     if (frozenPreviewPoint) return;
     const surface = document.querySelector(".canvas-surface") as HTMLElement | null;
     if (!surface) return;
@@ -307,10 +289,9 @@ function LinkPreview({
 }
 
 /**
- * Render de uma seta individual. Memoizado por (arrow, from, to, zoom, tool):
- * mudancas de selecao/linking sao absorvidas pelos seletores derivados
- * abaixo (booleans), entao seleccionar UMA seta nao recomputa as outras
- * — em canvas com muitas setas, antes era O(N) `routeArrow` por toggle.
+ * Uma seta. Memoizada por (arrow, from, to, zoom, tool); mudanças de
+ * seleção entram por seletores derivados booleanos, então selecionar uma
+ * seta não recalcula a rota das outras.
  */
 type ArrowNodeProps = {
   arrow: ReturnType<typeof useCanvasStore.getState>["arrows"][number];
@@ -330,14 +311,11 @@ type ArrowNodeProps = {
 const sameRect = (a: Rect, b: Rect) =>
   a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
-// Comparador custom. Ao arrastar UM card, `updateCard` cria um novo array
-// `cards` → ArrowLayer re-renderiza → `rectById` reconstroi TODOS os Rect
-// como objetos novos. Com o memo default (shallow por referencia) TODA
-// seta re-renderizava e recomputava `routeArrow` por frame de drag —
-// exatamente o "lag ao mover coisas no canvas". Comparando from/to por
-// VALOR, setas que nao tocam o card movido tem rect identico e pulam o
-// render. Conservador: qualquer diferenca → re-renderiza (a seta cujo
-// endpoint realmente mexeu tem rect diferente, entao nunca fica stale).
+// Arrastar um card reconstrói o mapa `rectById` inteiro, com objetos Rect
+// novos. Com a comparação por referência do memo padrão, toda seta
+// re-renderizaria e recalcularia a rota por frame de arrasto. Comparando
+// os retângulos por valor, as setas que não tocam o card movido pulam o
+// render; qualquer diferença real ainda re-renderiza.
 function arrowNodePropsEqual(prev: ArrowNodeProps, next: ArrowNodeProps): boolean {
   return (
     prev.arrow === next.arrow &&
@@ -365,8 +343,8 @@ const ArrowNode = memo(function ArrowNode({
 }: ArrowNodeProps) {
   const isSel = useCanvasStore((s) => s.selectedId === a.id);
   // Grupo: seta capturada por marquee (ambos os cards endpoint dentro)
-  // mas nao e primary. Sem esse visual, setas em multi-selecao ficavam
-  // invisiveis ao olho — usuario nao sabia que Delete iria apaga-las.
+  // mas não e primary. Sem esse visual, setas em multi-seleção ficavam
+  // invisiveis ao olho — usuário não sabia que Delete iria apaga-las.
   const isInGroup = useCanvasStore(
     (s) => s.selectedId !== a.id && s.selectedIds.has(a.id),
   );
@@ -401,7 +379,7 @@ const ArrowNode = memo(function ArrowNode({
           tool === "select" || tool === "eraser" ? "auto" : "none",
       }}
     >
-      {/* Hit area invisível */}
+      {/* Faixa invisível e larga, para o clique não exigir precisão. */}
       <path
         d={d}
         stroke="transparent"
@@ -479,18 +457,12 @@ type Rect = { x: number; y: number; w: number; h: number };
 type Side = CardSide;
 
 /**
- * Qual lado de `r` "encara" o centro de `other`. Compara delta CRU
- * (sem normalizacao) — se o other esta mais a' direita do que abaixo,
- * conecta pelo lado direito.
+ * Qual lado de `r` encara o centro de `other`.
  *
- * Antes a gente normalizava por meia-largura/altura, o que invertia a
- * intuicao em cards retangulares: pra um card 220x120, half-w=110 e
- * half-h=60. Target 50px direito + 50px baixo dava nx=0.45, ny=0.83 →
- * |ny|>|nx| → escolhia bottom. Bug clasico: usuario puxava horizontal
- * e a flecha desviava pra baixo do alvo.
- *
- * Com delta cru (dx, dy), o mesmo target da' dx=dy=50 → escolhe right
- * (>= prefere horizontal). Comportamento intuitivo.
+ * Compara o delta cru, sem normalizar por meia-largura e meia-altura. A
+ * normalização inverte a intuição em retângulos: num card 220x120, um
+ * alvo 50px à direita e 50px abaixo daria ny > nx e sairia pela base,
+ * mesmo com o usuário puxando na horizontal.
  */
 function sideFacing(r: Rect, other: Rect): Side {
   const rcx = r.x + r.w / 2;
@@ -516,17 +488,15 @@ function extrude(p: { x: number; y: number }, side: Side, len: number) {
   }
 }
 
-// Respiro pra fora da borda — a seta nasce/termina FORA da caixa, nao colada
-// (nem por dentro, sobre o texto). Combina com os dots de conexao (que ja'
+// Respiro pra fora da borda — a seta nasce/termina FORA da caixa, não colada
+// (nem por dentro, sobre o texto). Combina com os dots de conexão (que ja'
 // ficam fora).
 const ANCHOR_GAP = 7;
 
 /**
- * Ponto de ancoragem no MEIO da lateral `side`, extrudado pra fora pelo gap.
- * FIXO (nao desliza) — coincide com o dot de conexao daquele lado. Uma versao
- * anterior deslizava a ancora "em direcao ao alvo", o que fazia a CAUDA da
- * seta escorregar enquanto voce arrastava o preview (parecia bugado). Fixo no
- * meio do lado e' previsivel e consistente com o dot.
+ * Ponto de ancoragem no meio do lado `side`, afastado para fora pelo gap.
+ * É fixo e coincide com o ponto de conexão daquele lado: deixá-lo deslizar
+ * em direção ao alvo faz a cauda da seta escorregar durante o arrasto.
  */
 function sideAnchor(r: Rect, side: Side) {
   let p: { x: number; y: number };
@@ -588,13 +558,9 @@ function routeArrow(
 }
 
 /**
- * Versão pra preview de linking: destino é um ponto (cursor) em vez de um
- * card. cp1 extruda do lado cardinal da origem; cp2 fica "sugado" pro
- * cursor, dando uma entrada relativamente perpendicular.
- *
- * `overrideFromSide` força o lado de saída (quando o usuário já clicou num
- * ponto específico de conexão na origem). Sem override, calcula pelo
- * vetor origem→cursor.
+ * Versão para a prévia: o destino é um ponto (o cursor) em vez de um
+ * retângulo. `overrideFromSide` força o lado de saída quando o usuário já
+ * escolheu um ponto de conexão; sem ele, o lado vem do vetor origem→cursor.
  */
 function routeArrowToPoint(
   from: Rect,
@@ -605,10 +571,7 @@ function routeArrowToPoint(
   if (overrideFromSide) {
     fromSide = overrideFromSide;
   } else {
-    // Mesmo principio do `sideFacing`: delta CRU (sem normalizar por
-    // meia-dimensao). Drag pro lado direito do card → sai pelo lado
-    // direito. Antes normalizavamos e em cards largos a flecha desviava
-    // pra cima/baixo mesmo quando o cursor estava lateral.
+    // Mesmo critério de `sideFacing`: delta cru, sem normalizar.
     const fcx = from.x + from.w / 2;
     const fcy = from.y + from.h / 2;
     const dx = target.x - fcx;

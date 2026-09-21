@@ -1,6 +1,7 @@
 import type { FileNode } from "../store/useAppStore";
 import { parseDocument } from "./frontmatter";
 import { isInsideProject, isProjectNotePath } from "./pathSecurity";
+import { isTauriRuntime } from "./runtime";
 
 export type WorkspaceHealthSeverity = "error" | "warning" | "info";
 
@@ -19,9 +20,6 @@ export interface WorkspaceHealthReport {
   checkedAt: number;
   issues: WorkspaceHealthIssue[];
 }
-
-const isTauri = (): boolean =>
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 const EXTERNAL_SRC_RE = /^(https?:|data:|blob:|mailto:|#)/i;
 const WIKILINK_RE = /\[\[([^\]\n|#]+)(?:[|#][^\]\n]+)?\]\]/g;
@@ -97,7 +95,7 @@ export async function scanWorkspaceHealth(
   rootFolder: string | null,
   fileTree: FileNode[],
 ): Promise<WorkspaceHealthReport> {
-  if (!isTauri() || !rootFolder) {
+  if (!isTauriRuntime() || !rootFolder) {
     return { scannedFiles: 0, checkedAt: Date.now(), issues: [] };
   }
 

@@ -6,9 +6,7 @@ import { parseDocument } from "../../lib/frontmatter";
 import { markdownToHtml } from "../Editor/markdownBridge";
 import { resolveEditorImageHtml } from "../../lib/editorImages";
 import { assertProjectNotePath } from "../../lib/pathSecurity";
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+import { isTauriRuntime } from "../../lib/windows";
 
 export function ReferencePane({
   path,
@@ -28,7 +26,7 @@ export function ReferencePane({
     let cancelled = false;
     void (async () => {
       try {
-        if (!isTauri) {
+        if (!isTauriRuntime()) {
           setHtml(`<p>${name}</p>`);
           return;
         }

@@ -1,6 +1,7 @@
 import { marked } from "marked";
 import { parseDocument } from "./frontmatter";
 import type { FileNode } from "../store/useAppStore";
+import { isTauriRuntime } from "./runtime";
 
 /**
  * Export DOCX em formato manuscrito Shunn ("Proper Manuscript Format",
@@ -12,9 +13,6 @@ import type { FileNode } from "../store/useAppStore";
  * sob demanda — exatamente como o `jspdf` no pdfExport — pra ficar fora
  * do bundle principal.
  */
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export type ShunnCategory = "short" | "novel";
 
@@ -62,7 +60,7 @@ async function prepareSingle(
   fileName: string,
   opts: DocxOptions,
 ): Promise<PreparedDoc> {
-  if (!isTauri) throw new Error("Export DOCX disponível apenas no app Tauri.");
+  if (!isTauriRuntime()) throw new Error("Export DOCX disponível apenas no app Tauri.");
   const body = await readBody(filePath);
   const title = (opts.title || fileName.replace(/\.(md|txt)$/i, "")).trim();
   return {
@@ -76,7 +74,7 @@ async function prepareFolder(
   folderTitle: string,
   opts: DocxOptions,
 ): Promise<PreparedDoc> {
-  if (!isTauri) throw new Error("Export DOCX disponível apenas no app Tauri.");
+  if (!isTauriRuntime()) throw new Error("Export DOCX disponível apenas no app Tauri.");
   const files = flatten(folderTree).filter((f) => /\.(md|txt)$/i.test(f.name));
   if (files.length === 0) {
     throw new Error("Pasta sem arquivos .md/.txt pra exportar.");

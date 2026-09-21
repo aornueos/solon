@@ -1,7 +1,5 @@
 import { CanvasDoc, EMPTY_CANVAS } from "../types/canvas";
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+import { isTauriRuntime } from "./runtime";
 
 /**
  * Cada arquivo `.md` tem seu próprio canvas como sidecar `<file>.canvas.json`
@@ -21,7 +19,7 @@ export function canvasPathFor(filePath: string): string {
  *  - Arquivo NAO existe → EMPTY_CANVAS (canvas novo, ok persistir).
  *  - Arquivo existe mas falha ao ler/parsear → `null` (SINAL de erro).
  *
- * A distincao e' CRITICA pra integridade: se retornassemos EMPTY num erro
+ * A distincao é CRITICA pra integridade: se retornassemos EMPTY num erro
  * transiente (arquivo travado, disco ocupado, JSON corrompido), o auto-save
  * subsequente sobrescreveria o canvas real com vazio — perda catastrofica.
  * Com `null`, o caller (useCanvasPersistence) BLOQUEIA a persistencia e
@@ -30,13 +28,13 @@ export function canvasPathFor(filePath: string): string {
 export async function loadCanvas(
   filePath: string,
 ): Promise<CanvasDoc | null> {
-  if (!isTauri) {
+  if (!isTauriRuntime()) {
     const raw = localStorage.getItem(`solon:canvas:${filePath}`);
     if (raw == null) return { ...EMPTY_CANVAS };
     try {
       return normalize(JSON.parse(raw));
     } catch {
-      return null; // corrompido — nao trata como vazio
+      return null; // corrompido — não trata como vazio
     }
   }
   try {
@@ -46,7 +44,7 @@ export async function loadCanvas(
     const raw = await readTextFile(full);
     return normalize(JSON.parse(raw));
   } catch (err) {
-    // Arquivo existe mas nao deu pra ler/parsear — preserva (retorna null).
+    // Arquivo existe mas não deu pra ler/parsear — preserva (retorna null).
     console.error("Erro ao carregar canvas:", err);
     return null;
   }
@@ -56,7 +54,7 @@ export async function saveCanvas(
   filePath: string,
   doc: CanvasDoc,
 ): Promise<void> {
-  if (!isTauri) {
+  if (!isTauriRuntime()) {
     try {
       localStorage.setItem(`solon:canvas:${filePath}`, JSON.stringify(doc));
     } catch {}
@@ -75,7 +73,7 @@ export async function renameCanvasSidecar(
   oldFilePath: string,
   newFilePath: string,
 ): Promise<void> {
-  if (!isTauri) return;
+  if (!isTauriRuntime()) return;
   try {
     const { rename, exists } = await import("@tauri-apps/plugin-fs");
     const oldSidecar = canvasPathFor(oldFilePath);
@@ -90,7 +88,7 @@ export async function renameCanvasSidecar(
 
 /** Remove o sidecar — chamado após delete do arquivo. */
 export async function deleteCanvasSidecar(filePath: string): Promise<void> {
-  if (!isTauri) return;
+  if (!isTauriRuntime()) return;
   try {
     const { remove, exists } = await import("@tauri-apps/plugin-fs");
     const sidecar = canvasPathFor(filePath);

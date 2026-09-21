@@ -1,5 +1,4 @@
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+import { isTauriRuntime } from "./runtime";
 
 const DEFAULT_SNIPPETS: Record<string, string> = {
   ";chr": "personagem",
@@ -13,7 +12,7 @@ function join(a: string, b: string): string {
 export async function loadSnippets(
   rootFolder: string | null,
 ): Promise<Record<string, string>> {
-  if (!isTauri || !rootFolder) return DEFAULT_SNIPPETS;
+  if (!isTauriRuntime() || !rootFolder) return DEFAULT_SNIPPETS;
   try {
     const { exists, readTextFile } = await import("@tauri-apps/plugin-fs");
     const path = join(rootFolder, ".solon/snippets.json");

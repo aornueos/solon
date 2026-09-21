@@ -866,8 +866,9 @@ export function Editor() {
                   maxWidth: "42ch",
                 }}
               >
-                Nenhum arquivo aberto. Escolha um no explorador à esquerda
-                ou volte para a página inicial.
+                {rootFolder
+                  ? "Nenhum arquivo aberto. Escolha um na lista à esquerda ou crie um novo."
+                  : "Nenhuma pasta aberta. Abra a pasta do seu projeto para ver os arquivos aqui."}
               </p>
             </div>
           </div>

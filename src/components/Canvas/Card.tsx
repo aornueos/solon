@@ -1,11 +1,11 @@
 import { memo, useRef, useState, useEffect } from "react";
-import { CanvasCard, CARD_COLORS, CardSide } from "../../types/canvas";
+import { CanvasCard, CARD_COLORS } from "../../types/canvas";
 import { SCENE_STATUSES } from "../../types/scene";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { useAppStore } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { startDrag } from "../../lib/drag";
-import { startCanvasLinkDrag } from "../../lib/canvasLinkDrag";
+import { ConnectionDots } from "./ConnectionDots";
 import { Link2, Trash2, Palette, FileText, MapPin, Clock, User } from "lucide-react";
 import clsx from "clsx";
 
@@ -19,12 +19,10 @@ export const Card = memo(function Card({ card }: Props) {
   const bringToFront = useCanvasStore((s) => s.bringToFront);
   const select = useCanvasStore((s) => s.select);
   const toggleInSelection = useCanvasStore((s) => s.toggleInSelection);
-  // Seletores DERIVADOS (booleans/primitivos) em vez de selectedId/selectedIds
-  // crus. Antes, assinar `selectedIds: Set<string>` fazia *todos* os cards
-  // re-renderizarem em qualquer mudanca de selecao (Set sempre nova ref).
-  // Agora cada Card so' re-renderiza quando o status DELE muda — pra 100
-  // cards, selecionar um card vai de 100 re-renders pra 2 (o anterior +
-  // o novo). Mesmo principio pra linkingFromId.
+  // Seletores derivados (booleanos) em vez de selectedId/selectedIds crus:
+  // `selectedIds` é um Set novo a cada mudança, então assiná-lo faria todos
+  // os cards re-renderizarem a cada clique. Assim só os dois cards cujo
+  // estado de fato mudou re-renderizam. Mesma razão para linkingFromId.
   const isSelected = useCanvasStore((s) => s.selectedId === card.id);
   const isInGroup = useCanvasStore(
     (s) => s.selectedId !== card.id && s.selectedIds.has(card.id),
@@ -79,12 +77,12 @@ export const Card = memo(function Card({ card }: Props) {
     const target = e.target as HTMLElement;
     // Lemos linkingFromId via getState pra evitar subscription — esse valor
     // muda durante o linking e fazia todo Card re-renderizar a cada mouse
-    // move durante a operacao.
+    // move durante a operação.
     const linkingFromId = useCanvasStore.getState().linkingFromId;
 
     // Arrow mode tem prioridade sobre todos os guards: clicar em QUALQUER
     // pedaço do card (inclusive barra de ações, handle de resize, overlay
-    // de "action area") deve iniciar ou completar o link. Antes, a barra
+    // de "action área") deve iniciar ou completar o link. Antes, a barra
     // de ações — com `opacity-0 group-hover:opacity-100` ocupando 28px
     // acima do card — interceptava o clique e o usuário via "a seta só
     // aparece em partes específicas do card".
@@ -127,17 +125,17 @@ export const Card = memo(function Card({ card }: Props) {
       return;
     }
 
-    // Group drag: se este card ja pertence a uma selecao multipla,
-    // preserva o grupo e translada todos juntos. Se nao, reduz a
-    // selecao a este card (comportamento classico de single-drag).
+    // Group drag: se este card ja pertence a uma seleção múltipla,
+    // preserva o grupo e translada todos juntos. Se não, reduz a
+    // seleção a este card (comportamento clássico de single-drag).
     //
     // Detecta _antes_ de chamar `select`, pq select() reescreveria
-    // selectedIds pra {card.id} e perderiamos a referencia ao grupo.
+    // selectedIds pra {card.id} e perderiamos a referência ao grupo.
     const currentIds = useCanvasStore.getState().selectedIds;
     const isGroupDrag = currentIds.size > 1 && currentIds.has(card.id);
 
     if (isGroupDrag) {
-      // Snapshot das posicoes originais de TODOS os itens do grupo.
+      // Snapshot das posições originais de TODOS os itens do grupo.
       const snapshot = snapshotSelection();
       const orig = { startX: e.clientX, startY: e.clientY };
       let frame: number | null = null;
@@ -157,7 +155,7 @@ export const Card = memo(function Card({ card }: Props) {
         frame = null;
         pendingDelta = null;
       };
-      // History push antes do drag — Ctrl+Z volta a posicao do grupo
+      // History push antes do drag — Ctrl+Z volta a posição do grupo
       // inteira pre-drag de uma vez.
       pushHistory();
       // NAO chamamos select() aqui — preservamos selectedId/selectedIds
@@ -261,16 +259,12 @@ export const Card = memo(function Card({ card }: Props) {
     return () => window.clearTimeout(id);
   }, [showPalette]);
 
-  // Cor de fundo do card: se o usuário escolheu uma custom na paleta
-  // (CARD_COLORS tem hex fixos, sépia-friendly), respeitamos. Sem custom,
-  // cai no `--bg-panel` do tema — garante que cards default no dark tema
-  // fiquem no grafite e não no sépia claro original.
+  // Sem cor escolhida na paleta, o card segue o painel do tema — no tema
+  // escuro isso o mantém grafite em vez do sépia claro.
   const color = card.color ?? "var(--bg-panel)";
-  // Quando o card tem fundo pastel custom (todos CARD_COLORS sao tons claros
-  // — sepia, ambar, verde, rosa, azul, lavanda), o texto interno PRECISA
-  // ser escuro pra contrastar — independente do tema da app. Sem isso, no
-  // dark theme `--text-primary` vira clarinho e some no fundo pastel.
-  // Tons: #1f1e1c (mesmo do --text-primary do light theme).
+  // Todas as cores da paleta são pastéis claros, então um card pintado
+  // precisa de texto escuro seja qual for o tema: `--text-primary` no tema
+  // escuro sumiria sobre o pastel.
   const hasCustomBg = !!card.color;
   const innerTextColor = hasCustomBg ? "#1f1e1c" : "var(--text-primary)";
   const innerSecondaryColor = hasCustomBg ? "#5e5a52" : "var(--text-secondary)";
@@ -281,9 +275,8 @@ export const Card = memo(function Card({ card }: Props) {
     : undefined;
   const statusBorder = sceneStatus?.color ?? "var(--border)";
 
-  // Ring de estado: ring do Tailwind injeta cor via `--tw-ring-color`,
-  // mas usar Tailwind arbitrary com `ring-[#hex]` não respeita theme.
-  // Composed aqui em runtime — 2px solid + offset simulado via outline.
+  // O anel de estado é montado em runtime porque as cores vêm de
+  // variáveis do tema, que o utilitário `ring-[#hex]` do Tailwind não lê.
   const ringStyle: React.CSSProperties = isLinkSource
     ? { boxShadow: "0 0 0 2px var(--accent-2)" }
     : isLinkCandidate
@@ -308,10 +301,8 @@ export const Card = memo(function Card({ card }: Props) {
         width: card.w,
         height: card.h,
         background: color,
-        // Hairline 1px, cantos suaves, sombra macia. Cena ganha uma faixa
-        // accent fina (3px) com a cor do status na borda esquerda; resto
-        // hairline. Selecionado = borda accent + sombra um pouco mais
-        // presente.
+        // Card de cena ganha uma faixa de 3px na borda esquerda com a cor
+        // do status; o resto é hairline.
         borderLeft: isScene
           ? `3px solid ${statusBorder}`
           : `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
@@ -397,10 +388,8 @@ export const Card = memo(function Card({ card }: Props) {
           }
           onClick={(e) => {
             e.stopPropagation();
-            // Se há linking ativo, este botão completa a conexão quando
-            // clicado num card diferente do de origem. Antes ele só chamava
-            // beginLink, o que fazia usuário "clicar e não acontecer nada"
-            // quando partia do Link2 para conectar via barra de ações.
+            // Com um linking ativo, este botão completa a conexão no card
+            // clicado; no card de origem, cancela.
             const fromId = useCanvasStore.getState().linkingFromId;
             if (fromId && fromId !== card.id) {
               completeLink(card.id);
@@ -482,19 +471,16 @@ export const Card = memo(function Card({ card }: Props) {
         </div>
       )}
 
-      {/* Pontos de conexão (4 lados) — clique inicia/completa linking
-          com lado explícito. Visíveis no hover do card, sempre durante
-          linking, e quando o card está selecionado.
-          Em modo eraser ficam escondidos: o stopPropagation deles comeria
-          o click e o card nao seria apagado, dando a sensacao de "borracha
-          nao funciona em alguns pontos do card". */}
+      {/* Pontos de conexão (4 lados). Escondidos com a borracha ativa: o
+          stopPropagation deles engoliria o clique e o card não seria
+          apagado — parecia que a borracha falhava em certos pontos. */}
       {tool !== "eraser" && (
         <ConnectionDots
           entityId={card.id}
           isLinkSource={isLinkSource}
-          isLinkCandidate={isLinkCandidate}
+
           linkingFromSide={linkingFromSide}
-          isSelected={isSelected}
+
           onPick={(side) => {
             const fromId = useCanvasStore.getState().linkingFromId;
             if (fromId && fromId !== card.id) {
@@ -509,110 +495,12 @@ export const Card = memo(function Card({ card }: Props) {
         />
       )}
 
-      {/* Handle de resize (canto inf-dir). Tambem escondido em eraser
-          pelo mesmo motivo dos ConnectionDots. */}
+      {/* Handle de resize (canto inferior direito), escondido com a
+          borracha ativa pelo mesmo motivo dos pontos de conexão. */}
       {tool !== "eraser" && <ResizeHandle card={card} />}
     </div>
   );
 });
-
-function ConnectionDots({
-  entityId,
-  isLinkSource,
-  isLinkCandidate,
-  linkingFromSide,
-  isSelected,
-  onPick,
-}: {
-  entityId: string;
-  isLinkSource: boolean;
-  isLinkCandidate: boolean;
-  linkingFromSide: CardSide | null;
-  isSelected: boolean;
-  onPick: (side: CardSide) => void;
-}) {
-  const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
-  const dotSize = 10 / zoom;
-  const border = 1.8 / zoom;
-  const mask = 1.5 / zoom;
-  // Posicionamento em CSS: cada dot fica centrado no midpoint do seu lado,
-  // usando translate(-50%,-50%) pra o centro do círculo coincidir com a
-  // borda do card. Assim o dot "monta" a borda como num Miro clássico.
-  const sides: {
-    side: CardSide;
-    style: React.CSSProperties;
-    title: string;
-  }[] = [
-    {
-      side: "top",
-      style: { top: 0, left: "50%", transform: "translate(-50%, -50%)" },
-      title: "Conectar pelo topo",
-    },
-    {
-      side: "right",
-      style: { top: "50%", left: "100%", transform: "translate(-50%, -50%)" },
-      title: "Conectar pela direita",
-    },
-    {
-      side: "bottom",
-      style: { top: "100%", left: "50%", transform: "translate(-50%, -50%)" },
-      title: "Conectar pela base",
-    },
-    {
-      side: "left",
-      style: { top: "50%", left: 0, transform: "translate(-50%, -50%)" },
-      title: "Conectar pela esquerda",
-    },
-  ];
-
-  // Durante linking todos os dots de candidatos ficam visíveis (afford de
-  // drop target). Fora de linking só aparecem no hover/selected pra não
-  // poluir o canvas.
-  const alwaysShow = isLinkSource || isLinkCandidate || isSelected;
-
-  return (
-    <>
-      {sides.map(({ side, style, title }) => {
-        // Destaca o dot que está sendo usado como lado de origem
-        const activeSource = isLinkSource && linkingFromSide === side;
-        return (
-          <button
-            key={side}
-            data-card-action
-            data-connection-side={side}
-            title={title}
-            onMouseDown={(e) => {
-              // stopPropagation garante que o onMouseDown do card pai não
-              // dispare (evita iniciar drag do card ou auto-link por clique
-              // no body). preventDefault evita text-select em arrasto.
-              e.stopPropagation();
-              e.preventDefault();
-              onPick(side);
-              startCanvasLinkDrag(entityId, e);
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onDoubleClick={(e) => e.stopPropagation()}
-            className={clsx(
-              "absolute rounded-full transition-opacity",
-              alwaysShow ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-            )}
-            style={{
-              ...style,
-              width: dotSize,
-              height: dotSize,
-              background: activeSource ? "var(--accent)" : "var(--bg-panel)",
-              border: `${border}px solid var(--accent)`,
-              cursor: "crosshair",
-              // zIndex acima do resize handle e da barra de ações
-              zIndex: 40,
-              boxShadow: `0 0 0 ${mask}px var(--bg-app), 0 ${1 / zoom}px ${2 / zoom}px rgba(0,0,0,0.18)`,
-            }}
-          />
-        );
-      })}
-    </>
-  );
-}
 
 function ActionBtn({
   children,
@@ -803,6 +691,11 @@ function MetaItem({
 function ResizeHandle({ card }: { card: CanvasCard }) {
   const updateCard = useCanvasStore((s) => s.updateCard);
   const pushHistory = useCanvasStore((s) => s.pushHistory);
+  // O handle vive dentro do container escalado, então um tamanho fixo em
+  // world px encolhe junto com o zoom: a 30% sobravam 4px de alvo. Dividir
+  // pelo zoom mantem ~12px na tela, igual aos pontos de conexão.
+  const zoom = useCanvasStore((s) => s.viewport.zoom || 1);
+  const size = 12 / zoom;
   const onDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -856,12 +749,15 @@ function ResizeHandle({ card }: { card: CanvasCard }) {
     <div
       data-card-action
       onMouseDown={onDown}
-      className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize opacity-0 group-hover:opacity-100"
+      title="Arraste para redimensionar"
+      className="absolute bottom-0 right-0 cursor-nwse-resize opacity-0 group-hover:opacity-100"
       style={{
-        // Hachura diagonal 2px usando `border-strong` pro hint visual.
-        // No dark tema o tom é cinza claro; no light é cinza-sépia.
-        background:
-          "repeating-linear-gradient(135deg, var(--border-strong) 0 2px, transparent 2px 4px)",
+        width: size,
+        height: size,
+        // Hachura diagonal usando `border-strong`: cinza claro no tema
+        // escuro, cinza-sepia no claro. As faixas também são divididas
+        // pelo zoom pra manter 2px de largura na tela.
+        backgroundImage: `repeating-linear-gradient(135deg, var(--border-strong) 0 ${2 / zoom}px, transparent ${2 / zoom}px ${4 / zoom}px)`,
       }}
     />
   );

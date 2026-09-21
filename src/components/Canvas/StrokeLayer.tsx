@@ -12,7 +12,7 @@ import { startCanvasLinkDrag } from "../../lib/canvasLinkDrag";
  * (antes de ser commitado na store). Evita re-commit a cada pixel.
  *
  * Otimizacao: cada stroke vira um `<StrokeNode>` memoizado. Sem isso,
- * qualquer mudanca de selecao/zoom recomputa `pointsToPath` para todos
+ * qualquer mudanca de seleção/zoom recomputa `pointsToPath` para todos
  * strokes (O(N · pontos) por frame). Strokes longos com 1000+ pontos
  * dominavam o frame budget durante pan/zoom.
  */
@@ -66,8 +66,8 @@ export const StrokeLayer = memo(function StrokeLayer({
 /**
  * Um stroke individual. Memoizado por (stroke, tool). Subscreve apenas
  * seletores DERIVADOS (booleans) — assim selecionar/deselecionar outro
- * stroke nao re-renderiza este. O path `d` e' memoizado por ref do
- * array de pontos: enquanto o stroke nao for alterado, nao reconstroi.
+ * stroke não re-renderiza este. O path `d` é memoizado por ref do
+ * array de pontos: enquanto o stroke não for alterado, não reconstroi.
  */
 const StrokeNode = memo(function StrokeNode({
   stroke: s,
@@ -95,11 +95,16 @@ const StrokeNode = memo(function StrokeNode({
   const bounds = useMemo(() => strokeRect(s), [s]);
   if (!d) return null;
 
+  // A área de clique é em world px: fixa-la fazia o traço encolher junto
+  // com o zoom e virar impossível de acertar abaixo de ~50%. Dividir pelo
+  // zoom mantem ~16px de alvo na tela, igual ao hit das setas.
+  const hitWidth = Math.max(s.width + 8 / zoom, 16 / zoom);
+
   // Cor de render theme-aware: vazio ("Auto") ou o legado "#2a2420"
   // (Tinta sepia escuro, default antigo) viram var(--text-primary).
-  // Mesma logica do FloatingText — strokes criados em tema claro
-  // continuam legiveis ao trocar pra dark. Cores deliberadas
-  // (sangue, indigo, marcador, floresta) sao preservadas.
+  // Mesma lógica do FloatingText — strokes criados em tema claro
+  // continuam legíveis ao trocar pra dark. Cores deliberadas
+  // (sangue, indigo, marcador, floresta) são preservadas.
   const strokeColor =
     !s.color || s.color === "#2a2420" ? "var(--text-primary)" : s.color;
 
@@ -109,22 +114,41 @@ const StrokeNode = memo(function StrokeNode({
       data-canvas-entity-id={s.id}
       style={{
         pointerEvents:
-          tool === "select" || tool === "eraser" ? "auto" : "none",
+          tool === "select" || tool === "eraser" || tool === "arrow"
+            ? "auto"
+            : "none",
       }}
     >
-      {/* Hit area gorda (transparente) pra facilitar seleção/borracha */}
+      {/* Hit área larga e transparente, pra facilitar clique e borracha. */}
       <path
         d={d}
         stroke="transparent"
-        strokeWidth={Math.max(12, s.width + 8)}
+        strokeWidth={hitWidth}
         fill="none"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ cursor: tool === "eraser" ? "cell" : "pointer" }}
+        style={{
+          cursor:
+            tool === "eraser"
+              ? "cell"
+              : tool === "arrow"
+                ? "crosshair"
+                : "pointer",
+        }}
         onMouseDown={(e) => {
           if (tool === "eraser") {
             e.stopPropagation();
             eraseById(s.id);
+            return;
+          }
+          // Com a ferramenta seta ativa, o traço é um alvo como qualquer
+          // outro — a dica na tela promete "cards, textos, imagens, traços".
+          if (tool === "arrow") {
+            e.stopPropagation();
+            e.preventDefault();
+            const fromId = useCanvasStore.getState().linkingFromId;
+            if (fromId && fromId !== s.id) completeLink(s.id);
+            else beginLink(s.id);
             return;
           }
           if (tool !== "select") return;
@@ -216,13 +240,13 @@ function StrokeConnectionDots({
   zoom: number;
   onPick: (side: CardSide) => void;
 }) {
-  // So' a origem do link mantem os dots fixos; candidatos e selecao simples
+  // So' a origem do link mantem os dots fixos; candidatos e seleção simples
   // aparecem no hover (senao vira sopa de bolinhas). Igual ao ConnectionDots.
   const alwaysShow = isLinkSource;
   const radius = 5 / zoom;
   const strokeWidth = 1.8 / zoom;
-  // Fora do bbox do traco — mesmo gap do ConnectionDots (Card/Image/Text),
-  // pra nao ficar em cima da borda.
+  // Fora do bbox do traço — mesmo gap do ConnectionDots (Card/Image/Text),
+  // pra não ficar em cima da borda.
   const gap = 8 / zoom;
   const sides: { side: CardSide; x: number; y: number; title: string }[] = [
     { side: "top", x: rect.x + rect.w / 2, y: rect.y - gap, title: "Conectar pelo topo" },

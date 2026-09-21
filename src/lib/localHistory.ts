@@ -1,5 +1,6 @@
 import { parseDocument } from "./frontmatter";
 import { isProjectNotePath } from "./pathSecurity";
+import { isTauriRuntime } from "./runtime";
 
 export interface LocalSnapshot {
   path: string;
@@ -9,9 +10,6 @@ export interface LocalSnapshot {
 }
 
 const MAX_SNAPSHOTS_PER_FILE = 24;
-
-const isTauri = (): boolean =>
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 function joinPath(dir: string, name: string): string {
   const sep = dir.includes("\\") && !dir.includes("/") ? "\\" : "/";
@@ -72,7 +70,7 @@ export async function listSnapshots(
   rootFolder: string | null,
   filePath: string | null,
 ): Promise<LocalSnapshot[]> {
-  if (!isTauri() || !rootFolder || !filePath || !isProjectNotePath(rootFolder, filePath)) return [];
+  if (!isTauriRuntime() || !rootFolder || !filePath || !isProjectNotePath(rootFolder, filePath)) return [];
   const { readDir, stat, readTextFile } = await import("@tauri-apps/plugin-fs");
   const dir = historyDir(rootFolder, filePath);
   try {
@@ -127,7 +125,7 @@ export async function createSnapshotBeforeWrite({
   filePath: string;
   nextContent: string;
 }): Promise<void> {
-  if (!isTauri() || !rootFolder || !isProjectNotePath(rootFolder, filePath)) return;
+  if (!isTauriRuntime() || !rootFolder || !isProjectNotePath(rootFolder, filePath)) return;
   const { exists, mkdir, readTextFile, remove } = await import(
     "@tauri-apps/plugin-fs"
   );
