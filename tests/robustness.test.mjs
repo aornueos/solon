@@ -32,7 +32,10 @@ import { isSafeAssetSrc } from "../src/lib/canvasImages.ts";
 import { useCanvasStore } from "../src/store/useCanvasStore.ts";
 import {
   clientToSurface,
+  contentBoxes,
+  entityRects,
   fitAllViewport,
+  neighbourId,
   zoomToLevel,
 } from "../src/lib/canvasViewport.ts";
 import { isSelectionToggle } from "../src/lib/canvasSelectionInput.ts";
@@ -634,5 +637,75 @@ describe("canvas — zoom em nível exato", () => {
     assert.equal(useCanvasStore.getState().viewport.zoom, 1);
     assert.ok(Math.abs(after.x - before.x) < 1e-9);
     assert.ok(Math.abs(after.y - before.y) < 1e-9);
+  });
+});
+
+describe("canvas — percurso por teclado", () => {
+  const seed = () => {
+    const store = useCanvasStore.getState();
+    store.reset();
+    // Criados fora de ordem de leitura de propósito: o percurso ordena.
+    const baixo = store.addCard({ x: 0, y: 500, w: 200, h: 100 });
+    const cimaDireita = store.addCard({ x: 400, y: 0, w: 200, h: 100 });
+    const cimaEsquerda = store.addCard({ x: 0, y: 0, w: 200, h: 100 });
+    return { baixo, cimaDireita, cimaEsquerda };
+  };
+
+  it("walks top-to-bottom then left-to-right", () => {
+    const { baixo, cimaDireita, cimaEsquerda } = seed();
+    const ordem = entityRects().map((e) => e.id);
+    assert.deepEqual(ordem, [cimaEsquerda, cimaDireita, baixo]);
+  });
+
+  it("wraps around at both ends", () => {
+    const { baixo, cimaEsquerda } = seed();
+    assert.equal(neighbourId(baixo, 1), cimaEsquerda);
+    assert.equal(neighbourId(cimaEsquerda, -1), baixo);
+  });
+
+  it("starts from either end when nothing is selected", () => {
+    const { baixo, cimaEsquerda } = seed();
+    assert.equal(neighbourId(null, 1), cimaEsquerda);
+    assert.equal(neighbourId(null, -1), baixo);
+  });
+
+  it("reaches arrows, which have no box of their own", () => {
+    const store = useCanvasStore.getState();
+    store.reset();
+    const a = store.addCard({ x: 0, y: 0, w: 100, h: 100 });
+    const b = store.addCard({ x: 600, y: 0, w: 100, h: 100 });
+    useCanvasStore.getState().addArrow(a, b);
+    const arrowId = useCanvasStore.getState().arrows[0].id;
+    assert.ok(entityRects().some((e) => e.id === arrowId));
+    // O enquadramento ignora quem não ocupa área.
+    assert.equal(contentBoxes().length, 2);
+  });
+
+  it("nudges the whole selection and collapses a burst into one undo", () => {
+    const store = useCanvasStore.getState();
+    store.reset();
+    const a = store.addCard({ x: 0, y: 0, w: 100, h: 100 });
+    const b = store.addCard({ x: 300, y: 0, w: 100, h: 100 });
+    useCanvasStore.getState().selectMany([a, b], a);
+
+    const historyBefore = useCanvasStore.getState().past.length;
+    for (let i = 0; i < 5; i += 1) {
+      useCanvasStore.getState().nudgeSelection(1, 0);
+    }
+    const state = useCanvasStore.getState();
+    const byId = Object.fromEntries(state.cards.map((c) => [c.id, c]));
+    assert.equal(byId[a].x, 5);
+    assert.equal(byId[b].x, 305);
+    assert.equal(state.past.length, historyBefore + 1);
+  });
+
+  it("does nothing without a selection", () => {
+    const store = useCanvasStore.getState();
+    store.reset();
+    store.addCard({ x: 0, y: 0 });
+    useCanvasStore.getState().select(null);
+    const before = useCanvasStore.getState().cards[0].x;
+    useCanvasStore.getState().nudgeSelection(10, 10);
+    assert.equal(useCanvasStore.getState().cards[0].x, before);
   });
 });

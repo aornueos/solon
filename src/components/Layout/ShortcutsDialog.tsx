@@ -85,6 +85,17 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "Esc", label: "Cancelar / desselecionar" },
     ],
   },
+  {
+    title: "Canvas pelo teclado",
+    items: [
+      { keys: "Tab", label: "Foco no canvas: próximo item, em ordem de leitura" },
+      { keys: "Shift + Tab", label: "Item anterior" },
+      { keys: "Setas", label: "Mover a seleção (1px, ou uma célula com snap)" },
+      { keys: "Shift + setas", label: "Mover 10px" },
+      { keys: "Enter", label: "Editar o item; cena abre na escrita" },
+      { keys: "Esc", label: "Limpar a seleção e soltar o foco do canvas" },
+    ],
+  },
 ];
 
 interface Props {

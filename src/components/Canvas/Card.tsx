@@ -63,6 +63,9 @@ export const Card = memo(function Card({ card }: Props) {
 
   const [editing, setEditing] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
+  // Enter com o foco no canvas pede edicao por aqui; ver `requestEdit`.
+  const editRequested = useCanvasStore((s) => s.requestEditId === card.id);
+  const requestEdit = useCanvasStore((s) => s.requestEdit);
 
   const openInEditor = () => {
     if (!isScene || !card.scenePath) return;
@@ -248,6 +251,18 @@ export const Card = memo(function Card({ card }: Props) {
       },
     });
   };
+
+  // Enter no canvas: cena abre na escrita, card de texto entra em edição.
+  // O pedido é consumido na hora para não reabrir a cada render. Só
+  // `editRequested` entra nas dependências — as outras são lidas no
+  // instante em que o pedido chega.
+  useEffect(() => {
+    if (!editRequested) return;
+    requestEdit(null);
+    if (isScene) openInEditor();
+    else setEditing(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editRequested]);
 
   // Fecha paleta ao clicar fora
   useEffect(() => {

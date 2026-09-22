@@ -26,10 +26,21 @@ import {
 import {
   clientToSurface,
   fitAllViewport,
+  neighbourId,
+  rectOf,
+  revealRect,
   zoomStep,
   zoomToLevel,
 } from "../../lib/canvasViewport";
 import { isSelectionToggle } from "../../lib/canvasSelectionInput";
+
+/** Setas do teclado, em delta unitario. */
+const NUDGE_KEYS: Record<string, { dx: number; dy: number }> = {
+  ArrowUp: { dx: 0, dy: -1 },
+  ArrowDown: { dx: 0, dy: 1 },
+  ArrowLeft: { dx: -1, dy: 0 },
+  ArrowRight: { dx: 1, dy: 0 },
+};
 
 /**
  * Canvas infinito do projeto.
@@ -46,6 +57,9 @@ import { isSelectionToggle } from "../../lib/canvasSelectionInput";
  * F (enquadrar), +/− (zoom), 0 (100%), Ctrl+D (duplicar), Ctrl+C/X/V,
  * Ctrl+Z/Y, Delete (apagar seleção), Esc (voltar para select).
  * Shift ou Ctrl/Cmd somam à seleção, no clique e no marquee.
+ *
+ * Com o foco na superfície: Tab percorre os itens em ordem de leitura,
+ * as setas movem a seleção e Enter abre o item para edição.
  */
 export function CanvasView() {
   const viewport = useCanvasStore((s) => s.viewport);
@@ -218,11 +232,56 @@ export function CanvasView() {
       }
       if (typing) return;
 
+      // Tab, setas e Enter só valem com o foco na própria superfície. Num
+      // botão da toolbar ou noutro painel, o teclado precisa continuar
+      // fazendo o de sempre — e Tab preso no canvas seria uma armadilha.
+      const onSurface = document.activeElement === containerRef.current;
+
       if (e.key === "Escape") {
         setEmptyLinkMenu(null);
         cancelLink();
         select(null);
         setTool("select");
+        // Devolve o foco ao documento: é assim que se sai do ciclo do Tab.
+        if (onSurface) containerRef.current?.blur();
+      }
+
+      if (e.key === "Tab" && onSurface) {
+        e.preventDefault();
+        const st = useCanvasStore.getState();
+        const next = neighbourId(st.selectedId, e.shiftKey ? -1 : 1);
+        if (!next) return;
+        st.select(next);
+        const rect = rectOf(next);
+        if (rect) revealRect(rect, containerRef.current);
+        return;
+      }
+
+      if (e.key === "Enter" && onSurface) {
+        const st = useCanvasStore.getState();
+        if (!st.selectedId) return;
+        e.preventDefault();
+        st.requestEdit(st.selectedId);
+        return;
+      }
+
+      const nudge = NUDGE_KEYS[e.key];
+      if (nudge && onSurface) {
+        const st = useCanvasStore.getState();
+        if (!st.selectedId && st.selectedIds.size === 0) return;
+        e.preventDefault();
+        // Com o snap ligado o passo é uma célula, pra não quebrar o
+        // alinhamento que o snap acabou de garantir. Sem snap, 1px e
+        // 10px com Shift, como em qualquer editor vetorial.
+        const step = canvasSnapToGrid
+          ? canvasGridSize
+          : e.shiftKey
+            ? 10
+            : 1;
+        st.nudgeSelection(nudge.dx * step, nudge.dy * step);
+        const rect = st.selectedId ? rectOf(st.selectedId) : null;
+        if (rect) revealRect(rect, containerRef.current);
+        return;
       }
       if (e.key === "Delete" || e.key === "Backspace") {
         // Le estado FRESCO (não o closure do effect, que pode estar stale) —
@@ -349,6 +408,8 @@ export function CanvasView() {
     cancelLink,
     select,
     setTool,
+    canvasSnapToGrid,
+    canvasGridSize,
   ]);
 
   // Refresca snapshots de cenas ao (re)entrar no canvas
@@ -784,6 +845,11 @@ export function CanvasView() {
       active.blur();
     }
 
+    // Clicar no fundo põe o foco na superfície, senão Tab e setas não
+    // teriam onde começar: o `preventDefault` logo abaixo cancelaria a
+    // mudança de foco que o clique faria sozinho.
+    containerRef.current?.focus({ preventScroll: true });
+
     const isPanTrigger = spaceDown.current || e.button === 1;
     if (isPanTrigger) return startPan(e);
 
@@ -865,10 +931,18 @@ export function CanvasView() {
       onDragOver={onDragOver}
       onDrop={onDrop}
       role="application"
-      aria-label="Canvas do Solon"
+      tabIndex={0}
+      aria-label="Canvas do projeto. Tab percorre os itens, setas movem a seleção, Enter edita, Esc sai."
+      aria-describedby="canvas-keyboard-hint"
       className="canvas-surface relative w-full h-full overflow-hidden select-none"
       style={{ cursor: bgCursor }}
     >
+      <p id="canvas-keyboard-hint" className="sr-only">
+        Com o foco no canvas, Tab e Shift+Tab percorrem os itens em ordem de
+        leitura, as setas movem a seleção, Enter abre o item para edição e
+        Esc limpa a seleção e devolve o foco à página.
+      </p>
+
       {!activeFilePath && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div

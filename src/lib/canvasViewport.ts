@@ -32,22 +32,54 @@ export function clientToSurface(
   return { x: clientX - rect.left, y: clientY - rect.top };
 }
 
-/** Caixas de todas as entidades com geometria — a base do enquadramento. */
-export function contentBoxes(): Rect[] {
-  const { cards, images, texts, strokes } = useCanvasStore.getState();
-  const boxes: Rect[] = [];
+export type EntityRect = { id: string; rect: Rect };
+
+/**
+ * Toda entidade do canvas com a sua caixa, em ordem de leitura: de cima
+ * para baixo e, no empate, da esquerda para a direita. É a ordem que o Tab
+ * percorre, então precisa ser estável e corresponder ao que se vê.
+ *
+ * Setas entram pelo ponto médio entre os centros das duas pontas — sem
+ * isso elas ficariam inalcançáveis por teclado.
+ */
+export function entityRects(): EntityRect[] {
+  const { cards, images, texts, strokes, arrows } = useCanvasStore.getState();
+  const out: EntityRect[] = [];
+  const byId = new Map<string, Rect>();
+
+  const push = (id: string, rect: Rect) => {
+    byId.set(id, rect);
+    out.push({ id, rect });
+  };
+
   for (const card of cards) {
-    boxes.push({ x: card.x, y: card.y, w: card.w, h: card.h });
+    push(card.id, { x: card.x, y: card.y, w: card.w, h: card.h });
   }
   for (const image of images) {
-    boxes.push({ x: image.x, y: image.y, w: image.w, h: image.h });
+    push(image.id, { x: image.x, y: image.y, w: image.w, h: image.h });
   }
-  for (const text of texts) boxes.push(textRect(text));
+  for (const text of texts) push(text.id, textRect(text));
   for (const stroke of strokes) {
-    const box = strokeRect(stroke);
-    if (box) boxes.push(box);
+    const rect = strokeRect(stroke);
+    if (rect) push(stroke.id, rect);
   }
-  return boxes;
+  for (const arrow of arrows) {
+    const from = byId.get(arrow.from);
+    const to = byId.get(arrow.to);
+    if (!from || !to) continue;
+    const cx = (from.x + from.w / 2 + to.x + to.w / 2) / 2;
+    const cy = (from.y + from.h / 2 + to.y + to.h / 2) / 2;
+    out.push({ id: arrow.id, rect: { x: cx, y: cy, w: 0, h: 0 } });
+  }
+
+  return out.sort((a, b) => a.rect.y - b.rect.y || a.rect.x - b.rect.x);
+}
+
+/** Caixas de tudo que ocupa área — a base do enquadramento. */
+export function contentBoxes(): Rect[] {
+  return entityRects()
+    .filter(({ rect }) => rect.w > 0 && rect.h > 0)
+    .map(({ rect }) => rect);
 }
 
 const FIT_PADDING = 80;
@@ -109,4 +141,53 @@ export function zoomToLevel(level: number, from?: Element | null) {
     x: w / 2 - worldCx * level,
     y: h / 2 - worldCy * level,
   });
+}
+
+/** Margem entre o item revelado e a borda da superfície, em px de tela. */
+const REVEAL_MARGIN = 48;
+
+/**
+ * Faz o pan mínimo para que `rect` (world coords) caiba na tela. No-op se
+ * já estiver visível — navegar por teclado não deve mexer na vista quando
+ * o próximo item já está à mostra.
+ */
+export function revealRect(rect: Rect, from?: Element | null) {
+  const { w, h } = surfaceSize(canvasSurfaceRect(from));
+  if (w === 0 || h === 0) return;
+  const { viewport, setViewport } = useCanvasStore.getState();
+  const { zoom } = viewport;
+
+  const left = rect.x * zoom + viewport.x;
+  const top = rect.y * zoom + viewport.y;
+  const right = (rect.x + rect.w) * zoom + viewport.x;
+  const bottom = (rect.y + rect.h) * zoom + viewport.y;
+
+  let dx = 0;
+  let dy = 0;
+  if (left < REVEAL_MARGIN) dx = REVEAL_MARGIN - left;
+  else if (right > w - REVEAL_MARGIN) dx = w - REVEAL_MARGIN - right;
+  if (top < REVEAL_MARGIN) dy = REVEAL_MARGIN - top;
+  else if (bottom > h - REVEAL_MARGIN) dy = h - REVEAL_MARGIN - bottom;
+
+  if (dx === 0 && dy === 0) return;
+  setViewport({ x: viewport.x + dx, y: viewport.y + dy });
+}
+
+/**
+ * Próximo id na ordem de leitura a partir do que está selecionado. Dá a
+ * volta nas duas pontas; sem seleção, começa pelo primeiro (ou pelo último
+ * quando `step` é negativo).
+ */
+export function neighbourId(currentId: string | null, step: 1 | -1): string | null {
+  const entities = entityRects();
+  if (entities.length === 0) return null;
+  const index = currentId ? entities.findIndex((e) => e.id === currentId) : -1;
+  if (index === -1) return (step === 1 ? entities[0] : entities[entities.length - 1]).id;
+  const next = (index + step + entities.length) % entities.length;
+  return entities[next].id;
+}
+
+/** Caixa de um id, ou null quando ele não existe mais. */
+export function rectOf(id: string): Rect | null {
+  return entityRects().find((e) => e.id === id)?.rect ?? null;
 }

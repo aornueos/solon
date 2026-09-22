@@ -139,11 +139,12 @@ export function GlobalSearchDialog() {
               <button
                 key={`${result.path}:${result.line}:${index}`}
                 onClick={() => void go(result)}
-                className="w-full flex items-start gap-3 px-3 mx-1.5 py-2 text-left transition-colors"
+                className="solon-long-row w-full flex items-start gap-3 px-3 mx-1.5 py-2 text-left transition-colors"
                 style={{
                   color: "var(--text-primary)",
                   borderRadius: "var(--radius-sm)",
                   width: "calc(100% - 0.75rem)",
+                  ["--solon-row-h" as string]: "52px",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "var(--accent-soft)";

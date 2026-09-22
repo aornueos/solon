@@ -400,8 +400,13 @@ const ArrowNode = memo(function ArrowNode({
           select(a.id);
         }}
         onDoubleClick={(e) => {
+          // Duplo clique endireita a seta em vez de apagá-la. Apagar num
+          // gesto que se usa para acertar um alvo fino dispara sem querer;
+          // Delete, a borracha e a barra de seleção cobrem a remoção e
+          // estão à vista.
           e.stopPropagation();
-          removeArrow(a.id);
+          if (tool === "eraser") return;
+          setArrowBend(a.id, null);
         }}
       />
       <path

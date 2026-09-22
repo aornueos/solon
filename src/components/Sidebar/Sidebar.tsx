@@ -745,7 +745,10 @@ function FileTreeRow({
       aria-selected={node.type === "file" ? isActive : undefined}
       aria-expanded={node.type === "folder" ? node.expanded : undefined}
       className={clsx(
-        "flex items-center gap-1.5 py-[3px] pr-2 mx-1.5 group relative",
+        // A classe fica na LINHA, não no wrapper: o wrapper de uma pasta
+        // contém a subárvore inteira e um palpite de altura de uma linha
+        // faria a barra de rolagem saltar. A linha sempre tem uma linha.
+        "solon-long-row flex items-center gap-1.5 py-[3px] pr-2 mx-1.5 group relative",
         "transition-colors text-[0.8125rem]",
         node.type === "folder" ? "cursor-default" : "cursor-pointer",
       )}

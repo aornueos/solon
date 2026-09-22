@@ -1185,6 +1185,23 @@
 }
 
 /* ─────────────────────────────────────────
+   Listas longas
+───────────────────────────────────────── */
+/* `content-visibility: auto` faz o browser pular layout e paint do que está
+   fora da viewport de rolagem, sem tirar nada do DOM — busca, drag and drop
+   e Ctrl+F continuam funcionando, ao contrário de uma janela virtualizada.
+   Resolve o custo de árvores de projeto com centenas de arquivos sem
+   introduzir dependência.
+
+   `auto` no `contain-intrinsic-size` guarda a altura medida no primeiro
+   render; o valor ao lado é só o palpite inicial, para a barra de rolagem
+   não dar um pulo antes disso. */
+.solon-long-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--solon-row-h, 26px);
+}
+
+/* ─────────────────────────────────────────
    Foco visível
 ───────────────────────────────────────── */
 /* A utility `outline-none` do Tailwind vencia a regra de foco que ficava em

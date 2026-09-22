@@ -150,6 +150,9 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   const isLinkSource = linkingFromId === text.id;
   const isLinkCandidate = linkingFromId !== null && linkingFromId !== text.id;
   const [editing, setEditing] = useState(!!autoEdit);
+  // Enter com o foco no canvas pede edicao por aqui; ver `requestEdit`.
+  const editRequested = useCanvasStore((s) => s.requestEditId === text.id);
+  const requestEdit = useCanvasStore((s) => s.requestEdit);
   const [draftText, setDraftText] = useState(text.text);
   const [openMenu, setOpenMenu] = useState<
     null | "color" | "highlight" | "size"
@@ -212,6 +215,15 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   // resetamos innerHTML em re-render (senao apagaria o que o usuário digita);
   // só lemos de volta no commit. O auto-grow é natural (a div cresce com o
   // conteudo; a caixa já tem height:auto).
+
+  // Enter com o foco no canvas pede edição por aqui; o pedido é consumido
+  // na hora para não reabrir a cada render.
+  useEffect(() => {
+    if (!editRequested) return;
+    requestEdit(null);
+    setEditing(true);
+  }, [editRequested, requestEdit]);
+
   useEffect(() => {
     if (!editing) return;
     const el = editRef.current;

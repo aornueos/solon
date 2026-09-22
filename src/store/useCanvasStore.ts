@@ -95,6 +95,10 @@ interface CanvasState {
   /** Lado escolhido no card de origem (quando o usuário clicou num dos 4
    *  pontos de conexão). Null = auto-pick baseado em geometria. */
   linkingFromSide: CardSide | null;
+  /** id que o teclado pediu para abrir em edição. O componente entra em
+   *  edição e zera o campo; serve de canal entre o atalho global e o
+   *  estado local de cada item. */
+  requestEditId: string | null;
 
   /** Carrega doc vindo do disco. */
   hydrate: (filePath: string, doc: CanvasDoc) => void;
@@ -192,6 +196,11 @@ interface CanvasState {
   /** Aplica delta (dx, dy) em cada item do snapshot. Reescreve posições
    *  como `origem + delta` (não incremental) pra evitar drift. */
   translateSelection: (snapshot: SelectionSnapshot, dx: number, dy: number) => void;
+  /** Desloca a seleção em world px. Uma rajada de setinhas vira um único
+   *  ponto de undo. */
+  nudgeSelection: (dx: number, dy: number) => void;
+  /** Pede que `id` entre em edição, ou limpa o pedido com null. */
+  requestEdit: (id: string | null) => void;
   beginLink: (fromId: string, side?: CardSide) => void;
   cancelLink: () => void;
   completeLink: (toId: string, side?: CardSide) => void;
@@ -266,6 +275,10 @@ let canvasClipboard: {
 } | null = null;
 let pasteSeq = 0;
 
+/** Janela em que setinhas seguidas contam como um só movimento no undo. */
+const NUDGE_HISTORY_GAP = 600;
+let lastNudgeAt = 0;
+
 /**
  * `selectedId` (foco) e `selectedIds` (grupo) precisam andar juntos: o
  * grupo é o que Delete, drag e Ctrl+C consomem. Criar um item com um
@@ -314,6 +327,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   selectedIds: new Set<string>(),
   linkingFromId: null,
   linkingFromSide: null,
+  requestEditId: null,
   past: [],
   future: [],
 
@@ -1002,6 +1016,20 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return { cards, images, texts, strokes };
     });
   },
+
+  nudgeSelection: (dx, dy) => {
+    const s = get();
+    const ids = s.selectedIds.size > 0
+      ? [...s.selectedIds]
+      : s.selectedId ? [s.selectedId] : [];
+    if (ids.length === 0) return;
+    const now = Date.now();
+    if (now - lastNudgeAt > NUDGE_HISTORY_GAP) s.pushHistory();
+    lastNudgeAt = now;
+    s.translateSelection(s.snapshotSelection(), dx, dy);
+  },
+
+  requestEdit: (id) => set({ requestEditId: id }),
 
   beginLink: (fromId, side) =>
     set({
