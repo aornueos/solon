@@ -1,5 +1,5 @@
 import { memo, useRef, useState, useEffect } from "react";
-import { CanvasCard, CARD_COLORS } from "../../types/canvas";
+import { CanvasCard, CARD_COLORS, isThemedCardColor } from "../../types/canvas";
 import { SCENE_STATUSES } from "../../types/scene";
 import { useCanvasStore } from "../../store/useCanvasStore";
 import { useAppStore } from "../../store/useAppStore";
@@ -278,14 +278,31 @@ export const Card = memo(function Card({ card }: Props) {
   // Sem cor escolhida na paleta, o card segue o painel do tema — no tema
   // escuro isso o mantém grafite em vez do sépia claro.
   const color = card.color ?? "var(--bg-panel)";
-  // Todas as cores da paleta são pastéis claros, então um card pintado
-  // precisa de texto escuro seja qual for o tema: `--text-primary` no tema
-  // escuro sumiria sobre o pastel.
-  const hasCustomBg = !!card.color;
-  const innerTextColor = hasCustomBg ? "#1f1e1c" : "var(--text-primary)";
-  const innerSecondaryColor = hasCustomBg ? "#5e5a52" : "var(--text-secondary)";
-  const innerPlaceholderColor = hasCustomBg ? "#9a9489" : "var(--text-placeholder)";
-  const innerMutedColor = hasCustomBg ? "#7a766d" : "var(--text-muted)";
+  // Card pintado com a paleta do tema usa a tinta que o próprio tema
+  // define para ela, medida contra os seis fundos. Só os cards salvos
+  // antes da paleta virar tokens guardam um pastel claro fixo e continuam
+  // precisando de tinta escura, seja qual for o tema.
+  const legacyBg = !!card.color && !isThemedCardColor(card.color);
+  const innerTextColor = legacyBg
+    ? "#1f1e1c"
+    : card.color
+      ? "var(--card-ink)"
+      : "var(--text-primary)";
+  const innerSecondaryColor = legacyBg
+    ? "#5e5a52"
+    : card.color
+      ? "color-mix(in srgb, var(--card-ink) 78%, transparent)"
+      : "var(--text-secondary)";
+  const innerPlaceholderColor = legacyBg
+    ? "#9a9489"
+    : card.color
+      ? "color-mix(in srgb, var(--card-ink) 45%, transparent)"
+      : "var(--text-placeholder)";
+  const innerMutedColor = legacyBg
+    ? "#7a766d"
+    : card.color
+      ? "color-mix(in srgb, var(--card-ink) 60%, transparent)"
+      : "var(--text-muted)";
   const sceneStatus = isScene
     ? SCENE_STATUSES.find((s) => s.value === card.scene?.status)
     : undefined;

@@ -32,6 +32,8 @@ import { WikilinkExtension } from "./WikilinkExtension";
 import { CollapsibleHeadingsExtension } from "./CollapsibleHeadingsExtension";
 import {
   EDITOR_INDENT_SIZES,
+  EDITOR_PAGE_MARGIN_RATIO,
+  EDITOR_PAGE_SIZES,
   EDITOR_FONT_FAMILIES,
   EDITOR_LINE_HEIGHTS,
   EDITOR_PARAGRAPH_SPACING,
@@ -55,10 +57,8 @@ const EDITOR_SCROLL_POSITIONS_KEY = "solon:editorScrollPositions";
 const EDITOR_SELECTIONS_KEY = "solon:editorSelections";
 const MAX_EDITOR_SCROLL_POSITIONS = 200;
 const MAX_EDITOR_SELECTIONS = 200;
-const A4_PAGE_WIDTH_PX = 794;
-const A4_PAGE_HEIGHT_PX = 1123;
-const A4_PAGE_MARGIN_X_PX = 96;
-const A4_PAGE_MARGIN_Y_PX = 96;
+// As medidas da folha vêm de EDITOR_PAGE_SIZES; a margem acompanha a
+// largura para que A5 e A3 mantenham a mesma proporção de respiro do A4.
 
 interface EditorSelectionMemory {
   from: number;
@@ -177,6 +177,7 @@ export function Editor() {
   const setEditorZoom = useAppStore((s) => s.setEditorZoom);
   const editorMaxWidth = useAppStore((s) => s.editorMaxWidth);
   const editorPageLayout = useAppStore((s) => s.editorPageLayout);
+  const editorPageSize = useAppStore((s) => s.editorPageSize);
   const editorTextSize = useAppStore((s) => s.editorTextSize);
   const editorLineHeight = useAppStore((s) => s.editorLineHeight);
   const editorParagraphSpacing = useAppStore((s) => s.editorParagraphSpacing);
@@ -782,10 +783,14 @@ export function Editor() {
     editorPaper === "default" ? "var(--bg-panel)" : "var(--editor-paper-bg)";
   const editorPageColor =
     editorPaper === "default" ? "var(--text-primary)" : "var(--editor-paper-text)";
-  const a4PageWidth = Math.round(A4_PAGE_WIDTH_PX * editorScale);
-  const a4PageHeight = Math.round(A4_PAGE_HEIGHT_PX * editorScale);
-  const a4PageMarginX = Math.round(A4_PAGE_MARGIN_X_PX * editorScale);
-  const a4PageMarginY = Math.round(A4_PAGE_MARGIN_Y_PX * editorScale);
+  const pageSize =
+    EDITOR_PAGE_SIZES.find((option) => option.value === editorPageSize) ??
+    EDITOR_PAGE_SIZES[1];
+  const pageMargin = Math.round(pageSize.width * EDITOR_PAGE_MARGIN_RATIO);
+  const a4PageWidth = Math.round(pageSize.width * editorScale);
+  const a4PageHeight = Math.round(pageSize.height * editorScale);
+  const a4PageMarginX = Math.round(pageMargin * editorScale);
+  const a4PageMarginY = Math.round(pageMargin * editorScale);
   const a4Padding = `${a4PageMarginY}px ${a4PageMarginX}px`;
   const a4TypewriterPadding = `max(${a4PageMarginY}px, min(30vh, 220px))`;
   const a4BaseStyle: React.CSSProperties = {

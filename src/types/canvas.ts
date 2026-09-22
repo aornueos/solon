@@ -187,14 +187,27 @@ export const EMPTY_CANVAS: CanvasDoc = {
   viewport: { x: 0, y: 0, zoom: 1 },
 };
 
+/**
+ * Paleta de fundo dos cards. Os valores são referências a tokens, não
+ * hex: cada tema define os seus, então a mesma "Âmbar" é um creme claro
+ * num tema claro e um âmbar profundo num escuro. Antes eram seis pastéis
+ * fixos, que num tema escuro viravam manchas berrantes.
+ *
+ * Cards salvos antes disso guardam o hex literal e continuam renderizando
+ * — `background` aceita as duas formas —, só não acompanham o tema.
+ */
 export const CARD_COLORS: { label: string; value: string }[] = [
-  { label: "Sépia", value: "#fdfaf4" },
-  { label: "Âmbar", value: "#f5e4c3" },
-  { label: "Verde", value: "#dfead0" },
-  { label: "Rosa", value: "#f3dcd6" },
-  { label: "Azul", value: "#d8e3ec" },
-  { label: "Lavanda", value: "#e3dcec" },
+  { label: "Papel", value: "var(--card-1)" },
+  { label: "Âmbar", value: "var(--card-2)" },
+  { label: "Verde", value: "var(--card-3)" },
+  { label: "Rosa", value: "var(--card-4)" },
+  { label: "Azul", value: "var(--card-5)" },
+  { label: "Lavanda", value: "var(--card-6)" },
 ];
+
+/** Um valor de `CARD_COLORS` (token) ou um hex de canvas antigo. */
+export const isThemedCardColor = (value: string | undefined): boolean =>
+  !!value && value.startsWith("var(");
 
 export const DEFAULT_CARD_W = 220;
 export const DEFAULT_CARD_H = 120;

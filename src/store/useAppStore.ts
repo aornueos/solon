@@ -341,6 +341,8 @@ interface AppState {
    *  historica; "a4-continuous" desenha uma folha A4 continua sem paginar
    *  nem alterar o documento ProseMirror. */
   editorPageLayout: EditorPageLayout;
+  /** Formato da folha quando `editorPageLayout` é "a4-continuous". */
+  editorPageSize: EditorPageSize;
   /** Preset tipografico do corpo do editor. Afeta paragrafos e headings
    *  juntos para preservar hierarquia visual previsivel. */
   editorTextSize: EditorTextSize;
@@ -378,6 +380,8 @@ interface AppState {
   showTitlebarActions: boolean;
   /** Preferencias do canvas. */
   canvasGridEnabled: boolean;
+  /** Moldura em volta do texto flutuante enquanto ele é editado. */
+  canvasTextEditFrame: boolean;
   canvasSnapToGrid: boolean;
   canvasGridSize: number;
   canvasDefaultTool: CanvasTool;
@@ -484,6 +488,7 @@ interface AppState {
   setAutoCheckUpdates: (v: boolean) => void;
   setEditorMaxWidth: (w: number) => void;
   setEditorPageLayout: (v: EditorPageLayout) => void;
+  setEditorPageSize: (v: EditorPageSize) => void;
   setEditorTextSize: (v: EditorTextSize) => void;
   setEditorLineHeight: (v: "compact" | "normal" | "relaxed") => void;
   setEditorParagraphSpacing: (v: "tight" | "normal" | "airy") => void;
@@ -498,6 +503,7 @@ interface AppState {
   setShowStatusPath: (v: boolean) => void;
   setShowTitlebarActions: (v: boolean) => void;
   setCanvasGridEnabled: (v: boolean) => void;
+  setCanvasTextEditFrame: (v: boolean) => void;
   setCanvasSnapToGrid: (v: boolean) => void;
   setCanvasGridSize: (v: number) => void;
   setCanvasDefaultTool: (v: CanvasTool) => void;
@@ -715,6 +721,7 @@ const DEFAULT_SHOW_STATUS_STATS = true;
 const DEFAULT_SHOW_STATUS_PATH = true;
 const DEFAULT_SHOW_TITLEBAR_ACTIONS = true;
 const DEFAULT_CANVAS_GRID_ENABLED = true;
+const DEFAULT_CANVAS_TEXT_EDIT_FRAME = true;
 const DEFAULT_CANVAS_SNAP_TO_GRID = false;
 const DEFAULT_CANVAS_GRID_SIZE = 24;
 const DEFAULT_CANVAS_TOOL: CanvasTool = "select";
@@ -734,6 +741,8 @@ const AUTO_CHECK_UPDATES_KEY = "solon:autoCheckUpdates";
 const SPELLCHECK_KEY = "solon:spellcheck";
 const EDITOR_MAX_WIDTH_KEY = "solon:editorMaxWidth";
 const EDITOR_PAGE_LAYOUT_KEY = "solon:editorPageLayout";
+const EDITOR_PAGE_SIZE_KEY = "solon:editorPageSize";
+const DEFAULT_EDITOR_PAGE_SIZE: EditorPageSize = "a4";
 const EDITOR_TEXT_SIZE_KEY = "solon:editorTextSize";
 const EDITOR_LINE_HEIGHT_KEY = "solon:editorLineHeight";
 const EDITOR_PARAGRAPH_SPACING_KEY = "solon:editorParagraphSpacing";
@@ -747,6 +756,7 @@ const SHOW_STATUS_STATS_KEY = "solon:showStatusStats";
 const SHOW_STATUS_PATH_KEY = "solon:showStatusPath";
 const SHOW_TITLEBAR_ACTIONS_KEY = "solon:showTitlebarActions";
 const CANVAS_GRID_ENABLED_KEY = "solon:canvasGridEnabled";
+const CANVAS_TEXT_EDIT_FRAME_KEY = "solon:canvasTextEditFrame";
 const CANVAS_SNAP_TO_GRID_KEY = "solon:canvasSnapToGrid";
 const CANVAS_GRID_SIZE_KEY = "solon:canvasGridSize";
 const CANVAS_DEFAULT_TOOL_KEY = "solon:canvasDefaultTool";
@@ -770,10 +780,26 @@ export const EDITOR_PAGE_LAYOUTS = [
   },
   {
     value: "a4-continuous" as const,
-    label: "A4 contínua",
-    hint: "Folha A4 contínua",
+    label: "Página",
+    hint: "Folha contínua no formato escolhido",
   },
 ] as const;
+
+/**
+ * Formatos de folha do modo Página, em px a 96 dpi — a mesma referência
+ * que o navegador usa para `mm` em CSS.
+ *
+ * A margem acompanha a largura (12,1%, que é a polegada clássica do A4),
+ * senão uma margem fixa engole o A5 e some no A3.
+ */
+export const EDITOR_PAGE_SIZES = [
+  { value: "a5" as const, label: "A5", hint: "148 × 210 mm", width: 559, height: 794 },
+  { value: "a4" as const, label: "A4", hint: "210 × 297 mm", width: 794, height: 1123 },
+  { value: "a3" as const, label: "A3", hint: "297 × 420 mm", width: 1123, height: 1587 },
+] as const;
+export type EditorPageSize = (typeof EDITOR_PAGE_SIZES)[number]["value"];
+/** Fração da largura usada como margem — 96px em 794px de A4. */
+export const EDITOR_PAGE_MARGIN_RATIO = 96 / 794;
 export const EDITOR_TEXT_SIZES = [
   { value: "small" as const, label: "Pequeno", shortLabel: "A-", css: 0.92 },
   { value: "medium" as const, label: "Médio", shortLabel: "A", css: 1 },
@@ -961,6 +987,16 @@ function loadEditorPageLayout(): EditorPageLayout {
     if (v === "fluid" || v === "a4-continuous") return v;
   } catch {}
   return DEFAULT_EDITOR_PAGE_LAYOUT;
+}
+
+function loadEditorPageSize(): EditorPageSize {
+  try {
+    const v = localStorage.getItem(EDITOR_PAGE_SIZE_KEY);
+    if (EDITOR_PAGE_SIZES.some((option) => option.value === v)) {
+      return v as EditorPageSize;
+    }
+  } catch {}
+  return DEFAULT_EDITOR_PAGE_SIZE;
 }
 
 function loadEditorTextSize(): EditorTextSize {
@@ -1151,6 +1187,7 @@ export const useAppStore = create<AppState>((set) => ({
   spellcheckEnabled: loadBoolPref(SPELLCHECK_KEY, DEFAULT_SPELLCHECK),
   editorMaxWidth: loadEditorMaxWidth(),
   editorPageLayout: loadEditorPageLayout(),
+  editorPageSize: loadEditorPageSize(),
   editorTextSize: loadEditorTextSize(),
   editorLineHeight: loadEditorLineHeight(),
   editorParagraphSpacing: loadEditorParagraphSpacing(),
@@ -1168,6 +1205,10 @@ export const useAppStore = create<AppState>((set) => ({
     DEFAULT_SHOW_TITLEBAR_ACTIONS,
   ),
   canvasGridEnabled: loadBoolPref(CANVAS_GRID_ENABLED_KEY, DEFAULT_CANVAS_GRID_ENABLED),
+  canvasTextEditFrame: loadBoolPref(
+    CANVAS_TEXT_EDIT_FRAME_KEY,
+    DEFAULT_CANVAS_TEXT_EDIT_FRAME,
+  ),
   canvasSnapToGrid: loadBoolPref(CANVAS_SNAP_TO_GRID_KEY, DEFAULT_CANVAS_SNAP_TO_GRID),
   canvasGridSize: loadNumberOption(
     CANVAS_GRID_SIZE_KEY,
@@ -1686,6 +1727,7 @@ export const useAppStore = create<AppState>((set) => ({
       spellcheckEnabled: DEFAULT_SPELLCHECK,
       editorMaxWidth: DEFAULT_EDITOR_MAX_WIDTH,
       editorPageLayout: DEFAULT_EDITOR_PAGE_LAYOUT,
+      editorPageSize: DEFAULT_EDITOR_PAGE_SIZE,
       editorTextSize: DEFAULT_EDITOR_TEXT_SIZE,
       editorLineHeight: DEFAULT_EDITOR_LINE_HEIGHT,
       editorParagraphSpacing: DEFAULT_EDITOR_PARAGRAPH_SPACING,
@@ -1699,6 +1741,7 @@ export const useAppStore = create<AppState>((set) => ({
       showStatusPath: DEFAULT_SHOW_STATUS_PATH,
       showTitlebarActions: DEFAULT_SHOW_TITLEBAR_ACTIONS,
       canvasGridEnabled: DEFAULT_CANVAS_GRID_ENABLED,
+      canvasTextEditFrame: DEFAULT_CANVAS_TEXT_EDIT_FRAME,
       canvasSnapToGrid: DEFAULT_CANVAS_SNAP_TO_GRID,
       canvasGridSize: DEFAULT_CANVAS_GRID_SIZE,
       canvasDefaultTool: DEFAULT_CANVAS_TOOL,
@@ -1754,6 +1797,16 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ editorMaxWidth: w });
+  },
+
+  setEditorPageSize: (v) => {
+    if (!EDITOR_PAGE_SIZES.some((option) => option.value === v)) return;
+    try {
+      localStorage.setItem(EDITOR_PAGE_SIZE_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ editorPageSize: v });
   },
 
   setEditorPageLayout: (v) => {
@@ -1894,6 +1947,15 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ canvasGridEnabled: v });
+  },
+
+  setCanvasTextEditFrame: (v) => {
+    try {
+      localStorage.setItem(CANVAS_TEXT_EDIT_FRAME_KEY, v ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+    set({ canvasTextEditFrame: v });
   },
 
   setCanvasSnapToGrid: (v) => {

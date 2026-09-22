@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
   ExternalLink,
   Archive,
@@ -20,6 +20,7 @@ import {
   EDITOR_LINE_HEIGHTS,
   EDITOR_MAX_WIDTHS,
   EDITOR_PAGE_LAYOUTS,
+  EDITOR_PAGE_SIZES,
   EDITOR_PAPERS,
   EDITOR_PARAGRAPH_SPACING,
   EDITOR_TEXT_SIZES,
@@ -93,6 +94,10 @@ export function SettingsDialog() {
   const outlineSide = useAppStore((s) => s.outlineSide);
   const setOutlineSide = useAppStore((s) => s.setOutlineSide);
   const canvasDblClickCreates = useAppStore((s) => s.canvasDblClickCreates);
+  const canvasTextEditFrame = useAppStore((s) => s.canvasTextEditFrame);
+  const editorPageSize = useAppStore((s) => s.editorPageSize);
+  const setEditorPageSize = useAppStore((s) => s.setEditorPageSize);
+  const setCanvasTextEditFrame = useAppStore((s) => s.setCanvasTextEditFrame);
   const setCanvasDblClickCreates = useAppStore((s) => s.setCanvasDblClickCreates);
   const rootFolder = useAppStore((s) => s.rootFolder);
   const fileTree = useAppStore((s) => s.fileTree);
@@ -103,6 +108,14 @@ export function SettingsDialog() {
   const resetSettings = useAppStore((s) => s.resetSettings);
   const { refresh } = useFileSystem();
 
+  const [activeSection, setActiveSection] = useState<string>(
+    SETTINGS_SECTIONS[0],
+  );
+  const [filter, setFilter] = useState("");
+  const viewContext = useMemo(
+    () => ({ active: activeSection, filter: filter.trim() }),
+    [activeSection, filter],
+  );
   const [personalDictSize, setPersonalDictSize] = useState(0);
   const [personalDictWords, setPersonalDictWords] = useState<string[]>([]);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
@@ -280,8 +293,42 @@ export function SettingsDialog() {
           </button>
         </div>
 
-        <div className="overflow-y-auto px-5 py-5">
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="flex-1 min-h-0 flex">
+          <nav
+            aria-label="Seções dos ajustes"
+            className="hidden sm:flex flex-col gap-0.5 w-44 flex-shrink-0 px-2 py-4 overflow-y-auto"
+            style={{ borderRight: "1px solid var(--border-subtle)" }}
+          >
+            {SETTINGS_SECTIONS.map((secao) => (
+              <button
+                key={secao}
+                onClick={() => {
+                  setFilter("");
+                  setActiveSection(secao);
+                }}
+                aria-current={!filter && activeSection === secao}
+                className="solon-settings-tab px-3 py-1.5 text-left text-[0.8rem]"
+              >
+                {secao}
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex-1 min-w-0 flex flex-col">
+            <div className="px-5 pt-4">
+              <input
+                type="search"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder="Buscar ajuste…"
+                aria-label="Buscar ajuste"
+                spellCheck={false}
+                className="solon-input"
+              />
+            </div>
+            <div className="overflow-y-auto px-5 py-4">
+              <SettingsFilterContext.Provider value={viewContext}>
+              <div className="flex flex-col gap-4">
             <Section title="Aparência" description="Tema, escala e medida visual.">
               <Row label="Tema visual" hint={themeHint(editorPaper)}>
                 <SelectControl
@@ -410,6 +457,26 @@ export function SettingsDialog() {
                 />
               </Row>
 
+              {editorPageLayout === "a4-continuous" && (
+                <Row
+                  label="Formato da folha"
+                  hint={
+                    EDITOR_PAGE_SIZES.find(
+                      (option) => option.value === editorPageSize,
+                    )?.hint
+                  }
+                >
+                  <SelectControl
+                    value={editorPageSize}
+                    options={EDITOR_PAGE_SIZES.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    onChange={setEditorPageSize}
+                  />
+                </Row>
+              )}
+
               <Row label="Auto-save" hint="Ctrl+S continua disponível a qualquer momento." icon={<Save size={12} />}>
                 <Toggle
                   checked={autoSaveEnabled}
@@ -433,6 +500,21 @@ export function SettingsDialog() {
                     label: option.label,
                   }))}
                   onChange={setCanvasDblClickCreates}
+                />
+              </Row>
+
+              <Row
+                label="Moldura ao editar texto no canvas"
+                hint={
+                  canvasTextEditFrame
+                    ? "Um contorno marca a caixa enquanto você escreve nela."
+                    : "Sem contorno: o cursor e a barra de formatação bastam."
+                }
+              >
+                <Toggle
+                  checked={canvasTextEditFrame}
+                  onChange={setCanvasTextEditFrame}
+                  label={canvasTextEditFrame ? "Mostrar" : "Ocultar"}
                 />
               </Row>
 
@@ -664,6 +746,11 @@ export function SettingsDialog() {
                 </ActionButton>
               </Row>
             </Section>
+
+                {filter.trim() && <EmptyFilter filter={filter.trim()} />}
+              </div>
+              </SettingsFilterContext.Provider>
+            </div>
           </div>
         </div>
 
@@ -760,6 +847,39 @@ function DictionaryPanel({
   );
 }
 
+/**
+ * Títulos das seções, na ordem do trilho lateral. Cada `Section` se
+ * identifica pelo próprio título, então a lista e os blocos não podem
+ * divergir sem que uma aba fique vazia.
+ */
+const SETTINGS_SECTIONS = [
+  "Aparência",
+  "Escrita",
+  "Fluxo",
+  "Interface",
+  "Projeto",
+  "Atualizações",
+] as const;
+
+/** Aba ativa e texto do filtro, lidos por `Section` e por `Row`. */
+const SettingsFilterContext = createContext({ active: "", filter: "" });
+
+/** Remove acentos e caixa: buscar "pagina" precisa achar "Página". */
+function normalizeForFilter(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+}
+
+function matchesFilter(filter: string, label: string, hint?: string): boolean {
+  const alvo = normalizeForFilter(`${label} ${hint ?? ""}`);
+  return normalizeForFilter(filter)
+    .split(/s+/)
+    .filter(Boolean)
+    .every((termo) => alvo.includes(termo));
+}
+
 function Section({
   title,
   description,
@@ -769,12 +889,16 @@ function Section({
   description?: string;
   children: React.ReactNode;
 }) {
+  // Sem filtro, só a aba escolhida aparece. Com filtro, todas entram e as
+  // que ficarem sem linhas somem pela regra `:has()` do CSS.
+  const { active, filter } = useContext(SettingsFilterContext);
+  if (!filter && title !== active) return null;
   // Section = card minimalista: hairline, cantos suaves, sem sombra
   // (cards estaticos dentro do dialog não precisam elevacao). Header com
   // label small-caps discreto.
   return (
     <section
-      className="p-4 flex flex-col gap-3"
+      className="solon-settings-section p-4 flex flex-col gap-3"
       style={{
         background: "var(--bg-panel-2)",
         border: "1px solid var(--border-subtle)",
@@ -814,8 +938,14 @@ function Row({
   icon?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  // Com um filtro ativo, a própria linha decide se aparece — é ela que
+  // conhece o rótulo e a dica. A seção some sozinha quando fica vazia,
+  // por uma regra `:has()` no CSS.
+  const { filter } = useContext(SettingsFilterContext);
+  if (filter && !matchesFilter(filter, label, hint)) return null;
   return (
     <div
+      data-setting-row
       className="px-3 py-2.5"
       style={{
         background: "color-mix(in srgb, var(--bg-panel) 64%, transparent)",
@@ -1063,4 +1193,19 @@ function getIndentSizeLabel(value: string): string {
   if (value === "small") return "Recuo curto";
   if (value === "large") return "Recuo amplo";
   return "Recuo clássico";
+}
+
+/**
+ * Só aparece quando a busca não achou nada: sem ela, filtrar por algo
+ * inexistente deixaria a área de ajustes em branco, sem dizer por quê.
+ */
+function EmptyFilter({ filter }: { filter: string }) {
+  return (
+    <p
+      className="solon-settings-empty px-3 py-6 text-center text-[0.82rem] italic"
+      style={{ color: "var(--text-muted)" }}
+    >
+      Nenhum ajuste combina com “{filter}”.
+    </p>
+  );
 }

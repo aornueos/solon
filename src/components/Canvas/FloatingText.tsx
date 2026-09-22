@@ -146,6 +146,7 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
   const canvasSnapToGrid = useAppStore((s) => s.canvasSnapToGrid);
   const canvasGridSize = useAppStore((s) => s.canvasGridSize);
   const editorFontFamily = useAppStore((s) => s.editorFontFamily);
+  const canvasTextEditFrame = useAppStore((s) => s.canvasTextEditFrame);
 
   const isLinkSource = linkingFromId === text.id;
   const isLinkCandidate = linkingFromId !== null && linkingFromId !== text.id;
@@ -704,12 +705,17 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
     overflow: "visible",
     // Durante um linking, alvos válidos ganham o mesmo anel verde dos
     // cards — antes só o card sinalizava "pode soltar aqui".
+    //
+    // Editar implica selecionar, então sem a opção desligada o texto ganha
+    // uma moldura justo enquanto se escreve nele — o oposto de um texto
+    // solto no quadro. Com ela desligada o caret e a toolbar já dizem que
+    // se está editando; o anel de seleção continua nos outros estados.
     ...(isLinkCandidate
       ? {
           outline: `${2 / zoom}px solid var(--success)`,
           outlineOffset: `${1 / zoom}px`,
         }
-      : isSelected
+      : isSelected && (!editing || canvasTextEditFrame)
         ? {
             outline: `${1 / zoom}px solid var(--accent)`,
             outlineOffset: `${1 / zoom}px`,
@@ -802,9 +808,11 @@ export const FloatingText = memo(function FloatingText({ text, autoEdit }: Props
             // Contenteditable cresce sozinho com o conteudo (height auto).
             height: "auto",
             overflow: "visible",
-            border: hasVisibleText
-              ? "1px solid transparent"
-              : "1px dashed var(--selection-ring)",
+            // A borda tracejada só serve para achar uma caixa ainda vazia.
+            border:
+              hasVisibleText || !canvasTextEditFrame
+                ? "1px solid transparent"
+                : "1px dashed var(--selection-ring)",
             outline: "none",
             background: "transparent",
             caretColor: "var(--accent)",

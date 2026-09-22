@@ -39,6 +39,15 @@ import {
   zoomToLevel,
 } from "../src/lib/canvasViewport.ts";
 import { isSelectionToggle } from "../src/lib/canvasSelectionInput.ts";
+import {
+  EDITOR_PAGE_MARGIN_RATIO,
+  EDITOR_PAGE_SIZES,
+} from "../src/store/useAppStore.ts";
+import {
+  auditThemes,
+  contrast,
+  readThemes,
+} from "./helpers/themeContrast.mjs";
 
 describe("frontmatter", () => {
   it("keeps body separators out of the yaml parser", () => {
@@ -707,5 +716,78 @@ describe("canvas — percurso por teclado", () => {
     const before = useCanvasStore.getState().cards[0].x;
     useCanvasStore.getState().nudgeSelection(10, 10);
     assert.equal(useCanvasStore.getState().cards[0].x, before);
+  });
+});
+
+describe("temas — contraste WCAG", () => {
+  it("keeps every theme above the floor for the pairs that reach the screen", () => {
+    const failures = auditThemes();
+    const report = failures
+      .map(
+        (f) =>
+          `${f.theme}: ${f.fgName} sobre ${f.bgName} = ${f.ratio} (mínimo ${f.min})`,
+      )
+      .join("\n");
+    assert.equal(failures.length, 0, `contraste insuficiente:\n${report}`);
+  });
+
+  it("covers every theme declared in the stylesheet", () => {
+    const { themes } = readThemes();
+    // 18 variantes `data-paper` mais o tema claro do :root. O piso pega
+    // um tema que suma da conta por regressão no parser — foi assim que
+    // `noir` e `amanhecer` passaram despercebidos.
+    assert.ok(themes.size >= 19, `só ${themes.size} temas encontrados`);
+    for (const nome of [
+      "tokyo",
+      "noir",
+      "amanhecer",
+      "creme",
+      "mel",
+      "vinho",
+      "sangue",
+      "claro",
+    ]) {
+      assert.ok(themes.has(nome), `tema ausente: ${nome}`);
+    }
+  });
+
+  it("measures contrast the way WCAG does", () => {
+    const preto = { rgb: [0, 0, 0], a: 1 };
+    const branco = { rgb: [255, 255, 255], a: 1 };
+    assert.equal(Math.round(contrast(preto, branco)), 21);
+    assert.equal(Math.round(contrast(branco, branco)), 1);
+  });
+});
+
+describe("editor — formatos de folha", () => {
+  it("uses the ISO ratio for every size", () => {
+    // Todo formato A tem proporção 1:√2; um valor errado apareceria aqui
+    // antes de virar uma folha torta na tela.
+    for (const size of EDITOR_PAGE_SIZES) {
+      const ratio = size.height / size.width;
+      assert.ok(
+        Math.abs(ratio - Math.SQRT2) < 0.01,
+        `${size.value}: proporção ${ratio.toFixed(3)}`,
+      );
+    }
+  });
+
+  it("halves the area from one size to the next", () => {
+    const [a5, a4, a3] = EDITOR_PAGE_SIZES;
+    assert.ok(Math.abs(a4.width / a5.height - 1) < 0.01, "A4 nasce do A5");
+    assert.ok(Math.abs(a3.width / a4.height - 1) < 0.01, "A3 nasce do A4");
+  });
+
+  it("keeps the margin proportional, so A5 is not swallowed by it", () => {
+    const margens = EDITOR_PAGE_SIZES.map((s) =>
+      Math.round(s.width * EDITOR_PAGE_MARGIN_RATIO),
+    );
+    // A margem do A4 é a polegada clássica.
+    assert.equal(margens[1], 96);
+    // Cresce com a folha, sem nunca comer mais de um terço da largura.
+    assert.ok(margens[0] < margens[1] && margens[1] < margens[2]);
+    for (const [i, m] of margens.entries()) {
+      assert.ok(m * 2 < EDITOR_PAGE_SIZES[i].width / 1.5, `margem grande demais em ${EDITOR_PAGE_SIZES[i].value}`);
+    }
   });
 });
