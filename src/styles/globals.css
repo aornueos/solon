@@ -1391,6 +1391,16 @@ select:focus-visible,
   outline-offset: 2px;
 }
 
+/* Superfície de escrita é a exceção: o cursor já diz onde o foco está, e
+   o anel viraria uma caixa em volta do texto inteiro — o editor tem
+   `tabindex="0"`, então cairia na regra acima só por clicar para escrever.
+   Vale para o editor e para o texto flutuante do canvas. */
+[contenteditable="true"]:focus-visible,
+[contenteditable=""]:focus-visible,
+.ProseMirror:focus-visible {
+  outline: none !important;
+}
+
 /* Inputs — cantos suaves, hairline, focus = borda accent + ring macio. */
 .solon-input {
   width: 100%;
