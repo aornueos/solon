@@ -10,7 +10,13 @@ import {
 import {
   canMoveIntoFolder,
   isSameOrDescendantPath,
+  rawParentPath,
+  resolveSidebarDrop,
 } from "../src/lib/sidebarDrop.ts";
+import {
+  collectExpandedRelPaths,
+  expandedAbsolutePaths,
+} from "../src/lib/expandedFolders.ts";
 import {
   isInsideProject,
   isProjectNotePath,
@@ -165,6 +171,111 @@ describe("sidebar folder drops", () => {
       ),
       false,
     );
+  });
+});
+
+describe("sidebar — destino do arraste", () => {
+  const root = "C:\\Projeto";
+  const nota = { path: "C:\\Projeto\\Parte I\\cena.md", type: "file" };
+  const irmas = ["C:\\Projeto\\Parte I\\cena.md", "C:\\Projeto\\Parte I\\outra.md"];
+
+  it("nota sobre pasta entra na pasta", () => {
+    assert.deepEqual(
+      resolveSidebarDrop(nota, { row: { path: "C:\\Projeto\\Parte II", type: "folder" } }, root, irmas),
+      { kind: "folder", path: "C:\\Projeto\\Parte II" },
+    );
+  });
+
+  it("nota sobre nota irmã reordena", () => {
+    assert.deepEqual(
+      resolveSidebarDrop(nota, { row: { path: irmas[1], type: "file" } }, root, irmas),
+      { kind: "reorder", path: irmas[1] },
+    );
+  });
+
+  it("nota sobre nota de outra pasta vai pra pasta dela, com o separador original", () => {
+    assert.deepEqual(
+      resolveSidebarDrop(nota, { row: { path: "C:\\Projeto\\capa.md", type: "file" } }, root, irmas),
+      { kind: "folder", path: "C:\\Projeto" },
+    );
+  });
+
+  it("fundo da árvore leva à raiz; se já está na raiz, não faz nada", () => {
+    assert.deepEqual(
+      resolveSidebarDrop(nota, { overTreeBackground: true }, root, irmas),
+      { kind: "folder", path: root },
+    );
+    assert.equal(
+      resolveSidebarDrop(
+        { path: "C:\\Projeto\\capa.md", type: "file" },
+        { overTreeBackground: true },
+        root,
+        ["C:\\Projeto\\capa.md"],
+      ),
+      null,
+    );
+  });
+
+  it("só nota vira card no canvas; pasta não", () => {
+    assert.deepEqual(resolveSidebarDrop(nota, { overCanvas: true }, root, irmas), { kind: "canvas" });
+    assert.equal(
+      resolveSidebarDrop({ path: "C:\\Projeto\\Parte I", type: "folder" }, { overCanvas: true }, root, []),
+      null,
+    );
+  });
+
+  it("pasta não cai dentro de si nem reordena sobre nota irmã", () => {
+    const pasta = { path: "C:\\Projeto\\Parte I", type: "folder" };
+    assert.equal(
+      resolveSidebarDrop(pasta, { row: { path: "C:\\Projeto\\Parte I\\cena.md", type: "file" } }, root, []),
+      null,
+    );
+    assert.equal(
+      resolveSidebarDrop(pasta, { row: { path: "C:\\Projeto\\capa.md", type: "file" } }, root, ["C:\\Projeto\\capa.md"]),
+      null,
+    );
+  });
+
+  it("rawParentPath preserva o separador", () => {
+    assert.equal(rawParentPath("C:\\Projeto\\Parte I\\cena.md"), "C:\\Projeto\\Parte I");
+    assert.equal(rawParentPath("/home/lua/proj/cena.md"), "/home/lua/proj");
+  });
+});
+
+describe("sidebar — pastas abertas entre sessões", () => {
+  const tree = [
+    {
+      name: "Parte I",
+      path: "C:\\Projeto\\Parte I",
+      type: "folder",
+      expanded: true,
+      children: [
+        {
+          name: "Rascunhos",
+          path: "C:\\Projeto\\Parte I\\Rascunhos",
+          type: "folder",
+          expanded: true,
+          children: [],
+        },
+      ],
+    },
+    { name: "Parte II", path: "C:\\Projeto\\Parte II", type: "folder", expanded: false, children: [] },
+    { name: "capa.md", path: "C:\\Projeto\\capa.md", type: "file" },
+  ];
+
+  it("guarda relativos com / e volta no formato da árvore", () => {
+    const rel = collectExpandedRelPaths("C:\\Projeto", tree);
+    assert.deepEqual(rel, ["Parte I", "Parte I/Rascunhos"]);
+    const abs = expandedAbsolutePaths("C:\\Projeto", rel);
+    assert.ok(abs.has("C:\\Projeto\\Parte I"));
+    assert.ok(abs.has("C:\\Projeto\\Parte I\\Rascunhos"));
+    assert.ok(!abs.has("C:\\Projeto\\Parte II"));
+  });
+
+  it("ignora nós de outro projeto e relativos que escapam da raiz", () => {
+    assert.deepEqual(collectExpandedRelPaths("D:\\Outro", tree), []);
+    assert.equal(expandedAbsolutePaths("/proj", ["../fora", "a/./b"]).size, 0);
+    assert.ok(expandedAbsolutePaths("/proj", ["a/b"]).has("/proj/a/b"));
   });
 });
 

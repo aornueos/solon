@@ -196,7 +196,9 @@ function HeadingRow({
         onMouseLeave={() => setHovered(false)}
         onClick={() => {
           document.dispatchEvent(
-            new CustomEvent("solon:scroll-to", { detail: { pos: heading.pos } }),
+            new CustomEvent("solon:scroll-to", {
+              detail: { pos: heading.pos, text: heading.text, level: heading.level },
+            }),
           );
         }}
       >

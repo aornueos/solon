@@ -29,7 +29,11 @@ import { ListExitExtension } from "./ListExitExtension";
 import { SmartDashesExtension } from "./SmartDashesExtension";
 import { HeadingNavExtension } from "./HeadingNavExtension";
 import { WikilinkExtension } from "./WikilinkExtension";
-import { CollapsibleHeadingsExtension } from "./CollapsibleHeadingsExtension";
+import {
+  CollapsibleHeadingsExtension,
+  revealCollapsedAt,
+} from "./CollapsibleHeadingsExtension";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import {
   EDITOR_INDENT_SIZES,
   EDITOR_PAGE_MARGIN_RATIO,
@@ -750,21 +754,42 @@ export function Editor() {
     // quando o user abria arquivo. Resultado: Ctrl+Scroll não zoomava.
   }, [setEditorZoom, activeFilePath]);
 
-  // Scroll para heading via evento do Outline. Chain pra scrollar DE FATO
-  // até a posição — `setTextSelection` sozinho só move o caret, não o
-  // scroll do viewport. `scrollIntoView()` do TipTap encosta a seleção no
-  // centro do viewport (ou no topo em docs curtos).
+  // Navegação pelo Índice. Três cuidados que o `setTextSelection(pos)
+  // .scrollIntoView()` de antes não tinha:
+  //  - `pos` é a posição ANTES do nó heading, fora do texto dele. O caret
+  //    caía no fim do bloco anterior, e era ESSE ponto que ia pra tela.
+  //  - `scrollIntoView` rola o mínimo: um título abaixo da tela parava
+  //    colado na borda de baixo (ou logo abaixo dela), com a seção
+  //    anterior ocupando a vista. O título agora sobe pro topo.
+  //  - Os headings do Índice são recalculados com debounce; se o doc
+  //    mudou nesse meio-tempo, `pos` pode apontar pra outro bloco. Nesse
+  //    caso procura o título pelo texto e nível, o mais perto de `pos`.
+  // Título dentro de seção dobrada fica escondido; a seção é desdobrada.
   useEffect(() => {
     const handler = (e: Event) => {
       if (!editor) return;
-      const detail = (e as CustomEvent).detail as { pos?: number } | undefined;
+      const detail = (e as CustomEvent).detail as OutlineJumpDetail | undefined;
       if (!detail || typeof detail.pos !== "number") return;
+      const pos = resolveHeadingPos(editor.state.doc, detail);
+      if (pos === null) return;
+
+      revealCollapsedAt(editor.view, pos);
       editor
         .chain()
-        .focus()
-        .setTextSelection(detail.pos)
-        .scrollIntoView()
+        .focus(null, { scrollIntoView: false })
+        .setTextSelection(pos + 1)
         .run();
+
+      // Typewriter mode já centraliza o caret, que agora está no título.
+      if (useAppStore.getState().typewriterMode) return;
+      requestAnimationFrame(() => {
+        const scroller = scrollRef.current;
+        const dom = editor.view.nodeDOM(pos);
+        if (!scroller || !(dom instanceof HTMLElement)) return;
+        const offset =
+          dom.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+        scroller.scrollTop = Math.max(0, scroller.scrollTop + offset - 24);
+      });
     };
     document.addEventListener("solon:scroll-to", handler);
     return () => document.removeEventListener("solon:scroll-to", handler);
@@ -882,12 +907,18 @@ export function Editor() {
     );
   }
 
-  // Click na área branca em volta do EditorContent posiciona o caret
-  // baseado na coordenada Y do click — clicar acima do primeiro
-  // paragrafo posiciona no INICIO do doc, abaixo do último posiciona
-  // no FIM. Clicar acima do primeiro parágrafo precisa levar ao começo do
-  // documento, não ao fim dele.
-  const focusEnd = (e: React.MouseEvent) => {
+  // Click na área em volta do texto (margens da folha, faixa lateral da
+  // coluna livre, fundo do scroller) posiciona o caret como num editor de
+  // texto: na mesma linha do clique. Na margem esquerda vai pro começo da
+  // linha, na direita pro fim; só acima do texto vai pro início do
+  // documento e só abaixo dele vai pro fim.
+  //
+  // `posAtCoords` devolve null para qualquer ponto fora do retângulo do
+  // ProseMirror — e as margens estão fora dele. O fallback antigo decidia
+  // pela metade da altura do documento, então clicar na margem de
+  // qualquer linha da primeira metade jogava o cursor pro topo da
+  // primeira página.
+  const focusFromMargin = (e: React.MouseEvent) => {
     if (!editor) return;
     const target = e.target as HTMLElement;
     if (target.closest(".ProseMirror")) return;
@@ -897,29 +928,29 @@ export function Editor() {
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && sel.toString().length > 0) return;
 
-    // Tenta posicionar o caret na coordenada do click (ProseMirror
-    // resolve pra posição mais proxima dentro do doc). Se não achar
-    // nada (click muito longe), heurística: acima do editor → inicio,
-    // abaixo → fim.
-    const coords = editor.view.posAtCoords({
-      left: e.clientX,
-      top: e.clientY,
-    });
-    if (coords) {
-      editor
-        .chain()
-        .focus()
-        .setTextSelection(coords.pos)
-        .run();
+    const view = editor.view;
+    const rect = (view.dom as HTMLElement).getBoundingClientRect();
+    if (e.clientY < rect.top) {
+      editor.chain().focus("start").run();
       return;
     }
-    const editorEl = editor.view.dom as HTMLElement;
-    const rect = editorEl.getBoundingClientRect();
-    if (e.clientY < rect.top + rect.height / 2) {
-      editor.chain().focus("start").run();
-    } else {
+    if (e.clientY > rect.bottom) {
       editor.chain().focus("end").run();
+      return;
     }
+    // Na altura do texto: traz o X pra dentro da coluna e mantém o Y, de
+    // modo que o ponto caia na linha clicada.
+    const edge = 2;
+    const left = Math.min(Math.max(e.clientX, rect.left + edge), rect.right - edge);
+    const hit = view.posAtCoords({ left, top: e.clientY });
+    if (hit) {
+      editor.chain().focus().setTextSelection(hit.pos).run();
+      return;
+    }
+    editor
+      .chain()
+      .focus(e.clientY - rect.top < rect.bottom - e.clientY ? "start" : "end")
+      .run();
   };
 
   // Zoom e presets tipograficos: zoom escala a área de escrita; tamanho
@@ -981,7 +1012,7 @@ export function Editor() {
         ref={scrollRef}
         data-paper={editorPaper === "default" ? undefined : editorPaper}
         className={editorScrollerClassName}
-        onClick={focusEnd}
+        onClick={focusFromMargin}
         onScroll={scheduleScrollMemory}
         style={{
           // Quando ha papel custom, aplica bg/text via vars CSS settadas
@@ -1062,4 +1093,44 @@ function extractHeadings(
     return { ...h, endPos, wordCount: words };
   });
   setHeadings(headings);
+}
+
+interface OutlineJumpDetail {
+  pos: number;
+  text?: string;
+  level?: number;
+}
+
+/**
+ * Posição atual do título pedido pelo Índice. Confia em `pos` quando ele
+ * ainda aponta pro mesmo título; senão procura um heading com o mesmo
+ * texto e nível, o mais próximo de `pos`.
+ */
+function resolveHeadingPos(
+  doc: ProseMirrorNode,
+  detail: OutlineJumpDetail,
+): number | null {
+  const matches = (node: ProseMirrorNode) =>
+    node.type.name === "heading" &&
+    (detail.text === undefined || node.textContent === detail.text) &&
+    (detail.level === undefined || node.attrs.level === detail.level);
+
+  const direct = detail.pos >= 0 && detail.pos < doc.content.size
+    ? doc.nodeAt(detail.pos)
+    : null;
+  if (direct && matches(direct)) return detail.pos;
+
+  let best: number | null = null;
+  doc.descendants((node, pos) => {
+    if (node.type.name !== "heading") return true;
+    if (
+      matches(node) &&
+      (best === null || Math.abs(pos - detail.pos) < Math.abs(best - detail.pos))
+    ) {
+      best = pos;
+    }
+    return false;
+  });
+  if (best !== null) return best;
+  return direct?.type.name === "heading" ? detail.pos : null;
 }

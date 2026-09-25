@@ -280,7 +280,7 @@ export function SettingsDialog() {
               Ajustes
             </h2>
             <p className="solon-dialog-subtitle">
-              Preferências de escrita, interface e projeto.
+              Personalização, escrita, utilitários e sistema.
             </p>
           </div>
           <button
@@ -329,145 +329,141 @@ export function SettingsDialog() {
             <div className="overflow-y-auto px-5 py-4">
               <SettingsFilterContext.Provider value={viewContext}>
               <div className="flex flex-col gap-4">
-            <Section title="Aparência" description="Tema, escala e medida visual.">
-              <Row label="Tema visual" hint={themeHint(editorPaper)}>
-                <SelectControl
-                  value={editorPaper}
-                  options={EDITOR_PAPERS.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  onChange={setEditorPaper}
+            <Section
+              title="Personalização"
+              description="Tema, escala e o que aparece em volta do texto."
+            >
+              <Group title="Tema">
+                <Row label="Tema visual" hint={themeHint(editorPaper)}>
+                  <SelectControl
+                    value={editorPaper}
+                    options={EDITOR_PAPERS.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    onChange={setEditorPaper}
+                  />
+                </Row>
+
+                <RangeRow
+                  label="Zoom do app"
+                  icon={<Monitor size={12} />}
+                  value={appZoom}
+                  suffix="%"
+                  min={80}
+                  max={160}
+                  step={10}
+                  onChange={setAppZoom}
+                  onReset={() => setAppZoom(100)}
                 />
-              </Row>
+              </Group>
 
-              <RangeRow
-                label="Zoom do app"
-                icon={<Monitor size={12} />}
-                value={appZoom}
-                suffix="%"
-                min={80}
-                max={160}
-                step={10}
-                onChange={setAppZoom}
-                onReset={() => setAppZoom(100)}
-              />
+              <Group title="Interface">
+                <Row label="Toolbar da escrita">
+                  <SelectControl
+                    value={editorToolbarMode}
+                    options={[
+                      { value: "fixed", label: "Fixa" },
+                      { value: "hover", label: "Ao passar o mouse" },
+                    ]}
+                    onChange={setEditorToolbarMode}
+                  />
+                </Row>
 
-              <RangeRow
-                label="Zoom da página"
-                icon={<Type size={12} />}
-                value={editorZoom}
-                suffix="%"
-                min={75}
-                max={200}
-                step={5}
-                onChange={setEditorZoom}
-                onReset={() => setEditorZoom(100)}
-              />
+                <Row
+                  label="Posição do Índice"
+                  hint={
+                    outlineSide === "left"
+                      ? "Embaixo da Sidebar"
+                      : outlineSide === "floating"
+                        ? "Painel flutuante (arrastável)"
+                        : "Junto do Inspector"
+                  }
+                >
+                  <SelectControl
+                    value={outlineSide}
+                    options={[
+                      { value: "right", label: "Direita" },
+                      { value: "left", label: "Esquerda" },
+                      { value: "floating", label: "Flutuante" },
+                    ]}
+                    onChange={setOutlineSide}
+                  />
+                </Row>
 
+                <Row label="Ações extras na barra superior">
+                  <Toggle
+                    checked={showTitlebarActions}
+                    onChange={setShowTitlebarActions}
+                    label={showTitlebarActions ? "Ativado" : "Desativado"}
+                  />
+                </Row>
+
+                <Row label="Estatísticas na barra inferior">
+                  <Toggle
+                    checked={showStatusStats}
+                    onChange={setShowStatusStats}
+                    label={showStatusStats ? "Ativado" : "Desativado"}
+                  />
+                </Row>
+
+                <Row label="Caminho do arquivo na barra inferior">
+                  <Toggle
+                    checked={showStatusPath}
+                    onChange={setShowStatusPath}
+                    label={showStatusPath ? "Ativado" : "Desativado"}
+                  />
+                </Row>
+              </Group>
             </Section>
 
-            <Section title="Escrita" description="Ritmo do texto e tipografia padrão.">
-              <Row label="Tamanho do texto" hint={getTextSizeLabel(editorTextSize)}>
-                <SelectControl
-                  value={editorTextSize}
-                  options={EDITOR_TEXT_SIZES.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  onChange={setEditorTextSize}
-                />
-              </Row>
+            <Section title="Escrita" description="A folha e a tipografia do texto.">
+              <Group title="Página">
+                <Row label="Modo da página" hint={pageLayoutHint(editorPageLayout)}>
+                  <SelectControl
+                    value={editorPageLayout}
+                    options={EDITOR_PAGE_LAYOUTS.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    onChange={setEditorPageLayout}
+                  />
+                </Row>
 
-              <Row
-                label="Largura no modo livre"
-                hint={
-                  editorPageLayout === "a4-continuous"
-                    ? "Usada no modo livre"
-                    : `${editorMaxWidth}px`
-                }
-              >
-                <SelectControl
-                  value={String(editorMaxWidth)}
-                  options={EDITOR_MAX_WIDTHS.map((w) => ({
-                    value: String(w),
-                    label: `${w}px`,
-                  }))}
-                  onChange={(v) => setEditorMaxWidth(parseInt(v, 10))}
-                />
-              </Row>
+                {/* As duas medidas ficam sempre visíveis (a busca acha as
+                    duas); a que não vale no modo atual fica desativada e
+                    diz de qual modo ela é. */}
+                <Row
+                  label="Largura da coluna"
+                  hint={
+                    editorPageLayout === "a4-continuous"
+                      ? "Vale no modo Livre."
+                      : `${editorMaxWidth}px de medida de linha.`
+                  }
+                >
+                  <SelectControl
+                    value={String(editorMaxWidth)}
+                    disabled={editorPageLayout === "a4-continuous"}
+                    options={EDITOR_MAX_WIDTHS.map((w) => ({
+                      value: String(w),
+                      label: `${w}px`,
+                    }))}
+                    onChange={(v) => setEditorMaxWidth(parseInt(v, 10))}
+                  />
+                </Row>
 
-              <Row label="Fonte padrão">
-                <SelectControl
-                  value={editorFontFamily}
-                  options={EDITOR_FONT_FAMILIES.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  onChange={setEditorFontFamily}
-                />
-              </Row>
-
-              <Row label="Espaçamento de linha" hint={getLineHeightLabel(editorLineHeight)}>
-                <SelectControl
-                  value={editorLineHeight}
-                  options={EDITOR_LINE_HEIGHTS.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  onChange={setEditorLineHeight}
-                />
-              </Row>
-
-              <Row
-                label="Entre parágrafos"
-                hint={getParagraphSpacingLabel(editorParagraphSpacing)}
-              >
-                <SelectControl
-                  value={editorParagraphSpacing}
-                  options={EDITOR_PARAGRAPH_SPACING.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  onChange={setEditorParagraphSpacing}
-                />
-              </Row>
-
-              <Row label="Recuo do Tab" hint={getIndentSizeLabel(editorIndentSize)}>
-                <SelectControl
-                  value={editorIndentSize}
-                  options={EDITOR_INDENT_SIZES.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  onChange={setEditorIndentSize}
-                />
-              </Row>
-            </Section>
-
-            <Section title="Fluxo" description="Página, salvamento e ferramentas.">
-              <Row label="Página" hint={pageLayoutHint(editorPageLayout)}>
-                <SelectControl
-                  value={editorPageLayout}
-                  options={EDITOR_PAGE_LAYOUTS.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  onChange={setEditorPageLayout}
-                />
-              </Row>
-
-              {editorPageLayout === "a4-continuous" && (
                 <Row
                   label="Formato da folha"
                   hint={
-                    EDITOR_PAGE_SIZES.find(
-                      (option) => option.value === editorPageSize,
-                    )?.hint
+                    editorPageLayout === "a4-continuous"
+                      ? EDITOR_PAGE_SIZES.find((option) => option.value === editorPageSize)
+                          ?.hint
+                      : "Vale no modo Página."
                   }
                 >
                   <SelectControl
                     value={editorPageSize}
+                    disabled={editorPageLayout !== "a4-continuous"}
                     options={EDITOR_PAGE_SIZES.map((option) => ({
                       value: option.value,
                       label: option.label,
@@ -475,276 +471,315 @@ export function SettingsDialog() {
                     onChange={setEditorPageSize}
                   />
                 </Row>
-              )}
 
-              <Row label="Auto-save" hint="Ctrl+S continua disponível a qualquer momento." icon={<Save size={12} />}>
-                <Toggle
-                  checked={autoSaveEnabled}
-                  onChange={setAutoSaveEnabled}
-                  label={autoSaveEnabled ? "Ativado" : "Desativado"}
+                <RangeRow
+                  label="Zoom da página"
+                  icon={<Type size={12} />}
+                  value={editorZoom}
+                  suffix="%"
+                  min={75}
+                  max={200}
+                  step={5}
+                  onChange={setEditorZoom}
+                  onReset={() => setEditorZoom(100)}
                 />
-              </Row>
+              </Group>
 
-              <Row
-                label="Duplo clique no canvas"
-                hint={
-                  CANVAS_DBLCLICK_ACTIONS.find(
-                    (option) => option.value === canvasDblClickCreates,
-                  )?.hint
-                }
-              >
-                <SelectControl
-                  value={canvasDblClickCreates}
-                  options={CANVAS_DBLCLICK_ACTIONS.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  onChange={setCanvasDblClickCreates}
-                />
-              </Row>
-
-              <Row
-                label="Moldura ao editar texto no canvas"
-                hint={
-                  canvasTextEditFrame
-                    ? "Um contorno marca a caixa enquanto você escreve nela."
-                    : "Sem contorno: o cursor e a barra de formatação bastam."
-                }
-              >
-                <Toggle
-                  checked={canvasTextEditFrame}
-                  onChange={setCanvasTextEditFrame}
-                  label={canvasTextEditFrame ? "Mostrar" : "Ocultar"}
-                />
-              </Row>
-
-              <Row
-                label="Ortografia pt-BR"
-                hint={
-                  personalDictSize > 0
-                    ? `${personalDictSize} ${personalDictSize === 1 ? "palavra" : "palavras"} no dicionário.`
-                    : "Sublinhado e sugestões do revisor interno."
-                }
-                icon={<SpellCheck size={12} />}
-              >
-                <Toggle
-                  checked={spellcheckEnabled}
-                  onChange={setSpellcheckEnabled}
-                  label={spellcheckEnabled ? "Ativado" : "Desativado"}
-                />
-              </Row>
-
-              <Row label="Toolbar da escrita">
-                <SelectControl
-                  value={editorToolbarMode}
-                  options={[
-                    { value: "fixed", label: "Fixa" },
-                    { value: "hover", label: "Ao passar o mouse" },
-                  ]}
-                  onChange={setEditorToolbarMode}
-                />
-              </Row>
-
-              {personalDictSize > 0 && (
-                <DictionaryPanel
-                  words={personalDictWords}
-                  size={personalDictSize}
-                  onClear={onClearPersonalDict}
-                  onRemove={onRemovePersonalWord}
-                />
-              )}
-            </Section>
-
-            <Section title="Interface" description="O que aparece quando o Solon abre.">
-              <Row label="Ao abrir">
-                <SelectControl
-                  value={startView}
-                  options={[
-                    { value: "home", label: "Início" },
-                    { value: "editor", label: "Livre" },
-                    { value: "canvas", label: "Canvas" },
-                  ]}
-                  onChange={(v) => setStartView(v as "home" | "editor" | "canvas")}
-                />
-              </Row>
-
-              <Row label="Abrir último arquivo">
-                <Toggle
-                  checked={openLastFileOnStartup}
-                  onChange={setOpenLastFileOnStartup}
-                  label={openLastFileOnStartup ? "Ativado" : "Desativado"}
-                />
-              </Row>
-
-              <Row
-                label="Restaurar sessão"
-                hint="Reabre layout, split pane, última visão e abas fechadas recentes."
-              >
-                <Toggle
-                  checked={restoreWorkspaceLayout}
-                  onChange={setRestoreWorkspaceLayout}
-                  label={restoreWorkspaceLayout ? "Ativado" : "Desativado"}
-                />
-              </Row>
-
-              <Row label="Ações extras na barra superior">
-                <Toggle
-                  checked={showTitlebarActions}
-                  onChange={setShowTitlebarActions}
-                  label={showTitlebarActions ? "Ativado" : "Desativado"}
-                />
-              </Row>
-
-              <Row
-                label="Posição do Índice"
-                hint={
-                  outlineSide === "left"
-                    ? "Embaixo da Sidebar"
-                    : outlineSide === "floating"
-                      ? "Painel flutuante (arrastável)"
-                      : "Junto do Inspector"
-                }
-              >
-                <SelectControl
-                  value={outlineSide}
-                  options={[
-                    { value: "right", label: "Direita" },
-                    { value: "left", label: "Esquerda" },
-                    { value: "floating", label: "Flutuante" },
-                  ]}
-                  onChange={setOutlineSide}
-                />
-              </Row>
-
-              <Row label="Estatísticas na barra inferior">
-                <Toggle
-                  checked={showStatusStats}
-                  onChange={setShowStatusStats}
-                  label={showStatusStats ? "Ativado" : "Desativado"}
-                />
-              </Row>
-
-              <Row label="Caminho do arquivo na barra inferior">
-                <Toggle
-                  checked={showStatusPath}
-                  onChange={setShowStatusPath}
-                  label={showStatusPath ? "Ativado" : "Desativado"}
-                />
-              </Row>
-            </Section>
-
-            <Section title="Projeto" description="Organização, histórico e verificações.">
-              <Row
-                label="Backup do projeto"
-                hint={backupMessage ?? "Copia notas para .solon/backups sem alterar seus arquivos."}
-                icon={<Archive size={12} />}
-              >
-                <ActionButton onClick={onCreateBackup} disabled={!rootFolder || creatingBackup}>
-                  {creatingBackup ? (
-                    <>
-                      <Loader2 size={12} className="animate-spin" />
-                      Criando...
-                    </>
-                  ) : (
-                    "Criar"
-                  )}
-                </ActionButton>
-              </Row>
-
-              <Row
-                label="Restaurar último backup"
-                hint="Sobrescreve notas existentes com a cópia local mais recente."
-              >
-                <ActionButton onClick={onRestoreBackup} disabled={!rootFolder || restoringBackup}>
-                  {restoringBackup ? (
-                    <>
-                      <Loader2 size={12} className="animate-spin" />
-                      Restaurando...
-                    </>
-                  ) : (
-                    "Restaurar"
-                  )}
-                </ActionButton>
-              </Row>
-
-              <Row
-                label="Saúde do projeto"
-                hint="Verifica links internos, imagens inline e notas vazias."
-                icon={<ShieldCheck size={12} />}
-              >
-                <ActionButton
-                  onClick={() => {
-                    close();
-                    openWorkspaceHealth();
-                  }}
-                >
-                  Verificar
-                </ActionButton>
-              </Row>
-
-              <Row label="Expandir pasta após mover">
-                <Toggle
-                  checked={autoExpandMovedFolders}
-                  onChange={setAutoExpandMovedFolders}
-                  label={autoExpandMovedFolders ? "Ativado" : "Desativado"}
-                />
-              </Row>
-
-              <Row label="Histórico local" hint="Mantém snapshots antes de sobrescrever notas.">
-                <Toggle
-                  checked={localHistoryEnabled}
-                  onChange={setLocalHistoryEnabled}
-                  label={localHistoryEnabled ? "Ativado" : "Desativado"}
-                />
-              </Row>
-            </Section>
-
-            <Section title="Atualizações" description="Versão instalada e canal de release.">
-              <Row
-                label="Versão atual"
-                hint={lastUpdateCheck ? `Checado ${formatDateTime(lastUpdateCheck)}` : undefined}
-              >
-                <span className="text-[0.72rem] tabular-nums" style={{ color: "var(--text-muted)" }}>
-                  v{APP_VERSION}
-                </span>
-              </Row>
-
-              <Row label="Verificar ao abrir" icon={<Sparkles size={12} />}>
-                <Toggle
-                  checked={autoCheckUpdates}
-                  onChange={setAutoCheckUpdates}
-                  label={autoCheckUpdates ? "Ativado" : "Desativado"}
-                />
-              </Row>
-
-              <Row label="Verificar agora" hint={updateMessage ?? undefined}>
-                <ActionButton onClick={onCheckUpdates} disabled={checkingUpdate} strong>
-                  {checkingUpdate ? (
-                    <>
-                      <Loader2 size={12} className="animate-spin" />
-                      Verificando...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={12} />
-                      Verificar
-                    </>
-                  )}
-                </ActionButton>
-              </Row>
-
-              {skippedVersion && (
-                <Row label="Versão ignorada" hint={`Solon ${skippedVersion}`}>
-                  <ActionButton onClick={onClearSkippedVersion}>Liberar</ActionButton>
+              <Group title="Tipografia">
+                <Row label="Fonte padrão">
+                  <SelectControl
+                    value={editorFontFamily}
+                    options={EDITOR_FONT_FAMILIES.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    onChange={setEditorFontFamily}
+                  />
                 </Row>
-              )}
 
-              <Row label="Canal de release">
-                <ActionButton onClick={openReleaseChannel}>
-                  <ExternalLink size={11} />
-                  GitHub
-                </ActionButton>
-              </Row>
+                <Row label="Tamanho do texto" hint={getTextSizeLabel(editorTextSize)}>
+                  <SelectControl
+                    value={editorTextSize}
+                    options={EDITOR_TEXT_SIZES.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    onChange={setEditorTextSize}
+                  />
+                </Row>
+
+                <Row label="Espaçamento de linha" hint={getLineHeightLabel(editorLineHeight)}>
+                  <SelectControl
+                    value={editorLineHeight}
+                    options={EDITOR_LINE_HEIGHTS.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    onChange={setEditorLineHeight}
+                  />
+                </Row>
+
+                <Row
+                  label="Entre parágrafos"
+                  hint={getParagraphSpacingLabel(editorParagraphSpacing)}
+                >
+                  <SelectControl
+                    value={editorParagraphSpacing}
+                    options={EDITOR_PARAGRAPH_SPACING.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    onChange={setEditorParagraphSpacing}
+                  />
+                </Row>
+
+                <Row label="Recuo do Tab" hint={getIndentSizeLabel(editorIndentSize)}>
+                  <SelectControl
+                    value={editorIndentSize}
+                    options={EDITOR_INDENT_SIZES.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    onChange={setEditorIndentSize}
+                  />
+                </Row>
+              </Group>
+            </Section>
+
+            <Section
+              title="Utilitários"
+              description="Ferramentas de apoio: revisão, canvas e arquivos."
+            >
+              <Group title="Revisão">
+                <Row
+                  label="Ortografia pt-BR"
+                  hint={
+                    personalDictSize > 0
+                      ? `${personalDictSize} ${personalDictSize === 1 ? "palavra" : "palavras"} no dicionário.`
+                      : "Sublinhado e sugestões do revisor interno."
+                  }
+                  icon={<SpellCheck size={12} />}
+                >
+                  <Toggle
+                    checked={spellcheckEnabled}
+                    onChange={setSpellcheckEnabled}
+                    label={spellcheckEnabled ? "Ativado" : "Desativado"}
+                  />
+                </Row>
+
+                {personalDictSize > 0 && (
+                  <DictionaryPanel
+                    words={personalDictWords}
+                    size={personalDictSize}
+                    onClear={onClearPersonalDict}
+                    onRemove={onRemovePersonalWord}
+                  />
+                )}
+              </Group>
+
+              <Group title="Canvas">
+                <Row
+                  label="Duplo clique no canvas"
+                  hint={
+                    CANVAS_DBLCLICK_ACTIONS.find(
+                      (option) => option.value === canvasDblClickCreates,
+                    )?.hint
+                  }
+                >
+                  <SelectControl
+                    value={canvasDblClickCreates}
+                    options={CANVAS_DBLCLICK_ACTIONS.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    onChange={setCanvasDblClickCreates}
+                  />
+                </Row>
+
+                <Row
+                  label="Moldura ao editar texto no canvas"
+                  hint={
+                    canvasTextEditFrame
+                      ? "Um contorno marca a caixa enquanto você escreve nela."
+                      : "Sem contorno: o cursor e a barra de formatação bastam."
+                  }
+                >
+                  <Toggle
+                    checked={canvasTextEditFrame}
+                    onChange={setCanvasTextEditFrame}
+                    label={canvasTextEditFrame ? "Mostrar" : "Ocultar"}
+                  />
+                </Row>
+              </Group>
+
+              <Group title="Arquivos">
+                <Row
+                  label="Expandir pasta após mover"
+                  hint="Abre a pasta de destino para mostrar o item que chegou."
+                >
+                  <Toggle
+                    checked={autoExpandMovedFolders}
+                    onChange={setAutoExpandMovedFolders}
+                    label={autoExpandMovedFolders ? "Ativado" : "Desativado"}
+                  />
+                </Row>
+
+                <Row
+                  label="Saúde do projeto"
+                  hint="Verifica links internos, imagens inline e notas vazias."
+                  icon={<ShieldCheck size={12} />}
+                >
+                  <ActionButton
+                    onClick={() => {
+                      close();
+                      openWorkspaceHealth();
+                    }}
+                  >
+                    Verificar
+                  </ActionButton>
+                </Row>
+              </Group>
+            </Section>
+
+            <Section
+              title="Sistema"
+              description="Inicialização, segurança dos dados e atualizações."
+            >
+              <Group title="Ao abrir o Solon">
+                <Row label="Tela inicial">
+                  <SelectControl
+                    value={startView}
+                    options={[
+                      { value: "home", label: "Início" },
+                      { value: "editor", label: "Livre" },
+                      { value: "canvas", label: "Canvas" },
+                    ]}
+                    onChange={(v) => setStartView(v as "home" | "editor" | "canvas")}
+                  />
+                </Row>
+
+                <Row label="Abrir último arquivo">
+                  <Toggle
+                    checked={openLastFileOnStartup}
+                    onChange={setOpenLastFileOnStartup}
+                    label={openLastFileOnStartup ? "Ativado" : "Desativado"}
+                  />
+                </Row>
+
+                <Row
+                  label="Restaurar sessão"
+                  hint="Reabre as pastas abertas na barra lateral, o layout, o split pane, a última visão e as abas fechadas recentes."
+                >
+                  <Toggle
+                    checked={restoreWorkspaceLayout}
+                    onChange={setRestoreWorkspaceLayout}
+                    label={restoreWorkspaceLayout ? "Ativado" : "Desativado"}
+                  />
+                </Row>
+              </Group>
+
+              <Group title="Salvamento e backup">
+                <Row
+                  label="Auto-save"
+                  hint="Ctrl+S continua disponível a qualquer momento."
+                  icon={<Save size={12} />}
+                >
+                  <Toggle
+                    checked={autoSaveEnabled}
+                    onChange={setAutoSaveEnabled}
+                    label={autoSaveEnabled ? "Ativado" : "Desativado"}
+                  />
+                </Row>
+
+                <Row label="Histórico local" hint="Mantém snapshots antes de sobrescrever notas.">
+                  <Toggle
+                    checked={localHistoryEnabled}
+                    onChange={setLocalHistoryEnabled}
+                    label={localHistoryEnabled ? "Ativado" : "Desativado"}
+                  />
+                </Row>
+
+                <Row
+                  label="Backup do projeto"
+                  hint={backupMessage ?? "Copia notas para .solon/backups sem alterar seus arquivos."}
+                  icon={<Archive size={12} />}
+                >
+                  <ActionButton onClick={onCreateBackup} disabled={!rootFolder || creatingBackup}>
+                    {creatingBackup ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        Criando...
+                      </>
+                    ) : (
+                      "Criar"
+                    )}
+                  </ActionButton>
+                </Row>
+
+                <Row
+                  label="Restaurar último backup"
+                  hint="Sobrescreve notas existentes com a cópia local mais recente."
+                >
+                  <ActionButton onClick={onRestoreBackup} disabled={!rootFolder || restoringBackup}>
+                    {restoringBackup ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        Restaurando...
+                      </>
+                    ) : (
+                      "Restaurar"
+                    )}
+                  </ActionButton>
+                </Row>
+              </Group>
+
+              <Group title="Atualizações">
+                <Row
+                  label="Versão atual"
+                  hint={lastUpdateCheck ? `Checado ${formatDateTime(lastUpdateCheck)}` : undefined}
+                >
+                  <span className="text-[0.72rem] tabular-nums" style={{ color: "var(--text-muted)" }}>
+                    v{APP_VERSION}
+                  </span>
+                </Row>
+
+                <Row label="Verificar ao abrir" icon={<Sparkles size={12} />}>
+                  <Toggle
+                    checked={autoCheckUpdates}
+                    onChange={setAutoCheckUpdates}
+                    label={autoCheckUpdates ? "Ativado" : "Desativado"}
+                  />
+                </Row>
+
+                <Row label="Verificar agora" hint={updateMessage ?? undefined}>
+                  <ActionButton onClick={onCheckUpdates} disabled={checkingUpdate} strong>
+                    {checkingUpdate ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        Verificando...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={12} />
+                        Verificar
+                      </>
+                    )}
+                  </ActionButton>
+                </Row>
+
+                {skippedVersion && (
+                  <Row label="Versão ignorada" hint={`Solon ${skippedVersion}`}>
+                    <ActionButton onClick={onClearSkippedVersion}>Liberar</ActionButton>
+                  </Row>
+                )}
+
+                <Row label="Canal de release">
+                  <ActionButton onClick={openReleaseChannel}>
+                    <ExternalLink size={11} />
+                    GitHub
+                  </ActionButton>
+                </Row>
+              </Group>
             </Section>
 
                 {filter.trim() && <EmptyFilter filter={filter.trim()} />}
@@ -789,8 +824,14 @@ function DictionaryPanel({
   onClear: () => void;
   onRemove: (word: string) => void;
 }) {
+  const { filter } = useContext(SettingsFilterContext);
+  const scope = useContext(SettingsScopeContext);
+  if (filter && !matchesFilter(filter, "Dicionário pessoal", "palavras", scope)) {
+    return null;
+  }
   return (
     <div
+      data-setting-row
       className="p-3 flex flex-col gap-2"
       style={{
         border: "1px solid var(--border-subtle)",
@@ -853,16 +894,18 @@ function DictionaryPanel({
  * divergir sem que uma aba fique vazia.
  */
 const SETTINGS_SECTIONS = [
-  "Aparência",
+  "Personalização",
   "Escrita",
-  "Fluxo",
-  "Interface",
-  "Projeto",
-  "Atualizações",
+  "Utilitários",
+  "Sistema",
 ] as const;
 
 /** Aba ativa e texto do filtro, lidos por `Section` e por `Row`. */
 const SettingsFilterContext = createContext({ active: "", filter: "" });
+
+/** Seção e grupo em volta de uma linha: entram na busca junto do rótulo,
+ *  então buscar "página" ou "canvas" traz o grupo inteiro. */
+const SettingsScopeContext = createContext("");
 
 /** Remove acentos e caixa: buscar "pagina" precisa achar "Página". */
 function normalizeForFilter(value: string): string {
@@ -872,10 +915,15 @@ function normalizeForFilter(value: string): string {
     .toLowerCase();
 }
 
-function matchesFilter(filter: string, label: string, hint?: string): boolean {
-  const alvo = normalizeForFilter(`${label} ${hint ?? ""}`);
+function matchesFilter(
+  filter: string,
+  label: string,
+  hint?: string,
+  scope = "",
+): boolean {
+  const alvo = normalizeForFilter(`${label} ${hint ?? ""} ${scope}`);
   return normalizeForFilter(filter)
-    .split(/s+/)
+    .split(/\s+/)
     .filter(Boolean)
     .every((termo) => alvo.includes(termo));
 }
@@ -898,7 +946,7 @@ function Section({
   // label small-caps discreto.
   return (
     <section
-      className="solon-settings-section p-4 flex flex-col gap-3"
+      className="solon-settings-section p-4 flex flex-col gap-4"
       style={{
         background: "var(--bg-panel-2)",
         border: "1px solid var(--border-subtle)",
@@ -922,8 +970,26 @@ function Section({
           </p>
         )}
       </div>
-      <div className="flex flex-col gap-2">{children}</div>
+      <SettingsScopeContext.Provider value={title}>
+        <div className="flex flex-col gap-4">{children}</div>
+      </SettingsScopeContext.Provider>
     </section>
+  );
+}
+
+/**
+ * Subgrupo dentro de uma seção ("Página", "Tipografia"...). Some sozinho
+ * na busca quando fica sem linhas, pela mesma regra `:has()` da seção.
+ */
+function Group({ title, children }: { title: string; children: React.ReactNode }) {
+  const sectionTitle = useContext(SettingsScopeContext);
+  return (
+    <div className="solon-settings-group flex flex-col gap-2" role="group" aria-label={title}>
+      <h3 className="solon-settings-group-title">{title}</h3>
+      <SettingsScopeContext.Provider value={`${sectionTitle} ${title}`}>
+        {children}
+      </SettingsScopeContext.Provider>
+    </div>
   );
 }
 
@@ -942,7 +1008,8 @@ function Row({
   // conhece o rótulo e a dica. A seção some sozinha quando fica vazia,
   // por uma regra `:has()` no CSS.
   const { filter } = useContext(SettingsFilterContext);
-  if (filter && !matchesFilter(filter, label, hint)) return null;
+  const scope = useContext(SettingsScopeContext);
+  if (filter && !matchesFilter(filter, label, hint, scope)) return null;
   return (
     <div
       data-setting-row
@@ -1041,16 +1108,19 @@ function SelectControl<T extends string>({
   value,
   options,
   onChange,
+  disabled,
 }: {
   value: T;
   options: { value: T; label: string }[];
   onChange: (v: T) => void;
+  disabled?: boolean;
 }) {
   return (
     <select
       value={value}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value as T)}
-      className="min-w-[152px] px-2.5 py-1.5 outline-none"
+      className="min-w-[152px] px-2.5 py-1.5 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
       style={{
         background: "var(--bg-panel)",
         color: "var(--text-primary)",

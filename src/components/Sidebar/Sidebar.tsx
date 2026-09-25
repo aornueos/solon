@@ -18,30 +18,17 @@ import {
 import { useAppStore, FileNode } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { startDrag } from "../../lib/drag";
-import { canMoveIntoFolder } from "../../lib/sidebarDrop";
-import { SCENE_DND_MIME } from "../../types/canvas";
+import {
+  normalizeTreePath,
+  resolveSidebarDrop,
+  type SidebarDropTarget,
+} from "../../lib/sidebarDrop";
+import {
+  SIDEBAR_SCENE_DROP_EVENT,
+  type SidebarSceneDropDetail,
+} from "../../types/canvas";
 import { TagFilterPopover } from "./TagFilterPopover";
 import clsx from "clsx";
-
-const SIDEBAR_DND_MIME = "application/x-solon-sidebar-node";
-
-function getSidebarDragPath(e: React.DragEvent): string | null {
-  try {
-    const raw = e.dataTransfer.getData(SIDEBAR_DND_MIME);
-    if (raw) {
-      const parsed = JSON.parse(raw) as { path?: string };
-      if (typeof parsed.path === "string") return parsed.path;
-    }
-  } catch {
-    /* dataTransfer pode estar indisponivel durante dragover */
-  }
-  try {
-    const text = e.dataTransfer.getData("text/plain");
-    return text || null;
-  } catch {
-    return null;
-  }
-}
 
 interface ContextMenuState {
   x: number;
@@ -73,22 +60,23 @@ export function Sidebar() {
    * Estado do drag-and-drop. Dois modos:
    *  - REORDER: dragOverPath aponta pro sibling sob o cursor (linha
    *    azul no topo do alvo). Mesmo parent que o dragged.
-   *  - MOVE: dragOverFolder aponta pra uma pasta DIFERENTE do parent
-   *    atual (highlight da pasta inteira). Solta = fs.rename pra
-   *    dentro dela.
+   *  - MOVE: dragOverFolder aponta pra pasta de destino (highlight da
+   *    pasta inteira, ou da árvore toda quando o destino é a raiz).
+   *    Solta = fs.rename pra dentro dela.
    */
   const [dragPath, setDragPath] = useState<string | null>(null);
-  const dragPathRef = useRef<string | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
+  const rootIsDropTarget =
+    !!rootFolder &&
+    dragOverFolder !== null &&
+    normalizeTreePath(dragOverFolder) === normalizeTreePath(rootFolder);
 
   const beginSidebarDrag = (path: string) => {
-    dragPathRef.current = path;
     setDragPath(path);
   };
 
   const clearSidebarDrag = () => {
-    dragPathRef.current = null;
     setDragPath(null);
     setDragOverPath(null);
     setDragOverFolder(null);
@@ -294,7 +282,15 @@ export function Sidebar() {
 
       {/* Árvore de arquivos (ou lista filtrada por tag) */}
       <div
-        className="flex-1 overflow-y-auto py-1"
+        // Fundo da árvore = raiz do projeto como destino de arraste.
+        data-sidebar-root-drop={fileTree.length > 0 && !activeTagFilter ? "" : undefined}
+        className="flex-1 overflow-y-auto py-1 transition-colors"
+        style={{
+          background: rootIsDropTarget
+            ? "color-mix(in srgb, var(--accent) 7%, transparent)"
+            : undefined,
+          boxShadow: rootIsDropTarget ? "inset 0 0 0 1px var(--accent)" : undefined,
+        }}
         role={fileTree.length > 0 ? "tree" : undefined}
         aria-label={fileTree.length > 0 ? "Explorador de arquivos" : undefined}
         onContextMenu={(e) => {
@@ -336,10 +332,10 @@ export function Sidebar() {
             nodes={fileTree}
             depth={0}
             activeFilePath={activeFilePath}
+            rootFolder={rootFolder}
             onToggle={toggleFolder}
             onContextMenu={(node, x, y) => setMenu({ x, y, node })}
             dragPath={dragPath}
-            dragPathRef={dragPathRef}
             dragOverPath={dragOverPath}
             dragOverFolder={dragOverFolder}
             onDragStart={beginSidebarDrag}
@@ -447,11 +443,11 @@ function FileTreeRow({
   node,
   depth,
   isActive,
+  rootFolder,
   onOpen,
   onOpenInBackground,
   onContextMenu,
   dragPath,
-  dragPathRef,
   dragOverPath,
   dragOverFolder,
   siblingPaths,
@@ -465,11 +461,11 @@ function FileTreeRow({
   node: FileNode;
   depth: number;
   isActive: boolean;
+  rootFolder: string | null;
   onOpen: () => void;
   onOpenInBackground: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
   dragPath: string | null;
-  dragPathRef: React.MutableRefObject<string | null>;
   dragOverPath: string | null;
   dragOverFolder: string | null;
   siblingPaths: string[];
@@ -477,54 +473,99 @@ function FileTreeRow({
   onDragOver: (path: string | null) => void;
   onDragOverFolder: (path: string | null) => void;
   onDragEnd: () => void;
-  onReorder: (targetPath: string) => void;
+  onReorder: (draggedPath: string, targetPath: string) => void;
   onMoveToFolder: (draggedPath: string, folderPath: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const suppressClickRef = useRef(false);
-  const activeDragPath = dragPathRef.current ?? dragPath;
-
-  // Regra de drop por TIPO do alvo:
-  //  - Drop em FILE → reorder (só dentro do mesmo parent)
-  //  - Drop em FOLDER → move-into SEMPRE (independente de ser sibling)
-  //
-  // Mover para uma pasta irmã é legítimo; bloquear esse caso
-  // impedia "arrastar pasta A pra dentro de pasta B" no mesmo nível.
-  // Agora pra reorder você solta em arquivo; pra mover pra dentro
-  // de pasta, solta na pasta. Conflito impossível — file != folder.
-  const isSameParent = !!activeDragPath && siblingPaths.includes(activeDragPath);
-  const canMoveIntoThisFolder =
-    node.type === "folder" && canMoveIntoFolder(activeDragPath, node.path);
 
   const showDropIndicator =
-    isSameParent &&
-    node.type === "file" &&
-    dragOverPath === node.path &&
-    activeDragPath !== node.path;
+    node.type === "file" && dragOverPath === node.path && dragPath !== node.path;
   const showFolderDropHighlight =
-    canMoveIntoThisFolder && dragOverFolder === node.path;
+    node.type === "folder" &&
+    dragOverFolder !== null &&
+    normalizeTreePath(dragOverFolder) === normalizeTreePath(node.path);
 
-  const findFolderDropTarget = (clientX: number, clientY: number) => {
+  /** Lê do DOM o que está sob o cursor e decide o destino. */
+  const findDropTarget = (clientX: number, clientY: number): SidebarDropTarget | null => {
     const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
-    const target = el?.closest<HTMLElement>(
-      '[data-sidebar-node-type="folder"][data-sidebar-node-path]',
+    if (!el) return null;
+    const row = el.closest<HTMLElement>("[data-sidebar-node-path]");
+    const rowType = row?.dataset.sidebarNodeType;
+    return resolveSidebarDrop(
+      { path: node.path, type: node.type },
+      {
+        row:
+          row && (rowType === "file" || rowType === "folder")
+            ? { path: row.dataset.sidebarNodePath ?? "", type: rowType }
+            : null,
+        overTreeBackground: el.hasAttribute("data-sidebar-root-drop"),
+        overCanvas: !!el.closest("[data-canvas-drop-zone]"),
+      },
+      rootFolder,
+      siblingPaths,
     );
-    const targetPath = target?.dataset.sidebarNodePath ?? null;
-    if (!targetPath) return null;
-    return canMoveIntoFolder(node.path, targetPath) ? targetPath : null;
   };
 
-  const startFolderPointerDrag = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (node.type !== "folder" || e.button !== 0) return;
+  // Arraste por mouse (mousedown → mousemove → mouseup), igual para nota e
+  // pasta. Antes as notas usavam o drag-and-drop nativo do HTML5, que no
+  // webview do Tauri no Windows compete com o tratamento de arquivos
+  // soltos na janela e falha de forma intermitente — a pasta, que já ia
+  // por mouse, movia; a nota ficava parada. Um caminho só, que não
+  // depende do webview, para os dois tipos e também para soltar no canvas.
+  const startPointerDrag = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
     if ((e.target as HTMLElement).closest("[data-sidebar-action]")) return;
 
     const originX = e.clientX;
     const originY = e.clientY;
     let dragging = false;
-    let currentTargetPath: string | null = null;
+    let target: SidebarDropTarget | null = null;
+    let ghost: HTMLDivElement | null = null;
+    let lastX = originX;
+    let lastY = originY;
+    let autoScrollFrame = 0;
+    const scroller = e.currentTarget.closest<HTMLElement>("[data-sidebar-root-drop]");
+
+    // Rola a árvore quando o cursor encosta na borda de cima ou de baixo —
+    // o drag nativo fazia isso de graça; sem ele, uma pasta fora da tela
+    // ficava inalcançável. Mais perto da borda, mais rápido.
+    const autoScroll = () => {
+      autoScrollFrame = 0;
+      if (!dragging || !scroller) return;
+      const rect = scroller.getBoundingClientRect();
+      if (lastX < rect.left || lastX > rect.right) return;
+      const zone = 32;
+      let dy = 0;
+      if (lastY < rect.top + zone) dy = -Math.min(12, Math.ceil((rect.top + zone - lastY) / 3));
+      else if (lastY > rect.bottom - zone) dy = Math.min(12, Math.ceil((lastY - rect.bottom + zone) / 3));
+      if (dy === 0) return;
+      const before = scroller.scrollTop;
+      scroller.scrollTop += dy;
+      if (scroller.scrollTop === before) return;
+      target = findDropTarget(lastX, lastY);
+      showTarget(target);
+      autoScrollFrame = requestAnimationFrame(autoScroll);
+    };
 
     const finishDrag = () => {
-      document.documentElement.classList.remove("solon-folder-dragging");
+      if (autoScrollFrame) cancelAnimationFrame(autoScrollFrame);
+      autoScrollFrame = 0;
+      document.documentElement.classList.remove("solon-tree-dragging");
+      ghost?.remove();
+      ghost = null;
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+    };
+
+    const showTarget = (next: SidebarDropTarget | null) => {
+      onDragOver(next?.kind === "reorder" ? next.path : null);
+      onDragOverFolder(next?.kind === "folder" ? next.path : null);
+      document.documentElement.classList.toggle(
+        "solon-tree-drop-canvas",
+        next?.kind === "canvas",
+      );
     };
 
     startDrag({
@@ -536,40 +577,56 @@ function FileTreeRow({
           dragging = true;
           suppressClickRef.current = true;
           onDragStart(node.path);
-          // Cursor "grabbing" GLOBAL enquanto arrasta a pasta. Via classe no
-          // <html> + CSS !important (não `body.style.cursor`) porque as linhas
-          // de pasta tem `cursor: default` próprio, que sobrescrevia o cursor
-          // do body ao passar por cima do alvo — a maozinha "revertia" pra
-          // seta. Com !important no <html>, o grabbing vale em tudo.
-          document.documentElement.classList.add("solon-folder-dragging");
+          // Cursor "grabbing" GLOBAL via classe no <html> + CSS
+          // !important: as linhas têm `cursor` próprio, que venceria um
+          // `body.style.cursor` ao passar por cima do alvo.
+          document.documentElement.classList.add("solon-tree-dragging");
+          ghost = document.createElement("div");
+          ghost.className = "solon-drag-ghost";
+          ghost.textContent = displayName(node);
+          document.body.appendChild(ghost);
         }
 
         ev.preventDefault();
-        const targetPath = findFolderDropTarget(ev.clientX, ev.clientY);
-        currentTargetPath = targetPath;
-        if (dragOverPath !== null) onDragOver(null);
-        if (dragOverFolder !== targetPath) onDragOverFolder(targetPath);
+        lastX = ev.clientX;
+        lastY = ev.clientY;
+        if (ghost) {
+          ghost.style.transform = `translate(${ev.clientX + 12}px, ${ev.clientY + 10}px)`;
+        }
+        target = findDropTarget(ev.clientX, ev.clientY);
+        showTarget(target);
+        if (!autoScrollFrame) autoScrollFrame = requestAnimationFrame(autoScroll);
       },
       onEnd: (ev) => {
         if (!dragging) return;
         ev.preventDefault();
-        const targetPath =
-          currentTargetPath ?? findFolderDropTarget(ev.clientX, ev.clientY);
-        if (targetPath) onMoveToFolder(node.path, targetPath);
-        else onDragEnd();
+        const drop = findDropTarget(ev.clientX, ev.clientY) ?? target;
+        showTarget(null);
         finishDrag();
-        window.setTimeout(() => {
-          suppressClickRef.current = false;
-        }, 0);
+        if (drop?.kind === "folder") {
+          onMoveToFolder(node.path, drop.path);
+        } else if (drop?.kind === "reorder") {
+          onReorder(node.path, drop.path);
+        } else {
+          if (drop?.kind === "canvas") {
+            window.dispatchEvent(
+              new CustomEvent<SidebarSceneDropDetail>(SIDEBAR_SCENE_DROP_EVENT, {
+                detail: {
+                  path: node.path,
+                  name: node.name,
+                  clientX: ev.clientX,
+                  clientY: ev.clientY,
+                },
+              }),
+            );
+          }
+          onDragEnd();
+        }
       },
       onCancel: () => {
-        onDragOver(null);
-        onDragOverFolder(null);
-        onDragEnd();
+        showTarget(null);
         finishDrag();
-        window.setTimeout(() => {
-          suppressClickRef.current = false;
-        }, 0);
+        onDragEnd();
       },
     });
   };
@@ -586,127 +643,9 @@ function FileTreeRow({
 
   return (
     <div
-      draggable={node.type === "file"}
       data-sidebar-node-path={node.path}
       data-sidebar-node-type={node.type}
-      onDragStart={(e) => {
-        if (node.type !== "file") {
-          e.preventDefault();
-          return;
-        }
-        // 2 funções:
-        // 1. Drag pro Canvas (scene cards) — usa MIME `SCENE_DND_MIME`
-        //    (só arquivos, não pastas)
-        // 2. Drag pra reorder no sidebar — usa estado interno (dragPath)
-        if (node.type === "file") {
-          const payload = JSON.stringify({
-            path: node.path,
-            name: node.name,
-          });
-          e.dataTransfer.setData(SCENE_DND_MIME, payload);
-        }
-        e.dataTransfer.setData(
-          SIDEBAR_DND_MIME,
-          JSON.stringify({ path: node.path, name: node.name, type: node.type }),
-        );
-        e.dataTransfer.setData("text/plain", node.path);
-        e.dataTransfer.effectAllowed = "copyMove";
-        onDragStart(node.path);
-      }}
-      onDragEnter={(e) => {
-        const draggedPath = dragPathRef.current ?? dragPath ?? getSidebarDragPath(e);
-        const isSidebarDrag =
-          !!draggedPath || Array.from(e.dataTransfer.types).includes(SIDEBAR_DND_MIME);
-        const canDropOnFolder =
-          node.type === "folder" &&
-          isSidebarDrag &&
-          (!draggedPath || canMoveIntoFolder(draggedPath, node.path));
-
-        if (canDropOnFolder) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-          if (dragOverFolder !== node.path) onDragOverFolder(node.path);
-          if (dragOverPath !== null) onDragOver(null);
-        }
-      }}
-      onDragOver={(e) => {
-        const draggedPath = dragPathRef.current ?? dragPath ?? getSidebarDragPath(e);
-        const isSidebarDrag =
-          !!draggedPath || Array.from(e.dataTransfer.types).includes(SIDEBAR_DND_MIME);
-        const canDropOnFolder =
-          node.type === "folder" &&
-          isSidebarDrag &&
-          (!draggedPath || canMoveIntoFolder(draggedPath, node.path));
-        const canReorderHere =
-          node.type === "file" &&
-          !!draggedPath &&
-          siblingPaths.includes(draggedPath) &&
-          draggedPath !== node.path;
-
-        // FOLDER alvo: sempre tenta move-into (regra simples,
-        // independente de sibling). Tem prioridade absoluta sobre
-        // reorder porque um folder nunca é alvo válido de reorder.
-        if (canDropOnFolder) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-          if (dragOverFolder !== node.path) onDragOverFolder(node.path);
-          if (dragOverPath !== null) onDragOver(null);
-          return;
-        }
-        // FILE alvo: só aceita reorder se mesmo parent.
-        if (canReorderHere) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-          if (dragOverPath !== node.path) onDragOver(node.path);
-        }
-      }}
-      onDragLeave={(e) => {
-        // Race classica: dragleave dispara TODA vez que o cursor sai
-        // de QUALQUER elemento dentro do row (icone, chevron, span do
-        // nome) — mesmo só transitando entre filhos. Fica piscando.
-        // Solucao: só limpa o highlight se o cursor REALMENTE saiu
-        // da bbox do row. relatedTarget é onde o cursor entrou; se
-        // for descendente do row, ainda estamos "dentro" — ignora.
-        const next = e.relatedTarget as Node | null;
-        const row = e.currentTarget;
-        if (next && row.contains(next)) return;
-        if (dragOverPath === node.path) onDragOver(null);
-        if (dragOverFolder === node.path) onDragOverFolder(null);
-      }}
-      onDrop={(e) => {
-        const draggedPath = dragPathRef.current ?? dragPath ?? getSidebarDragPath(e);
-        // FOLDER → move-into. NAO checa `dragOverFolder === node.path`
-        // porque ha race condition classica do HTML5 D&D: dragleave
-        // pode disparar transitoriamente quando o cursor passa sobre
-        // filhos do row (icone, chevron) ANTES do drop, limpando o
-        // state. Como o drop só chega aqui se passou pelo dragover
-        // (que já validou via preventDefault), e canMoveIntoThisFolder
-        // é sync (depende só do dragPath/node), basta confiar nele.
-        if (
-          node.type === "folder" &&
-          draggedPath &&
-          canMoveIntoFolder(draggedPath, node.path)
-        ) {
-          e.preventDefault();
-          e.stopPropagation();
-          onMoveToFolder(draggedPath, node.path);
-          return;
-        }
-        // FILE → reorder. Mesmo principio: não depende de dragOverPath
-        // hover state, que poderia ter sido limpado pelo dragleave race.
-        if (
-          node.type === "file" &&
-          draggedPath &&
-          siblingPaths.includes(draggedPath) &&
-          draggedPath !== node.path
-        ) {
-          e.preventDefault();
-          e.stopPropagation();
-          onReorder(node.path);
-        }
-      }}
-      onDragEnd={onDragEnd}
-      onMouseDown={startFolderPointerDrag}
+      onMouseDown={startPointerDrag}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={(e) => {
@@ -809,22 +748,24 @@ function FileTreeRow({
           />
         </>
       )}
-      <span className="truncate">
-        {node.name.replace(/\.md$/, "").replace(/\.txt$/, "")}
-      </span>
+      <span className="truncate">{displayName(node)}</span>
     </div>
   );
+}
+
+function displayName(node: FileNode): string {
+  return node.name.replace(/\.md$/, "").replace(/\.txt$/, "");
 }
 
 interface FileTreeProps {
   nodes: FileNode[];
   depth: number;
   activeFilePath: string | null;
+  rootFolder: string | null;
   onToggle: (path: string) => void;
   onContextMenu: (node: FileNode, x: number, y: number) => void;
   // ─── drag-and-drop ───
   dragPath: string | null;
-  dragPathRef: React.MutableRefObject<string | null>;
   dragOverPath: string | null;
   /** Pasta atualmente highlighted como destino de move (drop dentro). */
   dragOverFolder: string | null;
@@ -838,7 +779,8 @@ interface FileTreeProps {
     targetPath: string | null,
     siblings: string[],
   ) => void;
-  /** Move pra OUTRA pasta (drop dentro de folder diferente do parent). */
+  /** Move pra OUTRA pasta: soltar na pasta, numa nota dela ou no fundo
+   *  da árvore (raiz). */
   onMoveToFolder: (draggedPath: string, folderPath: string) => void;
 }
 
@@ -846,10 +788,10 @@ function FileTree({
   nodes,
   depth,
   activeFilePath,
+  rootFolder,
   onToggle,
   onContextMenu,
   dragPath,
-  dragPathRef,
   dragOverPath,
   dragOverFolder,
   onDragStart,
@@ -878,6 +820,7 @@ function FileTree({
             node={node}
             depth={depth}
             isActive={node.type === "file" && activeFilePath === node.path}
+            rootFolder={rootFolder}
             onOpen={() => {
               if (node.type === "folder") onToggle(node.path);
               else openFile(node.path, node.name, { tab: "replace" });
@@ -895,7 +838,6 @@ function FileTree({
               onContextMenu(node, e.clientX, e.clientY);
             }}
             dragPath={dragPath}
-            dragPathRef={dragPathRef}
             dragOverPath={dragOverPath}
             dragOverFolder={dragOverFolder}
             siblingPaths={siblingPaths}
@@ -903,11 +845,9 @@ function FileTree({
             onDragOver={onDragOver}
             onDragOverFolder={onDragOverFolder}
             onDragEnd={onDragEnd}
-            onReorder={(targetPath) => {
-              const draggedPath = dragPathRef.current ?? dragPath;
-              if (!draggedPath) return;
-              onReorder(draggedPath, targetPath, siblingNames);
-            }}
+            onReorder={(draggedPath, targetPath) =>
+              onReorder(draggedPath, targetPath, siblingNames)
+            }
             onMoveToFolder={onMoveToFolder}
           />
 
@@ -916,10 +856,10 @@ function FileTree({
               nodes={node.children}
               depth={depth + 1}
               activeFilePath={activeFilePath}
+              rootFolder={rootFolder}
               onToggle={onToggle}
               onContextMenu={onContextMenu}
               dragPath={dragPath}
-              dragPathRef={dragPathRef}
               dragOverPath={dragOverPath}
               dragOverFolder={dragOverFolder}
               onDragStart={onDragStart}

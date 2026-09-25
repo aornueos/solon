@@ -27,6 +27,7 @@ import {
   saveOrder,
 } from "../lib/sidebarOrder";
 import { isTauriRuntime } from "../lib/runtime";
+import { loadExpandedFolders } from "../lib/expandedFolders";
 
 const IGNORED_TREE_DIRS = new Set(["node_modules", "target", "dist", "out"]);
 const MAX_TREE_DEPTH = 24;
@@ -133,12 +134,15 @@ export function useFileSystem() {
           // asset iguais.
           clearImageUrlCache();
           setRootFolder(selected);
+          // Lido antes de qualquer await: a partir daqui a raiz já é a
+          // nova, e a árvore na tela ainda é a do projeto anterior.
+          const expanded = rememberedExpandedFolders(selected);
           // Carrega a ordem manual ANTES do tree pra que o primeiro
           // setFileTree já venha ordenado. Sem isso, user veria o
           // sort alfabetico por 1 frame.
           const order = await loadOrder(selected);
           setSidebarOrder(order);
-          const tree = await buildFileTree(selected);
+          const tree = await buildFileTree(selected, expanded);
           setFileTree(applyOrder(selected, tree, order));
         }
       } catch (err) {
@@ -324,11 +328,12 @@ export function useFileSystem() {
         return;
       }
       setRootFolder(last);
+      const expanded = rememberedExpandedFolders(last);
       // Carrega a ordem manual antes do tree pra que apareca ja
       // ordenado no boot.
       const order = await loadOrder(last);
       setSidebarOrder(order);
-      const tree = await buildFileTree(last);
+      const tree = await buildFileTree(last, expanded);
       setFileTree(applyOrder(last, tree, order));
 
       // Restaura também o último arquivo aberto. Importante: NAO mudamos
@@ -786,8 +791,11 @@ export function useFileSystem() {
         return;
       }
 
+      // Sem `rejectUnsafeName` aqui: mover não cria nome novo, e o filtro
+      // de nome (feito pra quem digita um) barrava itens que o disco já
+      // aceitou — espaço no começo, `?` ou `:` no macOS/Linux. Esses
+      // itens apareciam na árvore e simplesmente não saíam do lugar.
       const name = baseName(sourcePath);
-      if (rejectUnsafeName(name, sourceIsFolder ? "folder" : "file")) return;
       const newPath = joinPath(targetFolderPath, name);
       const activeRelBefore = activeFilePath
         ? relativeInside(activeFilePath, sourcePath)
@@ -796,6 +804,7 @@ export function useFileSystem() {
       try {
         assertInsideProject(rootFolder, sourcePath, "Origem");
         assertInsideProject(rootFolder, targetFolderPath, "Destino");
+        assertInsideProject(rootFolder, newPath, "Destino");
         if (!sourceIsFolder) assertProjectNotePath(rootFolder, sourcePath, "Arquivo");
         const { rename, exists } = await import(
           "@tauri-apps/plugin-fs"
@@ -989,6 +998,15 @@ export function useFileSystem() {
     reorderItem,
     moveItem,
   };
+}
+
+/**
+ * Pastas que estavam abertas da última vez neste projeto. Segue o ajuste
+ * "Restaurar sessão": quem desligou quer a árvore recolhida ao abrir.
+ */
+function rememberedExpandedFolders(rootFolder: string): Set<string> | undefined {
+  if (!useAppStore.getState().restoreWorkspaceLayout) return undefined;
+  return loadExpandedFolders(rootFolder);
 }
 
 /**
