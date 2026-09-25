@@ -39,8 +39,18 @@ export interface CanvasCard {
   scene?: SceneCardSnapshot;
 }
 
-/** Identifier do MIME type usado no drag'n'drop Sidebar → Canvas. */
-export const SCENE_DND_MIME = "application/x-solon-scene";
+/**
+ * Evento disparado quando uma nota da barra lateral é solta sobre o
+ * canvas (o arraste do explorador é por mouse, não HTML5). O canvas que
+ * contém o ponto cria o card de cena.
+ */
+export const SIDEBAR_SCENE_DROP_EVENT = "solon:sidebar-scene-drop";
+export interface SidebarSceneDropDetail {
+  path: string;
+  name: string;
+  clientX: number;
+  clientY: number;
+}
 
 export const DEFAULT_SCENE_CARD_W = 260;
 export const DEFAULT_SCENE_CARD_H = 150;

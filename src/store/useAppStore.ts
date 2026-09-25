@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { SceneMeta } from "../types/scene";
 import type { CanvasTool } from "../types/canvas";
 import type { SidebarOrder } from "../lib/sidebarOrder";
+import { saveExpandedFolders } from "../lib/expandedFolders";
 
 export interface FileNode {
   name: string;
@@ -2076,6 +2077,19 @@ export const useAppStore = create<AppState>((set) => ({
     set({ startView: v });
   },
 }));
+
+// Lembra quais pastas estão abertas na barra lateral. Assina a árvore em
+// vez de cada ação porque ela muda por vários caminhos (clique, criar
+// nota, mover, revelar pela paleta) e todos devem ficar gravados.
+// Janela destacada não grava: a árvore dela é secundária e sobrescreveria
+// a da janela principal.
+if (!IS_DETACHED_WINDOW) {
+  useAppStore.subscribe((state, prev) => {
+    if (state.fileTree === prev.fileTree) return;
+    if (!state.rootFolder || state.fileTree.length === 0) return;
+    saveExpandedFolders(state.rootFolder, state.fileTree);
+  });
+}
 
 function toggleNodeExpanded(nodes: FileNode[], path: string): FileNode[] {
   return nodes.map((node) => {

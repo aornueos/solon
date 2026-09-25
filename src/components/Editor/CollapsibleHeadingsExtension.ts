@@ -1,6 +1,6 @@
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import type { Node as PMNode } from "@tiptap/pm/model";
 
 /**
@@ -39,6 +39,48 @@ interface CollapseState {
 function isHeadingAt(doc: PMNode, pos: number): PMNode | null {
   const node = doc.nodeAt(pos);
   return node && node.type.name === "heading" ? node : null;
+}
+
+/**
+ * Fim da seção de um heading de topo: posição do próximo heading de nível
+ * <= ao dele, ou o fim do doc. Mesma regra que decide o que esconder.
+ */
+function sectionEnd(doc: PMNode, headingPos: number): number {
+  const heading = isHeadingAt(doc, headingPos);
+  if (!heading) return headingPos;
+  const level = (heading.attrs.level as number) ?? 1;
+  let end = doc.content.size;
+  let passed = false;
+  doc.forEach((node, offset) => {
+    if (end !== doc.content.size) return;
+    if (offset === headingPos) {
+      passed = true;
+      return;
+    }
+    if (
+      passed &&
+      node.type.name === "heading" &&
+      ((node.attrs.level as number) ?? 1) <= level
+    ) {
+      end = offset;
+    }
+  });
+  return end;
+}
+
+/**
+ * Desdobra as seções que estão escondendo `pos`. Usado ao navegar pelo
+ * Índice: um título dentro de seção dobrada tem `display: none`, e rolar
+ * até ele não leva a lugar nenhum.
+ */
+export function revealCollapsedAt(view: EditorView, pos: number): void {
+  const collapsed = key.getState(view.state)?.collapsed ?? [];
+  const doc = view.state.doc;
+  const hiding = collapsed.filter((c) => c < pos && pos < sectionEnd(doc, c));
+  if (hiding.length === 0) return;
+  view.dispatch(
+    view.state.tr.setMeta(key, { expand: hiding }).setMeta("addToHistory", false),
+  );
 }
 
 function buildDecorations(doc: PMNode, collapsed: number[]): DecorationSet {
@@ -124,7 +166,9 @@ export const CollapsibleHeadingsExtension = Extension.create({
             deco: buildDecorations(state.doc, []),
           }),
           apply(tr, value, _oldState, newState) {
-            const meta = tr.getMeta(key) as { toggle?: number } | undefined;
+            const meta = tr.getMeta(key) as
+              | { toggle?: number; expand?: number[] }
+              | undefined;
             let collapsed = value.collapsed;
 
             if (tr.docChanged) {
@@ -142,6 +186,11 @@ export const CollapsibleHeadingsExtension = Extension.create({
               } else if (isHeadingAt(newState.doc, pos)) {
                 collapsed = [...collapsed, pos];
               }
+              changed = true;
+            }
+            if (meta && Array.isArray(meta.expand) && meta.expand.length > 0) {
+              const expand = new Set(meta.expand);
+              collapsed = collapsed.filter((p) => !expand.has(p));
               changed = true;
             }
 

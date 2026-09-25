@@ -1343,8 +1343,21 @@
    se aparece. A seção que ficou sem nenhuma linha some por aqui — é o
    único jeito de o pai saber o que os filhos decidiram sem duplicar a
    lógica de filtro nos dois níveis. */
-.solon-settings-section:not(:has([data-setting-row])) {
+.solon-settings-section:not(:has([data-setting-row])),
+.solon-settings-group:not(:has([data-setting-row])) {
   display: none;
+}
+/* Título de subgrupo dentro de uma seção dos ajustes: mais baixo na
+   hierarquia que a plaquinha da seção, sem competir com os rótulos. */
+.solon-settings-group-title {
+  margin: 0;
+  padding: 0 0.25rem;
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 /* Sobrou alguma linha? Então a mensagem de "nada encontrado" não vale. */
 .solon-settings-section:has([data-setting-row]) ~ .solon-settings-empty {
@@ -2051,12 +2064,39 @@ select:focus-visible {
   background-color: var(--bg-app);
 }
 
-/* Enquanto arrasta uma pasta no explorador, forca o cursor "grabbing" em TUDO
-   — senao o `cursor` proprio das linhas (folders = default) revertia a
-   maozinha pra seta ao passar por cima do alvo. */
-html.solon-folder-dragging,
-html.solon-folder-dragging * {
+/* Enquanto arrasta uma nota ou pasta no explorador, forca o cursor
+   "grabbing" em TUDO — senao o `cursor` proprio das linhas (folders =
+   default) revertia a maozinha pra seta ao passar por cima do alvo. Sobre
+   o canvas vira "copy": soltar ali cria um card, a nota fica onde está. */
+html.solon-tree-dragging,
+html.solon-tree-dragging * {
   cursor: grabbing !important;
+}
+html.solon-tree-dragging.solon-tree-drop-canvas,
+html.solon-tree-dragging.solon-tree-drop-canvas * {
+  cursor: copy !important;
+}
+
+/* Etiqueta com o nome do item que acompanha o cursor no arraste do
+   explorador — o arraste por mouse não tem a imagem fantasma do HTML5. */
+.solon-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 200;
+  pointer-events: none;
+  max-width: 240px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
 }
 
 .canvas-text-input::placeholder {

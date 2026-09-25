@@ -13,7 +13,8 @@ import {
   CANVAS_TOOL_ORDER,
   CanvasStroke,
   DEFAULT_TEXT_SIZE,
-  SCENE_DND_MIME,
+  SIDEBAR_SCENE_DROP_EVENT,
+  type SidebarSceneDropDetail,
 } from "../../types/canvas";
 import { readSceneSnapshot } from "../../lib/sceneSnapshot";
 import { saveImageForCanvas } from "../../lib/canvasImages";
@@ -528,38 +529,37 @@ export function CanvasView() {
     return () => document.removeEventListener("paste", onPaste);
   }, [activeView, rootFolder, viewport.x, viewport.y, viewport.zoom, addImage, pushToast]);
 
-  const onDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes(SCENE_DND_MIME)) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "copy";
-    }
-  };
-
-  const onDrop = async (e: React.DragEvent) => {
-    const raw = e.dataTransfer.getData(SCENE_DND_MIME);
-    if (!raw) return;
-    e.preventDefault();
-    let payload: { path: string; name: string };
-    try {
-      payload = JSON.parse(raw);
-    } catch {
-      return;
-    }
+  // Nota solta aqui vinda da barra lateral vira card de cena no ponto do
+  // cursor. Com split pane pode haver dois canvases montados: só responde
+  // o que contém o ponto. Viewport e snap lidos na hora do drop, então o
+  // listener não precisa ser re-registrado a cada pan.
+  const sceneDropRef = useRef<(detail: SidebarSceneDropDetail) => void>(() => {});
+  sceneDropRef.current = (detail) => {
     const el = containerRef.current;
     if (!el) return;
+    const hit = document.elementFromPoint(detail.clientX, detail.clientY);
+    if (!hit || !el.contains(hit)) return;
     const rect = el.getBoundingClientRect();
-    const worldX = (e.clientX - rect.left - viewport.x) / viewport.zoom;
-    const worldY = (e.clientY - rect.top - viewport.y) / viewport.zoom;
-    const sceneSnapshot = await readSceneSnapshot(payload.path, payload.name);
-    if (!sceneSnapshot) return;
-    addSceneCard({
-      scenePath: payload.path,
-      sceneName: payload.name,
-      snapshot: sceneSnapshot,
-      x: snap(worldX - 130),
-      y: snap(worldY - 75),
+    const worldX = (detail.clientX - rect.left - viewport.x) / viewport.zoom;
+    const worldY = (detail.clientY - rect.top - viewport.y) / viewport.zoom;
+    void readSceneSnapshot(detail.path, detail.name).then((sceneSnapshot) => {
+      if (!sceneSnapshot) return;
+      addSceneCard({
+        scenePath: detail.path,
+        sceneName: detail.name,
+        snapshot: sceneSnapshot,
+        x: snap(worldX - 130),
+        y: snap(worldY - 75),
+      });
     });
   };
+  useEffect(() => {
+    const onSceneDrop = (event: Event) => {
+      sceneDropRef.current((event as CustomEvent<SidebarSceneDropDetail>).detail);
+    };
+    window.addEventListener(SIDEBAR_SCENE_DROP_EVENT, onSceneDrop);
+    return () => window.removeEventListener(SIDEBAR_SCENE_DROP_EVENT, onSceneDrop);
+  }, []);
 
   const screenToWorld = (clientX: number, clientY: number) => {
     const el = containerRef.current;
@@ -928,8 +928,7 @@ export function CanvasView() {
       ref={containerRef}
       onMouseDown={onBgMouseDown}
       onDoubleClick={onBgDoubleClick}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      data-canvas-drop-zone=""
       role="application"
       tabIndex={0}
       aria-label="Canvas do projeto. Tab percorre os itens, setas movem a seleção, Enter edita, Esc sai."
