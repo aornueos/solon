@@ -1,4 +1,5 @@
 import type { Editor } from "@tiptap/react";
+import { INLINE_LEAF_CHAR, isSentenceStart } from "./spellcheck";
 
 /**
  * Referencia ao editor TipTap ativo.
@@ -58,7 +59,7 @@ export function findWordAtCoords(
   editor: Editor,
   clientX: number,
   clientY: number,
-): { word: string; from: number; to: number } | null {
+): { word: string; from: number; to: number; atSentenceStart: boolean } | null {
   const view = editor.view;
   const coords = view.posAtCoords({ left: clientX, top: clientY });
   if (!coords) return null;
@@ -68,7 +69,10 @@ export function findWordAtCoords(
   if (!node.isTextblock) return null;
 
   const blockStart = $pos.start();
-  const text = node.textContent;
+  // Nó inline (quebra de linha, comentário) ocupa uma posição no
+  // documento mas não entra no `textContent`: com ele, o índice no texto
+  // deixa de ser a posição no bloco e a correção trocaria o trecho errado.
+  const text = node.textBetween(0, node.content.size, "\n", INLINE_LEAF_CHAR);
   const offset = coords.pos - blockStart;
   if (offset < 0 || offset > text.length) return null;
 
@@ -90,6 +94,7 @@ export function findWordAtCoords(
     word: text.slice(s, e),
     from: blockStart + s,
     to: blockStart + e,
+    atSentenceStart: isSentenceStart(text.slice(0, s)),
   };
 }
 

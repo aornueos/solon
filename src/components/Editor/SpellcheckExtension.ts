@@ -3,8 +3,10 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { useAppStore } from "../../store/useAppStore";
 import {
+  INLINE_LEAF_CHAR,
   checkWords,
   ensureSpellchecker,
+  isSentenceStart,
   normalizeSpellWord,
   shouldSpellcheckWord,
 } from "../../lib/spellcheck";
@@ -125,7 +127,7 @@ export const SpellcheckExtension = Extension.create({
   },
 });
 
-function collectWordRanges(view: EditorView): {
+export function collectWordRanges(view: EditorView): {
   from: number;
   to: number;
   normalized: string;
@@ -135,18 +137,22 @@ function collectWordRanges(view: EditorView): {
   const selectionFrom = view.state.selection.from;
   const selectionTo = view.state.selection.to;
 
+  // Percorre o bloco de texto inteiro, não cada pedaço de texto: o
+  // negrito parte o parágrafo em vários nós, e decidir se a palavra começa
+  // frase exige ver o que vem antes dela no parágrafo.
   view.state.doc.descendants((node, pos) => {
     if (ranges.length >= MAX_WORD_RANGES) return false;
-    if (!node.isText || !node.text) return;
+    if (!node.isTextblock) return;
+    const text = node.textBetween(0, node.content.size, "\n", INLINE_LEAF_CHAR);
     WORD_RE.lastIndex = 0;
     let match: RegExpExecArray | null;
-    while ((match = WORD_RE.exec(node.text))) {
+    while ((match = WORD_RE.exec(text))) {
       if (ranges.length >= MAX_WORD_RANGES) break;
       const word = match[0];
-      const from = pos + match.index;
+      const from = pos + 1 + match.index;
       const to = from + word.length;
       if (selectionFrom <= to && selectionTo >= from) continue;
-      if (!shouldSpellcheckWord(word)) continue;
+      if (!shouldSpellcheckWord(word, isSentenceStart(text.slice(0, match.index)))) continue;
       const normalized = normalizeSpellWord(word);
       if (!unique.has(normalized)) {
         if (unique.size >= MAX_UNIQUE_WORDS) continue;
@@ -158,6 +164,7 @@ function collectWordRanges(view: EditorView): {
         normalized,
       });
     }
+    return false;
   });
 
   return ranges;

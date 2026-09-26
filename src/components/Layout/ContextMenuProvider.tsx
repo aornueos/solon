@@ -22,6 +22,7 @@ import {
   ensureSpellchecker,
   isCorrect,
   isSpellcheckerReady,
+  matchCase,
   shouldSpellcheckWord,
   suggest,
 } from "../../lib/spellcheck";
@@ -111,7 +112,7 @@ export function ContextMenuProvider() {
           // So' mostra placeholder se for uma palavra "checavel" — não
           // número, não no dict pessoal. Senao deixa o menu abrir
           // limpo (sem placeholder que ficaria pra sempre).
-          if (wordInfo && shouldSpellcheckWord(wordInfo.word)) {
+          if (wordInfo && shouldSpellcheckWord(wordInfo.word, wordInfo.atSentenceStart)) {
             wordToCheck = wordInfo;
             menuItems = [
               {
@@ -230,10 +231,12 @@ async function attachSuggestionsAsync({
     });
   } else {
     for (const sug of suggestions) {
+      // "Nao" no começo da frase vira "Não", não "não".
+      const replacement = matchCase(wordInfo.word, sug);
       prefix.push({
-        label: sug,
+        label: replacement,
         onClick: () => {
-          replaceRange(editor, wordInfo.from, wordInfo.to, sug);
+          replaceRange(editor, wordInfo.from, wordInfo.to, replacement);
           closeContextMenu();
         },
       });

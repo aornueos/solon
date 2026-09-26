@@ -18,6 +18,12 @@
 //! acento esquecido, letra dobrada, s/z/ç, xc/sc, h mudo, letras trocadas
 //! de lugar e teclas vizinhas custam menos que uma troca qualquer. Custos
 //! em centésimos de edição (100 = uma edição comum).
+//!
+//! Na ordenação entra também a frequência de uso da palavra, quando há
+//! lista de frequência: entre candidatas à mesma distância, a palavra
+//! comum vem antes da flexão rara.
+
+use std::collections::HashMap;
 
 /// Troca comum: vale uma edição.
 const EDIT: u32 = 100;
@@ -50,12 +56,19 @@ const SPLIT_HEADS: &[&str] = &[
     "nos", "num", "numa", "para", "pela", "pelo", "por", "pra", "que", "se", "sem", "um", "uma",
 ];
 
+/// Bônus de quem está na lista de frequência (palavra de uso real), mais
+/// uma parte que cresce com o uso. Em centésimos de edição, como o custo.
+const FREQUENT_BASE: i32 = 20;
+const FREQUENT_SCALE: f64 = 20.0;
+
 pub struct Dictionary<'a> {
     /// Ordenada por bytes e sem repetição (pré-requisito da busca binária
     /// e do percurso por prefixo).
     words: Vec<&'a str>,
     /// Maior palavra, em caracteres — dimensiona a tabela de distância.
     max_chars: usize,
+    /// Posição de cada palavra na lista de frequência (1 = mais usada).
+    frequency: HashMap<&'a str, u32>,
 }
 
 impl<'a> Dictionary<'a> {
@@ -76,7 +89,48 @@ impl<'a> Dictionary<'a> {
         }
         words.dedup();
         let max_chars = words.iter().map(|w| w.chars().count()).max().unwrap_or(0);
-        Self { words, max_chars }
+        Self {
+            words,
+            max_chars,
+            frequency: HashMap::new(),
+        }
+    }
+
+    /// Lista de frequência: uma palavra por linha, da mais usada para a
+    /// menos (o que vem depois da palavra na linha é ignorado; linhas com
+    /// `#` são comentário). Sem ela a sugestão desempata por ordem
+    /// alfabética, e uma flexão rara ("aguá") ganha da palavra comum
+    /// ("água") quando as duas estão à mesma distância.
+    pub fn with_frequency(mut self, data: &'a str) -> Self {
+        let mut rank = 0u32;
+        for line in data.lines() {
+            let word = line.split_whitespace().next().unwrap_or("");
+            if word.is_empty() || word.starts_with('#') {
+                continue;
+            }
+            rank += 1;
+            self.frequency.entry(word).or_insert(rank);
+        }
+        self
+    }
+
+    /// Quanto a frequência abate do custo na ordenação.
+    fn frequency_bonus(&self, word: &str) -> i32 {
+        let Some(&rank) = self.frequency.get(word) else {
+            return 0;
+        };
+        let total = self.frequency.len().max(1) as f64 + 1.0;
+        let usage = 1.0 - (rank as f64).ln() / total.ln();
+        FREQUENT_BASE + (FREQUENT_SCALE * usage.max(0.0)).round() as i32
+    }
+
+    fn score(&self, text: &str, cost: u32) -> i32 {
+        let bonus = text
+            .split(' ')
+            .map(|part| self.frequency_bonus(part))
+            .min()
+            .unwrap_or(0);
+        cost as i32 - bonus
     }
 
     pub fn len(&self) -> usize {
@@ -99,9 +153,12 @@ impl<'a> Dictionary<'a> {
         found.extend(self.split_candidates(&target));
 
         let first = target[0];
+        for candidate in &mut found {
+            candidate.score = self.score(&candidate.text, candidate.cost);
+        }
         found.sort_by(|a, b| {
-            a.cost
-                .cmp(&b.cost)
+            a.score
+                .cmp(&b.score)
                 .then_with(|| a.differs_at_start(first).cmp(&b.differs_at_start(first)))
                 .then_with(|| a.len_gap(target.len()).cmp(&b.len_gap(target.len())))
                 .then_with(|| a.text.cmp(&b.text))
@@ -109,12 +166,12 @@ impl<'a> Dictionary<'a> {
         found.dedup_by(|a, b| a.text == b.text);
 
         let best = match found.first() {
-            Some(c) => c.cost,
+            Some(c) => c.score,
             None => return Vec::new(),
         };
         found
             .into_iter()
-            .take_while(|c| c.cost < best + RELATIVE_CUTOFF)
+            .take_while(|c| c.score < best + RELATIVE_CUTOFF as i32)
             .take(MAX_SUGGESTIONS)
             .map(|c| c.text)
             .collect()
@@ -184,6 +241,7 @@ impl<'a> Dictionary<'a> {
                         out.push(Candidate {
                             text: word.to_string(),
                             cost,
+                            score: 0,
                         });
                     }
                     idx += 1;
@@ -223,6 +281,7 @@ impl<'a> Dictionary<'a> {
                 out.push(Candidate {
                     text: format!("{known} {tail}"),
                     cost: base + extra,
+                    score: 0,
                 });
             }
         }
@@ -233,6 +292,8 @@ impl<'a> Dictionary<'a> {
 struct Candidate {
     text: String,
     cost: u32,
+    /// Custo abatido pela frequência — é por ele que se ordena.
+    score: i32,
 }
 
 impl Candidate {
@@ -463,6 +524,16 @@ travessia\nrepente\nde\nisso\npor\npoço\ncerteza\ncom\nhoje\nvoc.\n";
     #[test]
     fn letras_trocadas_de_lugar() {
         assert_eq!(first("caas").as_deref(), Some("casa"));
+    }
+
+    #[test]
+    fn frequencia_desempata_a_favor_da_palavra_comum() {
+        // "aguá" (flexão de aguar) e "água" estão à mesma distância de
+        // "agua"; sem frequência a ordem alfabética punha "aguá" antes.
+        let d = Dictionary::from_lines("aguá\nágua\ncaãs\ncasa\n")
+            .with_frequency("# comentário\ncasa 10\nágua 5\n");
+        assert_eq!(d.suggest("agua").first().map(String::as_str), Some("água"));
+        assert_eq!(d.suggest("caas").first().map(String::as_str), Some("casa"));
     }
 
     #[test]

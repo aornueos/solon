@@ -11,7 +11,8 @@
 //!
 //! A lista de palavras é gerada por `scripts/copy-spellcheck-dict.cjs`
 //! (postinstall do npm) em `public/dict/pt-words.txt`, embutida no binário
-//! em tempo de compilação.
+//! em tempo de compilação. A lista de frequência fica em
+//! `src-tauri/data/pt-br-frequencia.txt`.
 
 use crate::spell_engine::Dictionary;
 use once_cell::sync::Lazy;
@@ -20,9 +21,14 @@ use std::sync::RwLock;
 
 const WORDS_DATA: &str = include_str!("../../public/dict/pt-words.txt");
 
+/// Palavras em ordem de uso, para ordenar sugestões (a comum antes da
+/// flexão rara). Versionada no repositório; fonte e licença no cabeçalho.
+const FREQUENCY_DATA: &str = include_str!("../data/pt-br-frequencia.txt");
+
 /// Carregado na primeira consulta — o frontend dispara `spell_size` logo
 /// depois de abrir o editor para isso acontecer antes do primeiro uso.
-static DICTIONARY: Lazy<Dictionary<'static>> = Lazy::new(|| Dictionary::from_lines(WORDS_DATA));
+static DICTIONARY: Lazy<Dictionary<'static>> =
+    Lazy::new(|| Dictionary::from_lines(WORDS_DATA).with_frequency(FREQUENCY_DATA));
 
 /// Palavras adicionadas pelo usuário. O frontend guarda a lista e a
 /// reenvia a cada início, então aqui ela só precisa viver em memória.

@@ -109,14 +109,55 @@ export function normalizeSpellWord(word: string): string {
   return word.trim().toLocaleLowerCase("pt-BR");
 }
 
-export function shouldSpellcheckWord(word: string): boolean {
+/**
+ * Caractere que representa um nó inline (quebra de linha, comentário) no
+ * texto de um bloco. Cada um ocupa uma posição no documento; usando um
+ * caractere no lugar, o índice no texto continua sendo a posição no bloco.
+ */
+export const INLINE_LEAF_CHAR = "\ufffc";
+
+/**
+ * A palavra que vem depois de `textBefore` começa frase? Vale o começo do
+ * parágrafo e o que vem depois de ponto final, de exclamação, de
+ * interrogação ou de reticências — pulando espaço, aspas, parênteses e o
+ * travessão do diálogo ("— Nao sei").
+ */
+export function isSentenceStart(textBefore: string): boolean {
+  const trimmed = textBefore.replace(/[\s"'“”‘’«»()[\]—–\-\ufffc]+$/u, "");
+  return trimmed === "" || /[.!?…]$/u.test(trimmed);
+}
+
+/**
+ * Palavra com maiúscula só é checada no começo de frase: no meio da frase
+ * ela quase sempre é nome próprio, e personagem inventado viraria erro.
+ * Palavra toda em maiúsculas (sigla, grito) não é checada.
+ */
+export function shouldSpellcheckWord(word: string, atSentenceStart = false): boolean {
   const normalized = normalizeSpellWord(word);
   if (normalized.length < 3) return false;
   if (/^\d+$/.test(normalized)) return false;
   if (!/^[\p{L}\p{M}]+$/u.test(word)) return false;
-  if (/^\p{Lu}/u.test(word)) return false;
+  if (/^\p{Lu}/u.test(word)) {
+    if (!atSentenceStart) return false;
+    if (word === word.toLocaleUpperCase("pt-BR")) return false;
+  }
   if (personalDict.has(normalized)) return false;
   return true;
+}
+
+/**
+ * Aplica à sugestão a caixa da palavra digitada: "Nao" → "Não", não
+ * "não". A sugestão vem minúscula do dicionário.
+ */
+export function matchCase(original: string, suggestion: string): string {
+  if (!original || !suggestion) return suggestion;
+  if (original.length > 1 && original === original.toLocaleUpperCase("pt-BR")) {
+    return suggestion.toLocaleUpperCase("pt-BR");
+  }
+  if (/^\p{Lu}/u.test(original)) {
+    return suggestion.charAt(0).toLocaleUpperCase("pt-BR") + suggestion.slice(1);
+  }
+  return suggestion;
 }
 
 /**

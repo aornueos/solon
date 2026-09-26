@@ -32,7 +32,7 @@ What that means in practice:
 ### Writing
 
 * **TipTap based Markdown editor** with full roundtrip support for bold, italic, strike, headings, lists, blockquotes, tables, horizontal rules, inline code, code blocks, text alignment, highlights, and smart dashes.
-* **Native Brazilian Portuguese spellcheck** running in a Rust backend, with Levenshtein distance, ranking aware of accents, suggestions in roughly 5 to 15 ms against a 312k word dictionary, and a persisted personal dictionary.
+* **Native Brazilian Portuguese spellcheck** running in a Rust backend off the window thread: a 2.8 million word-form dictionary, an edit distance weighted for common Portuguese mistakes (accents, doubled letters, s/z/ç, swapped letters, words run together), word frequency to break ties, at most four suggestions in tens of milliseconds, and a persisted personal dictionary.
 * **Wikilinks** with `[[note]]` syntax and aliased `[[note|display name]]` form, autocomplete while typing `[[`, `Ctrl/Cmd+click` navigation, and a backlinks panel in the Inspector showing every note that links to the current one.
 * **Typewriter mode** keeps the caret vertically centered while the page scrolls underneath.
 * **Reading mode** hides every chrome element for focused editing. Toggle with `Ctrl+Shift+R`. Exit with `Esc`, `F11`, or `Ctrl+Shift+Esc`.
@@ -187,7 +187,7 @@ tags: [romance, capítulo-1]
 * **[Tailwind CSS](https://tailwindcss.com/)** for styling.
 * **[marked](https://marked.js.org/)** and **[Turndown](https://github.com/mixmark-io/turndown)** for the Markdown and HTML bridge, with DOMPurify sanitization on input.
 * **[Vite](https://vitejs.dev/)** for the build.
-* **Rust** for native spellcheck, using Levenshtein distance and accent aware suggestions over a 312k word Portuguese dictionary.
+* **Rust** for native spellcheck, with a weighted edit distance and frequency-ranked suggestions over a 2.8 million word-form Portuguese dictionary.
 
 ## Development
 
@@ -271,3 +271,7 @@ This is a personal project. Issues and pull requests are welcome, but they are t
 Solon is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License** as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 Solon is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [GNU General Public License](LICENSE) for more details.
+
+### Third-party data
+
+* `src-tauri/data/pt-br-frequencia.txt`: word frequency list for Brazilian Portuguese from [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, derived from the OpenSubtitles 2018 corpus, licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Counts and non-lowercase entries were removed; only the word order is used, to rank spellcheck suggestions.
