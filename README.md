@@ -32,7 +32,7 @@ What that means in practice:
 ### Writing
 
 * **TipTap based Markdown editor** with full roundtrip support for bold, italic, strike, headings, lists, blockquotes, tables, horizontal rules, inline code, code blocks, text alignment, highlights, and smart dashes.
-* **Native Brazilian Portuguese spellcheck** running in a Rust backend off the window thread: a 2.8 million word-form dictionary, an edit distance weighted for common Portuguese mistakes (accents, doubled letters, s/z/ç, swapped letters, words run together), word frequency to break ties, at most four suggestions in tens of milliseconds, and a persisted personal dictionary.
+* **Native Brazilian Portuguese spellcheck** running in a Rust backend off the window thread: a 2.8 million word-form dictionary, an edit distance weighted for common Portuguese mistakes (accents, doubled letters, s/z/ç, swapped letters, words run together), word frequency to break ties, at most four suggestions in tens of milliseconds, and a persisted personal dictionary. **English (US)** too, alone or together with Portuguese (*Ajustes → Utilitários → Idioma do corretor*); contractions like *don't* are checked as one word, and with both languages on, Portuguese words typed without their accent (*voce*, *mes*) are still flagged.
 * **Wikilinks** with `[[note]]` syntax and aliased `[[note|display name]]` form, autocomplete while typing `[[`, `Ctrl/Cmd+click` navigation, and a backlinks panel in the Inspector showing every note that links to the current one.
 * **Typewriter mode** keeps the caret vertically centered while the page scrolls underneath.
 * **Reading mode** hides every chrome element for focused editing. Toggle with `Ctrl+Shift+R`. Exit with `Esc`, `F11`, or `Ctrl+Shift+Esc`.
@@ -187,7 +187,7 @@ tags: [romance, capítulo-1]
 * **[Tailwind CSS](https://tailwindcss.com/)** for styling.
 * **[marked](https://marked.js.org/)** and **[Turndown](https://github.com/mixmark-io/turndown)** for the Markdown and HTML bridge, with DOMPurify sanitization on input.
 * **[Vite](https://vitejs.dev/)** for the build.
-* **Rust** for native spellcheck, with a weighted edit distance and frequency-ranked suggestions over a 2.8 million word-form Portuguese dictionary.
+* **Rust** for native spellcheck, with a weighted edit distance and frequency-ranked suggestions over a 2.8 million word-form Portuguese dictionary and a 190 thousand word-form English one.
 
 ## Development
 
@@ -274,4 +274,5 @@ Solon is distributed in the hope that it will be useful, but WITHOUT ANY WARRANT
 
 ### Third-party data
 
-* `src-tauri/data/pt-br-frequencia.txt`: word frequency list for Brazilian Portuguese from [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, derived from the OpenSubtitles 2018 corpus, licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Counts and non-lowercase entries were removed; only the word order is used, to rank spellcheck suggestions.
+* `src-tauri/data/pt-br-frequencia.txt` and `src-tauri/data/en-us-frequencia.txt`: word frequency lists for Brazilian Portuguese and English from [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, derived from the OpenSubtitles 2018 corpus, licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Counts and non-lowercase entries were removed; only the word order is used, to rank spellcheck suggestions.
+* The English word list is generated at install time from [`@cspell/dict-en_us`](https://github.com/streetsidesoftware/cspell-dicts) (MIT); the Portuguese one from [`@cspell/dict-pt-br`](https://github.com/streetsidesoftware/cspell-dicts) and [`dictionary-pt`](https://github.com/wooorm/dictionaries).

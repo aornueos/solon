@@ -158,6 +158,7 @@ export function Editor() {
   const readingMode = useAppStore((s) => s.readingMode);
   const typewriterMode = useAppStore((s) => s.typewriterMode);
   const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
+  const spellcheckLanguage = useAppStore((s) => s.spellcheckLanguage);
   const sourceMode = useAppStore((s) => s.sourceMode);
   const { openFile } = useFileSystem();
 
@@ -460,13 +461,14 @@ export function Editor() {
 
   // Mantemos o spellcheck nativo do WebView desligado. Ele costuma seguir
   // o idioma do sistema/Edge e marcar portugues correto como erro; o Solon
-  // usa o backend pt-BR próprio para sublinhados e sugestoes.
+  // usa o backend próprio para sublinhados e sugestoes. O `lang` segue o
+  // idioma do corretor (hifenização e leitores de tela).
   useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom as HTMLElement;
     dom.setAttribute("spellcheck", "false");
-    dom.setAttribute("lang", "pt-BR");
-  }, [editor, spellcheckEnabled]);
+    dom.setAttribute("lang", spellcheckLanguage === "en-US" ? "en-US" : "pt-BR");
+  }, [editor, spellcheckEnabled, spellcheckLanguage]);
 
   useEffect(() => {
     setFindOpen(false);

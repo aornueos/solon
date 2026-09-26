@@ -9,7 +9,9 @@ import { collectWordRanges } from "../src/components/Editor/SpellcheckExtension.
 import {
   isSentenceStart,
   matchCase,
+  normalizeSpellWord,
   shouldSpellcheckWord,
+  wordAtOffset,
 } from "../src/lib/spellcheck.ts";
 
 describe("corretor — o que é checado", () => {
@@ -34,6 +36,22 @@ describe("corretor — o que é checado", () => {
     assert.equal(matchCase("Nao", "não"), "Não");
     assert.equal(matchCase("NAO", "não"), "NÃO");
     assert.equal(matchCase("nao", "não"), "não");
+  });
+
+  it("apóstrofo: consulta com o reto, devolve no estilo do texto", () => {
+    assert.equal(normalizeSpellWord("Don’t"), "don't");
+    assert.equal(matchCase("dont’", "don't"), "don’t");
+    assert.equal(matchCase("Isnt", "isn't"), "Isn't");
+    assert.equal(shouldSpellcheckWord("isn’t"), true);
+  });
+
+  it("a palavra sob o cursor inclui o apóstrofo do meio, não as aspas", () => {
+    const text = "say don’t 'go' now";
+    assert.deepEqual(wordAtOffset(text, 6), { start: 4, end: 9 });
+    assert.deepEqual(wordAtOffset(text, 12), { start: 11, end: 13 });
+    // Entre "say" e "don’t", no espaço, a ponta de "say" conta.
+    assert.deepEqual(wordAtOffset(text, 3), { start: 0, end: 3 });
+    assert.equal(wordAtOffset("  ", 1), null);
   });
 });
 
@@ -71,6 +89,14 @@ describe("corretor — posição das palavras no editor", () => {
     assert.ok(found.includes("Nao"), JSON.stringify(found));
     assert.ok(found.includes("Ela"), JSON.stringify(found));
     assert.ok(!found.includes("Lina"), JSON.stringify(found));
+  });
+
+  it("contração e elisão são uma palavra só; hífen separa", () => {
+    const found = words("I don’t know why it isn’t here, caixa-d’água e guarda-chuva.");
+    for (const word of ["don’t", "know", "isn’t", "here", "caixa", "d’água", "guarda", "chuva"]) {
+      assert.ok(found.includes(word), `${word}: ${JSON.stringify(found)}`);
+    }
+    assert.ok(!found.includes("don"), JSON.stringify(found));
   });
 
   it("negrito no meio do parágrafo não muda o que abre frase", () => {

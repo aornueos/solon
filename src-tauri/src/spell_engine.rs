@@ -22,8 +22,14 @@
 //! Na ordenação entra também a frequência de uso da palavra, quando há
 //! lista de frequência: entre candidatas à mesma distância, a palavra
 //! comum vem antes da flexão rara.
+//!
+//! Há um dicionário por idioma (português e inglês). Com mais de um
+//! ativo, a palavra vale se estiver em qualquer um, e as sugestões dos
+//! dois disputam o mesmo ranking (`suggest_in`). O primeiro da lista é o
+//! principal: palavra que só o outro conhece mas que é uma palavra do
+//! principal sem acento ("voce", "mes", "tres") continua sendo erro.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Troca comum: vale uma edição.
 const EDIT: u32 = 100;
@@ -51,9 +57,14 @@ pub const MAX_SUGGESTIONS: usize = 4;
 const RELATIVE_CUTOFF: u32 = 50;
 
 /// Palavras curtas que costumam aparecer coladas na seguinte.
-const SPLIT_HEADS: &[&str] = &[
+pub const PORTUGUESE_SPLIT_HEADS: &[&str] = &[
     "a", "à", "ao", "aos", "às", "com", "da", "das", "de", "do", "dos", "em", "na", "nas", "no",
     "nos", "num", "numa", "para", "pela", "pelo", "por", "pra", "que", "se", "sem", "um", "uma",
+];
+
+/// O mesmo em inglês: "alot" → "a lot", "infact" → "in fact".
+pub const ENGLISH_SPLIT_HEADS: &[&str] = &[
+    "a", "an", "any", "at", "each", "every", "in", "no", "of", "on", "some", "to",
 ];
 
 /// Bônus de quem está na lista de frequência (palavra de uso real), mais
@@ -69,18 +80,21 @@ pub struct Dictionary<'a> {
     max_chars: usize,
     /// Posição de cada palavra na lista de frequência (1 = mais usada).
     frequency: HashMap<&'a str, u32>,
+    /// Palavras curtas que o usuário cola na seguinte, neste idioma.
+    split_heads: &'a [&'a str],
 }
 
 impl<'a> Dictionary<'a> {
     /// Uma palavra por linha. Entradas com qualquer coisa que não seja
-    /// letra (abreviações como "voc.", hífen, apóstrofo) ficam de fora: o
-    /// editor só checa sequências de letras, então elas nunca seriam
-    /// consultadas e só apareceriam como sugestão estranha.
+    /// letra (abreviações como "voc.", hífen) ficam de fora: o editor só
+    /// checa sequências de letras, então elas nunca seriam consultadas e
+    /// só apareceriam como sugestão estranha. O apóstrofo no meio da
+    /// palavra fica ("don't", "d'água").
     pub fn from_lines(data: &'a str) -> Self {
         let mut words: Vec<&'a str> = data
             .lines()
             .map(str::trim)
-            .filter(|w| !w.is_empty() && w.chars().all(char::is_alphabetic))
+            .filter(|w| is_word_shape(w))
             .collect();
         // O gerador grava em ordem de `localeCompare`, que não é a ordem de
         // bytes. Só ordena se precisar.
@@ -93,7 +107,14 @@ impl<'a> Dictionary<'a> {
             words,
             max_chars,
             frequency: HashMap::new(),
+            split_heads: PORTUGUESE_SPLIT_HEADS,
         }
+    }
+
+    /// Troca as palavras curtas usadas para separar palavras coladas.
+    pub fn with_split_heads(mut self, heads: &'a [&'a str]) -> Self {
+        self.split_heads = heads;
+        self
     }
 
     /// Lista de frequência: uma palavra por linha, da mais usada para a
@@ -141,40 +162,61 @@ impl<'a> Dictionary<'a> {
         self.words.binary_search(&word).is_ok()
     }
 
-    /// Até `MAX_SUGGESTIONS` correções para `typed` (minúsculo), da mais
-    /// provável para a menos.
-    pub fn suggest(&self, typed: &str) -> Vec<String> {
-        let target: Vec<char> = typed.chars().collect();
-        if target.is_empty() {
-            return Vec::new();
+    /// Existe aqui a mesma palavra com um ou dois acentos (ou ç) que
+    /// faltaram ao digitar? "voce" → "você", "informacao" → "informação".
+    fn has_accented_form(&self, word: &str) -> bool {
+        let mut chars: Vec<char> = word.chars().collect();
+        let slots: Vec<(usize, &[char])> = chars
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &c)| accented_forms(c).map(|forms| (i, forms)))
+            .collect();
+        let mut buf = String::with_capacity(word.len() + 8);
+        let mut hit = |chars: &[char]| {
+            buf.clear();
+            buf.extend(chars);
+            self.contains(&buf)
+        };
+        for (a, &(pos_a, forms_a)) in slots.iter().enumerate() {
+            let plain_a = chars[pos_a];
+            for &form_a in forms_a {
+                chars[pos_a] = form_a;
+                if hit(&chars) {
+                    return true;
+                }
+                for &(pos_b, forms_b) in &slots[a + 1..] {
+                    let plain_b = chars[pos_b];
+                    for &form_b in forms_b {
+                        chars[pos_b] = form_b;
+                        if hit(&chars) {
+                            return true;
+                        }
+                    }
+                    chars[pos_b] = plain_b;
+                }
+            }
+            chars[pos_a] = plain_a;
         }
-        let limit = max_cost_for(target.len());
-        let mut found: Vec<Candidate> = self.edit_candidates(&target, limit);
-        found.extend(self.split_candidates(&target));
+        false
+    }
 
-        let first = target[0];
+    /// Até `MAX_SUGGESTIONS` correções para `typed` (minúsculo), da mais
+    /// provável para a menos, só deste dicionário. O app usa `suggest_in`.
+    #[cfg(test)]
+    pub fn suggest(&self, typed: &str) -> Vec<String> {
+        suggest_in(&[self], typed)
+    }
+
+    /// Candidatas deste dicionário, já com a pontuação (custo abatido pela
+    /// frequência).
+    fn scored_candidates(&self, target: &[char]) -> Vec<Candidate> {
+        let limit = max_cost_for(target.len());
+        let mut found: Vec<Candidate> = self.edit_candidates(target, limit);
+        found.extend(self.split_candidates(target));
         for candidate in &mut found {
             candidate.score = self.score(&candidate.text, candidate.cost);
         }
-        found.sort_by(|a, b| {
-            a.score
-                .cmp(&b.score)
-                .then_with(|| a.differs_at_start(first).cmp(&b.differs_at_start(first)))
-                .then_with(|| a.len_gap(target.len()).cmp(&b.len_gap(target.len())))
-                .then_with(|| a.text.cmp(&b.text))
-        });
-        found.dedup_by(|a, b| a.text == b.text);
-
-        let best = match found.first() {
-            Some(c) => c.score,
-            None => return Vec::new(),
-        };
         found
-            .into_iter()
-            .take_while(|c| c.score < best + RELATIVE_CUTOFF as i32)
-            .take(MAX_SUGGESTIONS)
-            .map(|c| c.text)
-            .collect()
     }
 
     /// Percorre a lista ordenada reaproveitando as linhas da tabela entre
@@ -269,7 +311,7 @@ impl<'a> Dictionary<'a> {
             if tail.chars().count() < 2 || !self.contains(&tail) {
                 continue;
             }
-            for &known in SPLIT_HEADS {
+            for &known in self.split_heads {
                 let extra = if known == head {
                     0
                 } else if near_head(known, &head) {
@@ -287,6 +329,85 @@ impl<'a> Dictionary<'a> {
         }
         out
     }
+}
+
+/// Sugestões juntando os dicionários ativos: a palavra que existe nos
+/// dois entra uma vez só, com a melhor pontuação.
+pub fn suggest_in(dicts: &[&Dictionary<'_>], typed: &str) -> Vec<String> {
+    let target: Vec<char> = typed.chars().collect();
+    if target.is_empty() {
+        return Vec::new();
+    }
+    let mut found: Vec<Candidate> = dicts
+        .iter()
+        .flat_map(|dict| dict.scored_candidates(&target))
+        .collect();
+
+    let first = target[0];
+    found.sort_by(|a, b| {
+        a.score
+            .cmp(&b.score)
+            .then_with(|| a.differs_at_start(first).cmp(&b.differs_at_start(first)))
+            .then_with(|| a.len_gap(target.len()).cmp(&b.len_gap(target.len())))
+            .then_with(|| a.text.cmp(&b.text))
+    });
+    // A mesma sugestão pode vir de dois caminhos (dois dicionários, ou dois
+    // cortes de palavras coladas) com pontuações diferentes, então não fica
+    // necessariamente vizinha na ordenação: fica a primeira, a melhor.
+    // A própria palavra digitada pode vir de um dicionário que a conhece
+    // ("voce" no inglês) — sugerir ela mesma não corrige nada.
+    let mut seen = HashSet::new();
+    found.retain(|c| c.text != typed && seen.insert(c.text.clone()));
+
+    let best = match found.first() {
+        Some(c) => c.score,
+        None => return Vec::new(),
+    };
+    found
+        .into_iter()
+        .take_while(|c| c.score < best + RELATIVE_CUTOFF as i32)
+        .take(MAX_SUGGESTIONS)
+        .map(|c| c.text)
+        .collect()
+}
+
+/// A palavra (minúscula, apóstrofo reto) está certa em algum dicionário
+/// ativo ou no pessoal? Com apóstrofo, basta a palavra inteira existir
+/// ("don't") ou cada parte dela ("d'água" = "d" + "água"): as partes de
+/// até duas letras são a elisão ("d", "l", "t", "re") e não são checadas.
+///
+/// `dicts[0]` é o idioma principal. Uma palavra que só os outros conhecem
+/// não vale se for uma palavra do principal sem acento: com português e
+/// inglês ativos, "voce", "mes" e "tres" (que o dicionário inglês traz)
+/// continuam sublinhadas.
+pub fn is_known(dicts: &[&Dictionary<'_>], word: &str, personal: impl Fn(&str) -> bool) -> bool {
+    let known = |w: &str| {
+        if personal(w) {
+            return true;
+        }
+        match dicts.split_first() {
+            Some((main, others)) => {
+                main.contains(w)
+                    || (others.iter().any(|d| d.contains(w)) && !main.has_accented_form(w))
+            }
+            None => false,
+        }
+    };
+    if known(word) {
+        return true;
+    }
+    word.contains('\'')
+        && word
+            .split('\'')
+            .all(|part| part.chars().count() <= 2 || known(part))
+}
+
+/// Letras, com apóstrofo reto só entre letras.
+fn is_word_shape(word: &str) -> bool {
+    !word.is_empty()
+        && word
+            .split('\'')
+            .all(|part| !part.is_empty() && part.chars().all(char::is_alphabetic))
 }
 
 struct Candidate {
@@ -465,6 +586,19 @@ fn near_head(known: &str, typed: &str) -> bool {
     }
 }
 
+/// Formas acentuadas do português para uma letra sem acento.
+fn accented_forms(c: char) -> Option<&'static [char]> {
+    match c {
+        'a' => Some(&['á', 'â', 'ã']),
+        'e' => Some(&['é', 'ê']),
+        'i' => Some(&['í']),
+        'o' => Some(&['ó', 'ô', 'õ']),
+        'u' => Some(&['ú']),
+        'c' => Some(&['ç']),
+        _ => None,
+    }
+}
+
 fn shared_prefix(a: &[char], b: &[char]) -> usize {
     a.iter().zip(b).take_while(|(x, y)| x == y).count()
 }
@@ -585,6 +719,71 @@ travessia\nrepente\nde\nisso\npor\npoço\ncerteza\ncom\nhoje\nvoc.\n";
         assert_eq!(d.len(), 3);
         assert!(d.contains("melão"));
         assert!(d.contains("zebra"));
+    }
+
+    #[test]
+    fn contracao_com_apostrofo_entra_no_dicionario() {
+        let d = Dictionary::from_lines("don't\n'tis\nrock'\ndon\nágua\n");
+        assert!(d.contains("don't"));
+        assert!(!d.contains("'tis"));
+        assert!(!d.contains("rock'"));
+    }
+
+    #[test]
+    fn palavra_com_apostrofo_vale_inteira_ou_por_partes() {
+        let en = Dictionary::from_lines("don't\nisn't\nwater\n");
+        let pt = Dictionary::from_lines("água\narco\n");
+        let nobody = |_: &str| false;
+        assert!(is_known(&[&en], "isn't", nobody));
+        // Só português ativo: contração inglesa é erro.
+        assert!(!is_known(&[&pt], "isn't", nobody));
+        // Elisão do português: "d" não é checado, "água" sim.
+        assert!(is_known(&[&pt], "d'água", nobody));
+        assert!(!is_known(&[&pt], "d'ágau", nobody));
+        assert!(is_known(&[&pt], "zorvanek", |w| w == "zorvanek"));
+    }
+
+    #[test]
+    fn dois_idiomas_disputam_o_mesmo_ranking() {
+        let en = Dictionary::from_lines("house\nhorse\n")
+            .with_frequency("house\nhorse\n")
+            .with_split_heads(ENGLISH_SPLIT_HEADS);
+        let pt = Dictionary::from_lines("casa\nhouse\n");
+        // Inglês ativo: a sugestão vem do inglês.
+        assert_eq!(suggest_in(&[&pt, &en], "hause").first().map(String::as_str), Some("house"));
+        // Palavra nos dois dicionários aparece uma vez só.
+        let both = suggest_in(&[&pt, &en], "hause");
+        assert_eq!(both.iter().filter(|s| *s == "house").count(), 1);
+        // Português continua sugerindo o que é dele.
+        assert_eq!(suggest_in(&[&pt, &en], "caza").first().map(String::as_str), Some("casa"));
+    }
+
+    #[test]
+    fn com_dois_idiomas_palavra_sem_acento_do_principal_continua_erro() {
+        let pt = Dictionary::from_lines("você\nárea\ninformação\ncasa\n");
+        let en = Dictionary::from_lines("voce\narea\nhouse\ninformacao\n");
+        let nobody = |_: &str| false;
+        for typo in ["voce", "area", "informacao"] {
+            assert!(!is_known(&[&pt, &en], typo, nobody), "{typo}");
+            // Só inglês: vale.
+            assert!(is_known(&[&en], typo, nobody), "{typo}");
+        }
+        // Palavra só inglesa, que não é português sem acento, vale.
+        assert!(is_known(&[&pt, &en], "house", nobody));
+        // E a sugestão é a forma com acento, não a própria palavra.
+        let got = suggest_in(&[&pt, &en], "voce");
+        assert_eq!(got.first().map(String::as_str), Some("você"));
+        assert!(!got.iter().any(|s| s == "voce"));
+    }
+
+    #[test]
+    fn palavras_coladas_em_ingles() {
+        let en = Dictionary::from_lines("fact\nleast\nlot\n").with_split_heads(ENGLISH_SPLIT_HEADS);
+        assert_eq!(en.suggest("infact").first().map(String::as_str), Some("in fact"));
+        assert_eq!(en.suggest("atleast").first().map(String::as_str), Some("at least"));
+        // As cabeças do português não valem no inglês.
+        let en_only = Dictionary::from_lines("isso\n").with_split_heads(ENGLISH_SPLIT_HEADS);
+        assert!(en_only.suggest("porisso").iter().all(|s| s != "por isso"));
     }
 
     #[test]

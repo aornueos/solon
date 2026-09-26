@@ -4,6 +4,11 @@ import type { CanvasTool } from "../types/canvas";
 import type { SidebarOrder } from "../lib/sidebarOrder";
 import { saveExpandedFolders } from "../lib/expandedFolders";
 import { flushEditor } from "../lib/editorRef";
+import {
+  SPELLCHECK_LANGUAGES,
+  setSpellcheckLanguage as applySpellcheckLanguage,
+  type SpellcheckLanguage,
+} from "../lib/spellcheck";
 
 export interface FileNode {
   name: string;
@@ -335,6 +340,8 @@ interface AppState {
   activeContextMenu: ActiveContextMenu | null;
   /** Liga/desliga spellcheck visual (red underlines) no editor. */
   spellcheckEnabled: boolean;
+  /** Idioma do corretor: português, inglês ou os dois. */
+  spellcheckLanguage: SpellcheckLanguage;
   /** Largura maxima da coluna de texto do editor (px). Afeta a "medida"
    *  da linha — escritor pode preferir mais estreito (560-680, clássico
    *  livro) ou mais ar (820-1000). Default 680 é o sweet spot pt-BR. */
@@ -546,6 +553,7 @@ interface AppState {
   updateContextMenuItems: (id: string, items: ContextMenuItem[]) => void;
   closeContextMenu: () => void;
   setSpellcheckEnabled: (v: boolean) => void;
+  setSpellcheckLanguage: (v: SpellcheckLanguage) => void;
 }
 
 const OPEN_TABS_KEY = "solon:openTabs";
@@ -745,6 +753,8 @@ const APP_ZOOM_KEY = "solon:appZoom";
 const AUTO_SAVE_KEY = "solon:autoSave";
 const AUTO_CHECK_UPDATES_KEY = "solon:autoCheckUpdates";
 const SPELLCHECK_KEY = "solon:spellcheck";
+const SPELLCHECK_LANGUAGE_KEY = "solon:spellcheckLanguage";
+const DEFAULT_SPELLCHECK_LANGUAGE: SpellcheckLanguage = "pt-BR";
 const EDITOR_MAX_WIDTH_KEY = "solon:editorMaxWidth";
 const EDITOR_PAGE_LAYOUT_KEY = "solon:editorPageLayout";
 const EDITOR_PAGE_SIZE_KEY = "solon:editorPageSize";
@@ -1021,6 +1031,15 @@ function loadEditorToolbarMode(): EditorToolbarMode {
   return DEFAULT_EDITOR_TOOLBAR_MODE;
 }
 
+function loadSpellcheckLanguage(): SpellcheckLanguage {
+  try {
+    const v = localStorage.getItem(SPELLCHECK_LANGUAGE_KEY);
+    const known = SPELLCHECK_LANGUAGES.find((option) => option.value === v);
+    if (known) return known.value;
+  } catch {}
+  return DEFAULT_SPELLCHECK_LANGUAGE;
+}
+
 function loadOutlineSide(): OutlineSide {
   try {
     const v = localStorage.getItem(OUTLINE_SIDE_KEY);
@@ -1191,6 +1210,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   backlinkIndex: null,
   activeContextMenu: null,
   spellcheckEnabled: loadBoolPref(SPELLCHECK_KEY, DEFAULT_SPELLCHECK),
+  spellcheckLanguage: loadSpellcheckLanguage(),
   editorMaxWidth: loadEditorMaxWidth(),
   editorPageLayout: loadEditorPageLayout(),
   editorPageSize: loadEditorPageSize(),
@@ -1696,6 +1716,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       localStorage.removeItem(AUTO_SAVE_KEY);
       localStorage.removeItem(AUTO_CHECK_UPDATES_KEY);
       localStorage.removeItem(SPELLCHECK_KEY);
+      localStorage.removeItem(SPELLCHECK_LANGUAGE_KEY);
       localStorage.removeItem(EDITOR_MAX_WIDTH_KEY);
       localStorage.removeItem(EDITOR_PAGE_LAYOUT_KEY);
       localStorage.removeItem(EDITOR_TEXT_SIZE_KEY);
@@ -1732,6 +1753,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       autoSaveEnabled: DEFAULT_AUTO_SAVE,
       autoCheckUpdates: DEFAULT_AUTO_CHECK_UPDATES,
       spellcheckEnabled: DEFAULT_SPELLCHECK,
+      spellcheckLanguage: DEFAULT_SPELLCHECK_LANGUAGE,
       editorMaxWidth: DEFAULT_EDITOR_MAX_WIDTH,
       editorPageLayout: DEFAULT_EDITOR_PAGE_LAYOUT,
       editorPageSize: DEFAULT_EDITOR_PAGE_SIZE,
@@ -1792,6 +1814,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       /* ignora */
     }
     set({ spellcheckEnabled: v });
+  },
+
+  setSpellcheckLanguage: (v) => {
+    if (!SPELLCHECK_LANGUAGES.some((option) => option.value === v)) return;
+    try {
+      localStorage.setItem(SPELLCHECK_LANGUAGE_KEY, v);
+    } catch {
+      /* ignora */
+    }
+    set({ spellcheckLanguage: v });
   },
 
   setEditorMaxWidth: (w) => {
@@ -2106,6 +2138,15 @@ if (!IS_DETACHED_WINDOW) {
     saveExpandedFolders(state.rootFolder, state.fileTree);
   });
 }
+
+// O corretor segue o idioma dos Ajustes: no arranque e a cada troca,
+// inclusive a de "restaurar padrões".
+applySpellcheckLanguage(useAppStore.getState().spellcheckLanguage);
+useAppStore.subscribe((state, prev) => {
+  if (state.spellcheckLanguage !== prev.spellcheckLanguage) {
+    applySpellcheckLanguage(state.spellcheckLanguage);
+  }
+});
 
 function toggleNodeExpanded(nodes: FileNode[], path: string): FileNode[] {
   return nodes.map((node) => {

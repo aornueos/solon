@@ -31,6 +31,45 @@ import { isTauriRuntime } from "./runtime";
 
 const PERSONAL_DICT_KEY = "solon:spellcheck:personal";
 
+/** Idiomas do corretor: português, inglês ou os dois. */
+export type SpellcheckLanguage = "pt-BR" | "en-US" | "pt-BR+en-US";
+
+export const SPELLCHECK_LANGUAGES: { value: SpellcheckLanguage; label: string; hint: string }[] = [
+  { value: "pt-BR", label: "Português", hint: "Português do Brasil." },
+  { value: "en-US", label: "Inglês", hint: "Inglês americano." },
+  {
+    value: "pt-BR+en-US",
+    label: "Português e inglês",
+    hint: "Aceita palavras dos dois idiomas; português sem acento (voce, mes) continua marcado.",
+  },
+];
+
+let language: SpellcheckLanguage = "pt-BR";
+// Trocas de idioma vão em fila: duas chamadas soltas ao backend podiam
+// terminar fora de ordem e deixar ativo o idioma anterior.
+let languageSync: Promise<unknown> = Promise.resolve();
+
+function syncLanguage(): Promise<unknown> {
+  const languages = language.split("+");
+  languageSync = languageSync
+    .catch(() => undefined)
+    .then(() => invoke<number>("spell_set_languages", { languages }));
+  return languageSync;
+}
+
+/**
+ * Troca o idioma do corretor. Os sublinhados são refeitos com o
+ * dicionário novo (o cache de palavras é descartado).
+ */
+export function setSpellcheckLanguage(next: SpellcheckLanguage): void {
+  if (next === language) return;
+  language = next;
+  if (!isTauriRuntime() || !warmupPromise) return;
+  void syncLanguage()
+    .then(notifyPersonalDictChanged)
+    .catch((err) => console.warn("[spellcheck] troca de idioma falhou:", err));
+}
+
 let isReady = false;
 let warmupPromise: Promise<void> | null = null;
 let personalDict = loadPersonalDict();
@@ -82,7 +121,8 @@ export function ensureSpellchecker(): void {
 
   warmupPromise = (async () => {
     try {
-      await invoke<number>("spell_size");
+      // Escolhe o idioma e já carrega o dicionário dele.
+      await syncLanguage();
 
       // Re-aplica dict pessoal
       for (const word of personalDict) {
@@ -106,7 +146,35 @@ export function isSpellcheckerReady(): boolean {
 }
 
 export function normalizeSpellWord(word: string): string {
-  return word.trim().toLocaleLowerCase("pt-BR");
+  return word.trim().toLocaleLowerCase("pt-BR").replace(/[’ʼ]/g, "'");
+}
+
+/**
+ * Palavra para o corretor: letras, com apóstrofo só no meio ("don't",
+ * "d’água"). Hífen separa: "guarda-chuva" são duas palavras.
+ */
+const SPELL_WORD_SOURCE = "[\\p{L}\\p{M}]+(?:['’ʼ][\\p{L}\\p{M}]+)*";
+
+const SPELL_WORD_EXACT = new RegExp(`^${SPELL_WORD_SOURCE}$`, "u");
+
+/** Expressão nova a cada chamada: ela guarda posição (`g`). */
+export function spellWordPattern(): RegExp {
+  return new RegExp(SPELL_WORD_SOURCE, "gu");
+}
+
+/** A palavra do texto que contém a posição `offset` (inclusive as pontas). */
+export function wordAtOffset(
+  text: string,
+  offset: number,
+): { start: number; end: number } | null {
+  const pattern = spellWordPattern();
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text))) {
+    if (match.index > offset) break;
+    const end = match.index + match[0].length;
+    if (offset <= end) return { start: match.index, end };
+  }
+  return null;
 }
 
 /**
@@ -136,7 +204,7 @@ export function shouldSpellcheckWord(word: string, atSentenceStart = false): boo
   const normalized = normalizeSpellWord(word);
   if (normalized.length < 3) return false;
   if (/^\d+$/.test(normalized)) return false;
-  if (!/^[\p{L}\p{M}]+$/u.test(word)) return false;
+  if (!SPELL_WORD_EXACT.test(word)) return false;
   if (/^\p{Lu}/u.test(word)) {
     if (!atSentenceStart) return false;
     if (word === word.toLocaleUpperCase("pt-BR")) return false;
@@ -151,6 +219,9 @@ export function shouldSpellcheckWord(word: string, atSentenceStart = false): boo
  */
 export function matchCase(original: string, suggestion: string): string {
   if (!original || !suggestion) return suggestion;
+  // Apóstrofo como estava no texto: o dicionário usa o reto, o editor
+  // costuma ter o curvo ("don’t").
+  if (original.includes("’")) suggestion = suggestion.replace(/'/g, "’");
   if (original.length > 1 && original === original.toLocaleUpperCase("pt-BR")) {
     return suggestion.toLocaleUpperCase("pt-BR");
   }

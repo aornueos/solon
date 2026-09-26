@@ -1,5 +1,5 @@
 import type { Editor } from "@tiptap/react";
-import { INLINE_LEAF_CHAR, isSentenceStart } from "./spellcheck";
+import { INLINE_LEAF_CHAR, isSentenceStart, wordAtOffset } from "./spellcheck";
 
 /**
  * Referencia ao editor TipTap ativo.
@@ -76,19 +76,11 @@ export function findWordAtCoords(
   const offset = coords.pos - blockStart;
   if (offset < 0 || offset > text.length) return null;
 
-  // \p{L} = letras (todas as scripts), \p{M} = combining marks (acentos
-  // que vem como codepoint separado em formas decompostas NFD).
-  // Apostrofes/hifens NAO contam como parte de palavra — "guarda-chuva"
-  // vira ["guarda", "chuva"], cada uma checada separadamente. Aceitavel.
-  const isWordChar = (ch: string | undefined): boolean =>
-    ch ? /[\p{L}\p{M}]/u.test(ch) : false;
-
-  let s = offset;
-  while (s > 0 && isWordChar(text[s - 1])) s--;
-  let e = offset;
-  while (e < text.length && isWordChar(text[e])) e++;
-
-  if (s === e) return null;
+  // Mesma divisão em palavras do sublinhado: letras, com apóstrofo no
+  // meio ("don't"). Hífen separa — "guarda-chuva" são duas palavras.
+  const found = wordAtOffset(text, offset);
+  if (!found) return null;
+  const { start: s, end: e } = found;
 
   return {
     word: text.slice(s, e),

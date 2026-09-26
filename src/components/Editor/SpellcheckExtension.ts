@@ -9,12 +9,12 @@ import {
   isSentenceStart,
   normalizeSpellWord,
   shouldSpellcheckWord,
+  spellWordPattern,
 } from "../../lib/spellcheck";
 
 type SpellMeta = { decorations: Decoration[] };
 
 const spellcheckKey = new PluginKey<DecorationSet>("solon-spellcheck");
-const WORD_RE = /[\p{L}\p{M}]{2,}/gu;
 const MAX_UNIQUE_WORDS = 2500;
 const MAX_WORD_RANGES = 6000;
 
@@ -144,9 +144,9 @@ export function collectWordRanges(view: EditorView): {
     if (ranges.length >= MAX_WORD_RANGES) return false;
     if (!node.isTextblock) return;
     const text = node.textBetween(0, node.content.size, "\n", INLINE_LEAF_CHAR);
-    WORD_RE.lastIndex = 0;
+    const words = spellWordPattern();
     let match: RegExpExecArray | null;
-    while ((match = WORD_RE.exec(text))) {
+    while ((match = words.exec(text))) {
       if (ranges.length >= MAX_WORD_RANGES) break;
       const word = match[0];
       const from = pos + 1 + match.index;

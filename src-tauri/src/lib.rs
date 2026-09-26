@@ -23,6 +23,7 @@ pub fn run() {
         // o dict pt-BR). O motor fica em `spell_engine`; os comandos
         // pesados rodam fora da thread da janela (ver `spellcheck`).
         .invoke_handler(tauri::generate_handler![
+            spellcheck::spell_set_languages,
             spellcheck::spell_size,
             spellcheck::spell_check,
             spellcheck::spell_check_many,

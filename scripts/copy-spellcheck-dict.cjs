@@ -1,6 +1,6 @@
 /**
- * Gera `public/dict/pt-words.txt`, a lista que o backend Rust embute no
- * binario para spellcheck.
+ * Gera `public/dict/pt-words.txt` e `public/dict/en-words.txt`, as listas
+ * que o backend Rust embute no binario para spellcheck.
  *
  * A versao antiga pegava somente as palavras-base do Hunspell
  * `dictionary-pt`. Isso descartava regras de flexao e fazia palavras
@@ -21,8 +21,24 @@ const CSPELL_TRIE = path.join(
   "dict-pt-br",
   "pt_BR.trie.gz",
 );
+const EN_TRIE = path.join(
+  ROOT,
+  "node_modules",
+  "@cspell",
+  "dict-en_us",
+  "en_US.trie.gz",
+);
 const DEST_DIR = path.join(ROOT, "public", "dict");
 const DEST_FILE = path.join(DEST_DIR, "pt-words.txt");
+const EN_DEST_FILE = path.join(DEST_DIR, "en-words.txt");
+
+// Forma que o corretor consulta: minúsculas, com apóstrofo só no meio
+// ("don't", "d'água"). O editor separa hifens antes de checar.
+const WORD_SHAPE = /^[\p{Ll}\p{M}]+(?:'[\p{Ll}\p{M}]+)*$/u;
+
+function spellForm(raw) {
+  return raw.normalize("NFC").toLowerCase().replace(/[’ʼ]/g, "'");
+}
 
 fs.mkdirSync(DEST_DIR, { recursive: true });
 
@@ -30,7 +46,7 @@ fs.mkdirSync(DEST_DIR, { recursive: true });
   const words = new Set();
 
   if (fs.existsSync(CSPELL_TRIE)) {
-    await addCspellWords(words);
+    await addCspellWords(words, CSPELL_TRIE, "@cspell/dict-pt-br");
   } else {
     console.warn(
       "[spellcheck] @cspell/dict-pt-br nao encontrado; usando fallback Hunspell base.",
@@ -51,6 +67,20 @@ fs.mkdirSync(DEST_DIR, { recursive: true });
     `[spellcheck] public/dict/pt-words.txt: ${sorted.length.toLocaleString("pt-BR")} palavras (${sizeMB} MB)`,
   );
 
+  // Inglês (EUA). Sem o pacote, grava a lista vazia: o binário embute o
+  // arquivo e não compilaria sem ele; o corretor em inglês só não acha nada.
+  const english = new Set();
+  if (fs.existsSync(EN_TRIE)) {
+    await addCspellWords(english, EN_TRIE, "@cspell/dict-en_us");
+  } else {
+    console.warn("[spellcheck] @cspell/dict-en_us nao encontrado; ingles fica vazio.");
+  }
+  const englishSorted = [...english].sort();
+  fs.writeFileSync(EN_DEST_FILE, englishSorted.join("\n") + "\n", "utf-8");
+  console.log(
+    `[spellcheck] public/dict/en-words.txt: ${englishSorted.length.toLocaleString("pt-BR")} palavras`,
+  );
+
   for (const old of ["pt.aff", "pt.dic"]) {
     const p = path.join(DEST_DIR, old);
     if (fs.existsSync(p)) {
@@ -63,26 +93,23 @@ fs.mkdirSync(DEST_DIR, { recursive: true });
   process.exit(1);
 });
 
-async function addCspellWords(words) {
+async function addCspellWords(words, triePath, label) {
   const { decodeTrie } = await import("cspell-trie-lib");
-  const trie = decodeTrie(zlib.gunzipSync(fs.readFileSync(CSPELL_TRIE)));
+  const trie = decodeTrie(zlib.gunzipSync(fs.readFileSync(triePath)));
   let count = 0;
 
   for (const raw of trie.words()) {
-    const word = raw.normalize("NFC").toLowerCase();
+    const word = spellForm(raw);
     // O trie expande milhoes de entradas, incluindo siglas e compostos.
     // O editor separa hifens antes de checar, entao guardamos apenas
     // formas minusculas naturais para reduzir falsos positivos sem
     // embutir dezenas de MB desnecessarios.
-    if (!/^[\p{Ll}\p{M}][\p{Ll}\p{M}'’-]*$/u.test(word)) continue;
-    if (word.includes("-") || word.length > 32) continue;
+    if (!WORD_SHAPE.test(word) || word.length > 32) continue;
     words.add(word);
     count += 1;
   }
 
-  console.log(
-    `[spellcheck] @cspell/dict-pt-br: ${count.toLocaleString("pt-BR")} formas`,
-  );
+  console.log(`[spellcheck] ${label}: ${count.toLocaleString("pt-BR")} formas`);
 }
 
 function addHunspellBaseWords(words) {
@@ -93,11 +120,8 @@ function addHunspellBaseWords(words) {
   for (const line of lines) {
     if (!line || /^\d+$/.test(line)) continue;
     const slash = line.indexOf("/");
-    const word = (slash >= 0 ? line.slice(0, slash) : line)
-      .normalize("NFC")
-      .toLowerCase();
-    if (!word || /\s/.test(word)) continue;
-    if (!/^[\p{Ll}\p{M}][\p{Ll}\p{M}'’.-]*$/u.test(word)) continue;
+    const word = spellForm(slash >= 0 ? line.slice(0, slash) : line);
+    if (!WORD_SHAPE.test(word)) continue;
     words.add(word);
     count += 1;
   }

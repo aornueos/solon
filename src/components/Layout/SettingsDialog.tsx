@@ -31,6 +31,7 @@ import {
   getPersonalDictSize,
   getPersonalDictWords,
   removeFromPersonalDict,
+  SPELLCHECK_LANGUAGES,
 } from "../../lib/spellcheck";
 import {
   checkForUpdate,
@@ -76,6 +77,8 @@ export function SettingsDialog() {
   const autoCheckUpdates = useAppStore((s) => s.autoCheckUpdates);
   const setAutoCheckUpdates = useAppStore((s) => s.setAutoCheckUpdates);
   const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
+  const spellcheckLanguage = useAppStore((s) => s.spellcheckLanguage);
+  const setSpellcheckLanguage = useAppStore((s) => s.setSpellcheckLanguage);
   const setSpellcheckEnabled = useAppStore((s) => s.setSpellcheckEnabled);
   const showStatusStats = useAppStore((s) => s.showStatusStats);
   const setShowStatusStats = useAppStore((s) => s.setShowStatusStats);
@@ -552,7 +555,7 @@ export function SettingsDialog() {
             >
               <Group title="Revisão">
                 <Row
-                  label="Ortografia pt-BR"
+                  label="Ortografia"
                   hint={
                     personalDictSize > 0
                       ? `${personalDictSize} ${personalDictSize === 1 ? "palavra" : "palavras"} no dicionário.`
@@ -564,6 +567,24 @@ export function SettingsDialog() {
                     checked={spellcheckEnabled}
                     onChange={setSpellcheckEnabled}
                     label={spellcheckEnabled ? "Ativado" : "Desativado"}
+                  />
+                </Row>
+
+                <Row
+                  label="Idioma do corretor"
+                  hint={
+                    SPELLCHECK_LANGUAGES.find((option) => option.value === spellcheckLanguage)
+                      ?.hint
+                  }
+                >
+                  <SelectControl
+                    value={spellcheckLanguage}
+                    options={SPELLCHECK_LANGUAGES.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    onChange={setSpellcheckLanguage}
+                    disabled={!spellcheckEnabled}
                   />
                 </Row>
 
