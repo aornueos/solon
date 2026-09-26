@@ -17,6 +17,9 @@ export default defineConfig(async () => ({
   plugins: [react()],
   clearScreen: false,
   build: {
+    // Fonte nunca vira `data:` embutido no CSS: a CSP do Tauri
+    // (`font-src 'self'`) recusa, e o trecho da fonte some.
+    assetsInlineLimit: (filePath: string) => (filePath.endsWith(".woff2") ? false : undefined),
     rollupOptions: {
       output: {
         manualChunks(id) {

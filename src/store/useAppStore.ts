@@ -850,17 +850,17 @@ export const EDITOR_FONT_FAMILIES = [
   {
     value: "serif",
     label: "Serifada",
-    css: '"Lora", "EB Garamond", Georgia, serif',
+    css: '"Lora Variable", "Lora", "EB Garamond", Georgia, serif',
   },
   {
     value: "sans",
     label: "Sem serifa",
-    css: '"Inter", system-ui, sans-serif',
+    css: '"Inter Variable", "Inter", system-ui, sans-serif',
   },
   {
     value: "mono",
     label: "Courier",
-    css: '"Courier New", "JetBrains Mono", monospace',
+    css: '"Courier New", "JetBrains Mono Variable", "JetBrains Mono", monospace',
   },
 ] as const;
 

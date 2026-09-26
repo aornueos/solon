@@ -275,4 +275,5 @@ Solon is distributed in the hope that it will be useful, but WITHOUT ANY WARRANT
 ### Third-party data
 
 * `src-tauri/data/pt-br-frequencia.txt` and `src-tauri/data/en-us-frequencia.txt`: word frequency lists for Brazilian Portuguese and English from [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, derived from the OpenSubtitles 2018 corpus, licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Counts and non-lowercase entries were removed; only the word order is used, to rank spellcheck suggestions.
+* Fonts: [Lora](https://github.com/cyrealtype/Lora-Cyrillic), [Inter](https://github.com/rsms/inter) and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), bundled through [Fontsource](https://fontsource.org), all under the [SIL Open Font License 1.1](https://openfontlicense.org).
 * The English word list is generated at install time from [`@cspell/dict-en_us`](https://github.com/streetsidesoftware/cspell-dicts) (MIT); the Portuguese one from [`@cspell/dict-pt-br`](https://github.com/streetsidesoftware/cspell-dicts) and [`dictionary-pt`](https://github.com/wooorm/dictionaries).

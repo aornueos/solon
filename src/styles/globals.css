@@ -872,9 +872,9 @@
   --radius-lg: 14px;
   --radius-pill: 999px;
 
-  --font-display: "Lora", "EB Garamond", Georgia, serif;
-  --font-ui: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-display: "Lora Variable", "Lora", "EB Garamond", Georgia, serif;
+  --font-ui: "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   --tracking-label: 0.09em;
 
   /* Compat: muitos componentes ainda referenciam estes tokens inline
@@ -913,7 +913,7 @@
   body {
     background-color: var(--bg-panel);
     color: var(--text-primary);
-    font-family: "Inter", system-ui, sans-serif;
+    font-family: "Inter Variable", "Inter", system-ui, sans-serif;
     text-rendering: optimizeLegibility;
     /* `antialiased` (grayscale) em vez de `subpixel-antialiased`: no webview
        Chromium do Tauri, subpixel fica pesado/borrado — especialmente em tema
@@ -1551,7 +1551,7 @@ select:focus-visible {
   background: transparent;
   color: var(--editor-paper-text, var(--text-primary));
   caret-color: var(--accent);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   font-size: calc(0.95rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1));
   line-height: 1.65;
   tab-size: 2;
@@ -1814,7 +1814,7 @@ select:focus-visible {
   user-select: text;
   -webkit-user-select: text;
   cursor: text;
-  font-family: var(--editor-font-family, "Lora", Georgia, serif) !important;
+  font-family: var(--editor-font-family, "Lora Variable", "Lora", Georgia, serif) !important;
   /* `--editor-text-scale` vem dos presets Pequeno/Medio/Grande; `--editor-zoom`
      escala a visualizacao. Mantidos separados para A4 poder dar zoom sem
      virar controle de tamanho tipografico livre. */
@@ -1843,7 +1843,7 @@ select:focus-visible {
 }
 
 .ProseMirror h1 {
-  font-family: var(--editor-font-family, "Lora", Georgia, serif) !important;
+  font-family: var(--editor-font-family, "Lora Variable", "Lora", Georgia, serif) !important;
   font-size: calc(2rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1)) !important;
   font-weight: 700 !important;
   line-height: 1.15;
@@ -1858,7 +1858,7 @@ select:focus-visible {
 .ProseMirror h1:first-child { margin-top: 0; }
 
 .ProseMirror h2 {
-  font-family: var(--editor-font-family, "Lora", Georgia, serif) !important;
+  font-family: var(--editor-font-family, "Lora Variable", "Lora", Georgia, serif) !important;
   font-size: calc(1.35rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1)) !important;
   font-weight: 600 !important;
   line-height: 1.3;
@@ -1871,7 +1871,7 @@ select:focus-visible {
 }
 
 .ProseMirror h3 {
-  font-family: var(--editor-font-family, "Inter", sans-serif) !important;
+  font-family: var(--editor-font-family, "Inter Variable", "Inter", sans-serif) !important;
   font-size: calc(0.72rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1)) !important;
   font-weight: 700 !important;
   line-height: 1.4;
@@ -1883,7 +1883,7 @@ select:focus-visible {
 }
 
 .ProseMirror h4 {
-  font-family: var(--editor-font-family, "Inter", sans-serif) !important;
+  font-family: var(--editor-font-family, "Inter Variable", "Inter", sans-serif) !important;
   font-size: calc(0.7rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1)) !important;
   font-weight: 600 !important;
   margin-top: 1.75rem;
@@ -1895,7 +1895,7 @@ select:focus-visible {
 
 .ProseMirror h5,
 .ProseMirror h6 {
-  font-family: var(--editor-font-family, "Inter", sans-serif) !important;
+  font-family: var(--editor-font-family, "Inter Variable", "Inter", sans-serif) !important;
   font-size: calc(0.68rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1)) !important;
   font-weight: 500 !important;
   margin-top: 1.25rem;
@@ -2137,7 +2137,7 @@ html.solon-resizing-image * {
 }
 
 .ProseMirror code {
-  font-family: "JetBrains Mono", monospace;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", monospace;
   font-size: 0.85em;
   background: var(--bg-code);
   padding: 0.1em 0.35em;
@@ -2151,7 +2151,7 @@ html.solon-resizing-image * {
   border-radius: 6px;
   overflow-x: auto;
   margin: 1rem 0;
-  font-family: "JetBrains Mono", monospace;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", monospace;
   font-size: calc(0.875rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1));
   line-height: 1.6;
 }
@@ -2187,7 +2187,7 @@ html.solon-resizing-image * {
   width: 100%;
   table-layout: fixed;
   overflow: hidden;
-  font-family: "Inter", sans-serif;
+  font-family: "Inter Variable", "Inter", sans-serif;
   font-size: calc(0.92rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1));
 }
 .ProseMirror table td,
@@ -2308,13 +2308,13 @@ html.solon-tree-dragging.solon-tree-drop-canvas * {
    no dialog sem virar parede de texto.
 ───────────────────────────────────────── */
 .update-notes {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", system-ui, sans-serif;
   font-size: 0.95rem;
   line-height: 1.65;
   color: var(--text-secondary);
 }
 .update-notes h1, .update-notes h2, .update-notes h3 {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: "Inter Variable", "Inter", system-ui, sans-serif;
   color: var(--text-primary);
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -2340,7 +2340,7 @@ html.solon-tree-dragging.solon-tree-drop-canvas * {
   text-underline-offset: 3px;
 }
 .update-notes code {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   font-size: 0.85em;
   padding: 0.1em 0.35em;
   border-radius: 3px;
@@ -2348,7 +2348,7 @@ html.solon-tree-dragging.solon-tree-drop-canvas * {
   color: var(--text-primary);
 }
 .update-notes pre {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   font-size: 0.82rem;
   padding: 0.85em 1em;
   background: var(--bg-app);
