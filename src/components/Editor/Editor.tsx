@@ -15,7 +15,7 @@ import {
 } from "../../store/useAppStore";
 import { EditorToolbar, SourceModeToolbar } from "./EditorToolbar";
 import { SourceEditor } from "./SourceEditor";
-import { markdownToHtml, htmlToMarkdown } from "./markdownBridge";
+import { markdownToHtml, createDocSerializer } from "./markdownBridge";
 import { setCurrentEditor, setEditorFlush } from "../../lib/editorRef";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { ensureSpellchecker } from "../../lib/spellcheck";
@@ -164,7 +164,7 @@ export function Editor() {
   const isLoadingRef = useRef(false);
   const lastLoadedPathRef = useRef<string | null>(null);
   // Debounce do trabalho pesado em `onUpdate` (extractHeadings, getText,
-  // getHTML, htmlToMarkdown). Esses passos custam ms em docs grandes e
+  // Markdown do documento). Esses passos custam ms em docs grandes e
   // disparavam por keystroke — em cap. de 8k palavras a digitacao
   // visivelmente atrasava. 180ms é um sweet spot: invisivel ao user mas
   // coalesce burstos de digitacao em uma única passada. O auto-save tem
@@ -180,6 +180,9 @@ export function Editor() {
   // Definida fora do escopo da useEditor pra que possa ser registrada via
   // setEditorFlush logo após a criação do editor.
   const flushUpdateRef = useRef<(() => void) | null>(null);
+  // Markdown do documento reaproveitando os blocos que não mudaram: num
+  // arquivo gigante, converter tudo a cada pausa travava a digitação.
+  const serializeDocRef = useRef(createDocSerializer());
   const [findOpen, setFindOpen] = useState(false);
   const [findInitialQuery, setFindInitialQuery] = useState("");
   // Ref do wrapper scrollavel — usado pra anexar wheel listener nativo
@@ -295,7 +298,7 @@ export function Editor() {
       // digitar uma frase de 30 letras disparava 30x:
       //   - extractHeadings (descend O(n) do doc inteiro)
       //   - editor.getText() + split (O(n))
-      //   - editor.getHTML() + htmlToMarkdown (turndown — *caro*)
+      //   - Markdown do documento (turndown — *caro*; hoje só dos blocos editados)
       //   - setFileBody (cascade de re-renders na arvore)
       // Marca dirty IMEDIATAMENTE pra StatusBar piscar "Editado" sem
       // esperar o debounce; o resto pode esperar 180ms.
@@ -313,8 +316,7 @@ export function Editor() {
         const text = editor.getText();
         const words = text.trim() ? text.trim().split(/\s+/).length : 0;
         setWordCount(words, text.length);
-        const md = htmlToMarkdown(editor.getHTML());
-        setFileBody(md);
+        setFileBody(serializeDocRef.current(editor.state.doc, editor.schema));
       }, 180);
     },
   });
@@ -336,8 +338,7 @@ export function Editor() {
     const text = editor.getText();
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     setWordCount(words, text.length);
-    const md = htmlToMarkdown(editor.getHTML());
-    setFileBody(md);
+    setFileBody(serializeDocRef.current(editor.state.doc, editor.schema));
   };
 
   // Registra o flush global pra que useAutoSave (Ctrl+S) e qualquer
@@ -405,6 +406,18 @@ export function Editor() {
     isLoadingRef.current = true;
     let cancelled = false;
     let raf: number | null = null;
+    // Adianta, em fatias curtas e com a janela livre, o Markdown dos blocos
+    // do arquivo recém-aberto. Sem isso a primeira pausa na digitação de um
+    // arquivo gigante convertia o documento inteiro de uma vez.
+    let warmTimer: number | null = null;
+    const warmSerializer = () => {
+      warmTimer = null;
+      if (cancelled || editor.isDestroyed) return;
+      const deadline = performance.now() + 8;
+      if (!serializeDocRef.current.warm(editor.state.doc, editor.schema, deadline)) {
+        warmTimer = window.setTimeout(warmSerializer, 16);
+      }
+    };
     const body = useAppStore.getState().fileBody;
     const html = markdownToHtml(body);
 
@@ -431,6 +444,7 @@ export function Editor() {
         }
         visiblePathRef.current = activeFilePath;
         isLoadingRef.current = false;
+        warmSerializer();
       });
     });
 
@@ -440,6 +454,7 @@ export function Editor() {
     return () => {
       cancelled = true;
       if (raf != null) cancelAnimationFrame(raf);
+      if (warmTimer != null) window.clearTimeout(warmTimer);
     };
   }, [activeFilePath, editor, rootFolder, setHeadings, setWordCount, sourceMode]);
 

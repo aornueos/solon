@@ -5,6 +5,7 @@ import { after, describe, it } from "node:test";
 import { Editor } from "@tiptap/core";
 import { createEditorExtensions } from "../src/components/Editor/editorExtensions.ts";
 import {
+  createDocSerializer,
   htmlToMarkdown,
   markdownToHtml,
 } from "../src/components/Editor/markdownBridge.ts";
@@ -20,14 +21,29 @@ const editor = new Editor({
 });
 after(() => editor.destroy());
 
+// Corta só quebras de linha das pontas: `.trim()` também apagaria o EM
+// SPACE do recuo de romance, e o teste do recuo não testaria nada.
+const trimNewlines = (text) => text.replace(/^\n+|\n+$/g, "");
+
 function roundtrip(markdown) {
   editor.commands.setContent(markdownToHtml(markdown), false);
-  return htmlToMarkdown(editor.getHTML()).trim();
+  return trimNewlines(htmlToMarkdown(editor.getHTML()));
+}
+
+// O serializador incremental (usado a cada pausa na digitação) tem de
+// dar exatamente o mesmo texto que a conversão do documento inteiro.
+const serializeIncremental = createDocSerializer();
+function incrementalMatchesFull() {
+  assert.equal(
+    serializeIncremental(editor.state.doc, editor.schema),
+    htmlToMarkdown(editor.getHTML()),
+  );
 }
 
 function same(name, markdown) {
   it(name, () => {
-    assert.equal(roundtrip(markdown), markdown.trim());
+    assert.equal(roundtrip(markdown), trimNewlines(markdown));
+    incrementalMatchesFull();
   });
 }
 
@@ -62,6 +78,60 @@ describe("fidelidade do Markdown — o que o arquivo tem, o arquivo mantém", ()
   same("wikilink com apelido", "[[cap1|o início]]");
   same("recuo de romance", " Recuado.");
   same("travessão de diálogo", "— Vamos? — perguntou ela.");
+
+  it("serializador incremental = conversão completa num documento misto, antes e depois de editar", () => {
+    const doc = [
+      "# Capítulo\n\n\u2003Recuado com [link](https://x.com) e <u>sublinhado</u>.",
+      "<!-- nota -->",
+      "- [ ] tarefa\n- [x] feita",
+      "5. quinto\n6. sexto",
+      "| a | b |\n| :-: | --: |\n| 1 | 2 |",
+      "> citação",
+      "```js\nconst a = 1;\n```",
+      "linha um  \nlinha dois",
+      "A\n\n<p><br></p>\n\nB",
+      "---",
+      "![capa](capa.png)",
+      "Fim com **negrito** e *itálico*.",
+    ].join("\n\n");
+    editor.commands.setContent(markdownToHtml(doc), false);
+    incrementalMatchesFull();
+    // Edita um bloco: só ele muda, o resto sai do cache.
+    editor.commands.setTextSelection(3);
+    editor.commands.insertContent("Novo ");
+    incrementalMatchesFull();
+    editor.commands.focus("end");
+    editor.commands.insertContent(" E mais.");
+    incrementalMatchesFull();
+  });
+
+  it("serializador incremental mantém a quebra de linha no fim de um parágrafo do meio", () => {
+    // Convertido sozinho, o bloco perdia os dois espaços finais.
+    editor.commands.setContent("<p>linha</p><p>seguinte</p>", false);
+    editor.commands.setTextSelection(6);
+    editor.commands.setHardBreak();
+    incrementalMatchesFull();
+  });
+
+  it("serializador incremental em documento vazio ou só com parágrafos vazios", () => {
+    for (const markdown of ["", "<p><br></p>", "<p><br></p>\n\nTexto", "Texto\n\n<p><br></p>"]) {
+      editor.commands.setContent(markdownToHtml(markdown), false);
+      incrementalMatchesFull();
+    }
+  });
+
+  it("aquecimento em fatias converte tudo e dá o mesmo texto", () => {
+    const doc = Array.from({ length: 40 }, (_, i) => `## Cena ${i}\n\nTexto da cena ${i}.`).join("\n\n");
+    editor.commands.setContent(markdownToHtml(doc), false);
+    const serialize = createDocSerializer();
+    let slices = 0;
+    while (!serialize.warm(editor.state.doc, editor.schema, performance.now() + 0.05)) {
+      slices++;
+      assert.ok(slices < 1000, "o aquecimento não termina");
+    }
+    assert.equal(serialize.warm(editor.state.doc, editor.schema, 0), true);
+    assert.equal(serialize(editor.state.doc, editor.schema), htmlToMarkdown(editor.getHTML()));
+  });
 
   it("link com javascript: perde o destino, não vira link clicável", () => {
     const out = roundtrip("[clique](javascript:alert(1))");

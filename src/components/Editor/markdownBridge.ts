@@ -3,6 +3,8 @@ import TurndownService from "turndown";
 // `turndown-plugin-gfm` não publica tipos; a shim fica em `src/types/shims.d.ts`.
 import { gfm, tables, strikethrough } from "turndown-plugin-gfm";
 import DOMPurify, { type Config as DOMPurifyConfig } from "dompurify";
+import { getHTMLFromFragment } from "@tiptap/core";
+import { Fragment, type Node as PMNode, type Schema } from "@tiptap/pm/model";
 
 /** Narrow turndown Node type — a propriedade `isBlock` é adicionada pelo
  *  turndown ao DOM node em runtime mas não está em `HTMLElement`. */
@@ -725,12 +727,97 @@ function prepareEditorHtml(html: string): string {
 
 export function htmlToMarkdown(html: string): string {
   if (!html) return "";
-  // Trim CONSERVADOR: só newlines e space ASCII. Nao usamos `.trim()`
-  // padrão porque ele considera EM SPACE como whitespace e come o
-  // marker de indent do primeiro paragrafo.
-  const markdown = turndown
-    .turndown(protectEditorSpaces(prepareEditorHtml(html)))
-    .replace(/^[\n ]+/, "")
-    .replace(/[\n ]+$/, "\n");
-  return repairEscapedInlineMarks(markdown);
+  return repairEscapedInlineMarks(finishMarkdown(turndownEditorHtml(html)));
+}
+
+function turndownEditorHtml(html: string): string {
+  return turndown.turndown(protectEditorSpaces(prepareEditorHtml(html)));
+}
+
+// Trim CONSERVADOR: só newlines e space ASCII. Nao usamos `.trim()`
+// padrão porque ele considera EM SPACE como whitespace e come o
+// marker de indent do primeiro paragrafo.
+function finishMarkdown(markdown: string): string {
+  return markdown.replace(/^[\n ]+/, "").replace(/[\n ]+$/, "\n");
+}
+
+/**
+ * Serializador do documento do editor para Markdown que só converte os
+ * blocos que mudaram.
+ *
+ * Converter o documento inteiro a cada pausa na digitação custava
+ * centenas de ms num arquivo de 100 mil palavras, com a janela parada.
+ * No ProseMirror um bloco que não mudou continua sendo o MESMO objeto
+ * de uma edição para outra; o Markdown de cada bloco de topo fica num
+ * cache indexado pelo próprio nó, e só o bloco editado passa de novo pelo
+ * turndown. O resultado é idêntico ao da conversão do documento inteiro
+ * (há teste que compara os dois).
+ *
+ * Um serializador por editor: o cache pertence a um documento.
+ */
+export interface DocSerializer {
+  (doc: PMNode, schema: Schema): string;
+  /**
+   * Converte blocos ainda fora do cache até `deadline` (em
+   * `performance.now()`), para adiantar o trabalho com a janela livre.
+   * Devolve `true` quando não sobrou bloco por converter.
+   */
+  warm(doc: PMNode, schema: Schema, deadline: number): boolean;
+}
+
+export function createDocSerializer(): DocSerializer {
+  const cache = new WeakMap<PMNode, string>();
+  const markdownOf = (block: PMNode, schema: Schema): string => {
+    let markdown = cache.get(block);
+    if (markdown === undefined) {
+      markdown = blockMarkdown(getHTMLFromFragment(Fragment.from(block), schema));
+      cache.set(block, markdown);
+    }
+    return markdown;
+  };
+
+  const serialize = ((doc: PMNode, schema: Schema) => {
+    const blocks: string[] = [];
+    doc.forEach((block) => {
+      const markdown = markdownOf(block, schema);
+      if (markdown) blocks.push(markdown);
+    });
+    // Os mesmos cortes que o turndown e o `htmlToMarkdown` fazem nas
+    // pontas do documento inteiro.
+    return finishMarkdown(
+      blocks.join("\n\n").replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, ""),
+    );
+  }) as DocSerializer;
+
+  serialize.warm = (doc, schema, deadline) => {
+    for (let i = 0; i < doc.childCount; i++) {
+      const block = doc.child(i);
+      if (cache.has(block)) continue;
+      if (performance.now() >= deadline) return false;
+      markdownOf(block, schema);
+    }
+    return true;
+  };
+
+  return serialize;
+}
+
+const BLOCK_EDGE = "solonblockedge";
+
+/**
+ * Markdown de um bloco de topo exatamente como ele sai no meio do
+ * documento inteiro. Convertido sozinho, o turndown apara as pontas do
+ * bloco, e um parágrafo que termina em quebra de linha perdia os dois
+ * espaços finais que a conversão completa mantém. Um parágrafo marcador
+ * de cada lado deixa o bloco no meio, e o texto entre os marcadores é o
+ * trecho que a conversão completa produziria.
+ */
+function blockMarkdown(html: string): string {
+  const edge = `<p>${BLOCK_EDGE}</p>`;
+  const wrapped = turndownEditorHtml(edge + html + edge);
+  const inner = wrapped
+    .slice(BLOCK_EDGE.length, wrapped.length - BLOCK_EDGE.length)
+    .replace(/^\n\n/, "")
+    .replace(/\n\n$/, "");
+  return repairEscapedInlineMarks(inner);
 }
