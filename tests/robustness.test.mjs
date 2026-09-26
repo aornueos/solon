@@ -16,6 +16,7 @@ import {
 import { resolveTabDrop } from "../src/lib/tabDrop.ts";
 import { htmlAsPlainText } from "../src/lib/exportText.ts";
 import { localImagePath } from "../src/lib/editorImages.ts";
+import { dataUrlToBlob } from "../src/lib/canvasImages.ts";
 import {
   collectExpandedRelPaths,
   expandedAbsolutePaths,
@@ -196,6 +197,18 @@ describe("imagem da nota — caminho no disco", () => {
     assert.equal(localImagePath("https://site.com/a.png", "/proj/cap.md"), null);
     assert.equal(localImagePath("data:image/png;base64,xx", "/proj/cap.md"), null);
     assert.equal(localImagePath("notas/segredo.txt", "/proj/cap.md"), null);
+  });
+});
+
+describe("canvas — imagem colada como data:", () => {
+  it("vira Blob sem passar pela rede", async () => {
+    const png = dataUrlToBlob("data:image/png;base64,iVBORw0KGgo=");
+    assert.equal(png.type, "image/png");
+    assert.deepEqual([...new Uint8Array(await png.arrayBuffer())].slice(0, 4), [0x89, 0x50, 0x4e, 0x47]);
+    const svg = dataUrlToBlob("data:image/svg+xml,%3Csvg%2F%3E");
+    assert.equal(svg.type, "image/svg+xml");
+    assert.equal(await svg.text(), "<svg/>");
+    assert.equal(dataUrlToBlob("https://x.com/a.png"), null);
   });
 });
 

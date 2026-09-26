@@ -143,6 +143,28 @@ function mimeFromExt(src: string): string {
 }
 
 /**
+ * `data:image/...` em Blob, sem `fetch`: a CSP do app (`connect-src`) não
+ * deixa o `fetch` abrir `data:`, e a imagem colada assim falhava.
+ */
+export function dataUrlToBlob(url: string): Blob | null {
+  const match = url.match(/^data:([^;,]*)((?:;[^;,]*)*),(.*)$/s);
+  if (!match) return null;
+  const mime = match[1] || "text/plain";
+  const isBase64 = /;base64/i.test(match[2]);
+  try {
+    if (isBase64) {
+      const binary = atob(match[3].replace(/\s+/g, ""));
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new Blob([bytes], { type: mime });
+    }
+    return new Blob([decodeURIComponent(match[3])], { type: mime });
+  } catch {
+    return null;
+  }
+}
+
+/**
  * URL de exibição de uma imagem pelo caminho completo no disco: a que a
  * nota referencia por conta própria ("imagens/capa.png", uma foto em
  * outra pasta), fora de `.solon/assets`. Usa o mesmo cache das outras.

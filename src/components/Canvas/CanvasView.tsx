@@ -17,7 +17,7 @@ import {
   type SidebarSceneDropDetail,
 } from "../../types/canvas";
 import { readSceneSnapshot } from "../../lib/sceneSnapshot";
-import { saveImageForCanvas } from "../../lib/canvasImages";
+import { dataUrlToBlob, saveImageForCanvas } from "../../lib/canvasImages";
 import { startDrag } from "../../lib/drag";
 import { textRect } from "../../lib/canvasGeom";
 import {
@@ -511,9 +511,16 @@ export function CanvasView() {
 
       e.preventDefault();
       try {
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const blob = await resp.blob();
+        let blob: Blob;
+        if (url.startsWith("data:")) {
+          const decoded = dataUrlToBlob(url);
+          if (!decoded) throw new Error("Imagem inválida");
+          blob = decoded;
+        } else {
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          blob = await resp.blob();
+        }
         if (!blob.type.startsWith("image/")) throw new Error("Conteúdo não é imagem");
         const ext = (blob.type.split("/")[1] || "png").split("+")[0];
         await placeImageFile(new File([blob], `colada.${ext}`, { type: blob.type }));
@@ -521,7 +528,7 @@ export function CanvasView() {
         console.error("Erro ao baixar imagem da web:", err);
         pushToast(
           "error",
-          'Não foi possível baixar a imagem da web (rede/CORS). Dica: botão direito na imagem → "Copiar imagem", depois cole.',
+          'Não deu para baixar a imagem da web. Clique com o botão direito nela → "Copiar imagem" e cole de novo.',
         );
       }
     };
