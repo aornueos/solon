@@ -1,38 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
-import Document from "@tiptap/extension-document";
-import Paragraph from "@tiptap/extension-paragraph";
-import Text from "@tiptap/extension-text";
-import Heading from "@tiptap/extension-heading";
-import Bold from "@tiptap/extension-bold";
-import Italic from "@tiptap/extension-italic";
-import Strike from "@tiptap/extension-strike";
-import Blockquote from "@tiptap/extension-blockquote";
-import BulletList from "@tiptap/extension-bullet-list";
-import OrderedList from "@tiptap/extension-ordered-list";
-import ListItem from "@tiptap/extension-list-item";
-import Code from "@tiptap/extension-code";
-import CodeBlock from "@tiptap/extension-code-block";
-import HorizontalRule from "@tiptap/extension-horizontal-rule";
-import History from "@tiptap/extension-history";
-import Placeholder from "@tiptap/extension-placeholder";
-import Typography from "@tiptap/extension-typography";
-import CharacterCount from "@tiptap/extension-character-count";
-import Table from "@tiptap/extension-table";
-import TableRow from "@tiptap/extension-table-row";
-import TableCell from "@tiptap/extension-table-cell";
-import TableHeader from "@tiptap/extension-table-header";
-import TextAlign from "@tiptap/extension-text-align";
-import Highlight from "@tiptap/extension-highlight";
-import { IndentExtension } from "./IndentExtension";
-import { ListExitExtension } from "./ListExitExtension";
-import { SmartDashesExtension } from "./SmartDashesExtension";
-import { HeadingNavExtension } from "./HeadingNavExtension";
-import { WikilinkExtension } from "./WikilinkExtension";
-import {
-  CollapsibleHeadingsExtension,
-  revealCollapsedAt,
-} from "./CollapsibleHeadingsExtension";
+import { createEditorExtensions } from "./editorExtensions";
+import { revealCollapsedAt } from "./CollapsibleHeadingsExtension";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import {
   EDITOR_INDENT_SIZES,
@@ -50,10 +19,7 @@ import { setCurrentEditor, setEditorFlush } from "../../lib/editorRef";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { ensureSpellchecker } from "../../lib/spellcheck";
 import { FindBar } from "./FindBar";
-import { SpellcheckExtension } from "./SpellcheckExtension";
-import { FindHighlightExtension } from "./FindHighlightExtension";
 import { WikilinkAutocomplete } from "./WikilinkAutocomplete";
-import { EditorImageExtension } from "./EditorImageExtension";
 import { resolveEditorImageHtml, saveImageForEditor } from "../../lib/editorImages";
 import { loadSnippets } from "../../lib/snippets";
 
@@ -309,64 +275,7 @@ export function Editor() {
   };
 
   const editor = useEditor({
-    extensions: [
-      Document,
-      Paragraph,
-      Text,
-      Heading.configure({ levels: [1, 2, 3, 4, 5, 6] }),
-      Bold,
-      Italic,
-      Strike,
-      Blockquote,
-      BulletList,
-      OrderedList,
-      ListItem,
-      Code,
-      CodeBlock,
-      HorizontalRule,
-      History,
-      Typography,
-      CharacterCount,
-      SpellcheckExtension,
-      FindHighlightExtension,
-      WikilinkExtension,
-      // Ordem: HeadingNav ANTES de IndentExtension. Ambos respondem a
-      // Tab/Shift+Tab; TipTap testa em ordem e o primeiro que retornar
-      // `true` consome o evento. HeadingNav só age se cursor esta em
-      // heading; senao retorna false e o Indent assume.
-      HeadingNavExtension,
-      CollapsibleHeadingsExtension,
-      IndentExtension,
-      ListExitExtension,
-      SmartDashesExtension,
-      Table.configure({ resizable: true, HTMLAttributes: { class: "solon-table" } }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      // Alinhamento de texto: paragrafos + headings. Default 'left' não
-      // é explicitamente settado (vira null/undefined no atributo) pra
-      // que markdown sem alinhamento permaneca markdown sem alinhamento.
-      TextAlign.configure({
-        types: ["heading", "paragraph"],
-        alignments: ["left", "center", "right", "justify"],
-        defaultAlignment: "left",
-      }),
-      // Highlight (grifo) com cores. `multicolor: true` permite marcar
-      // texto com cor especifica via setHighlight({ color: '#...' });
-      // `false` só permite toggle on/off (cor padrão). Queremos cores.
-      Highlight.configure({
-        multicolor: true,
-        HTMLAttributes: { class: "solon-mark" },
-      }),
-      // Placeholder vazio — o user não queria a frase "Comece a escrever
-      // sua historia..." aparecendo. Mantemos a Extension instalada
-      // (é lightweight) caso queiramos placeholders dinamicos por nota
-      // Sem título derivado do frontmatter ainda; fica em branco.
-      EditorImageExtension,
-      Placeholder.configure({
-        placeholder: "",
-      }),
-    ],
+    extensions: createEditorExtensions(),
     content: "",
     editorProps: {
       attributes: {
@@ -666,7 +575,8 @@ export function Editor() {
     };
   }, [editor, typewriterMode]);
 
-  // Click em wikilinks abre a nota correspondente.
+  // Click em wikilinks abre a nota correspondente; em link comum, só com
+  // Ctrl/Cmd e fora do app.
   useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom;
@@ -692,6 +602,18 @@ export function Editor() {
         }
         return;
       }
+      // Link comum: nunca navega dentro da janela — no Tauri isso trocaria
+      // o app pela página. Clique simples só posiciona o cursor (edição);
+      // Ctrl/Cmd+clique abre no navegador do sistema.
+      const link = target?.closest("a[href]") as HTMLAnchorElement | null;
+      if (!link) return;
+      e.preventDefault();
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const href = link.getAttribute("href") ?? "";
+      if (!/^(https?:|mailto:)/i.test(href)) return;
+      void import("@tauri-apps/plugin-opener")
+        .then(({ openUrl }) => openUrl(href))
+        .catch(() => window.open(href, "_blank", "noopener,noreferrer"));
     };
     dom.addEventListener("click", onClick);
     return () => dom.removeEventListener("click", onClick);

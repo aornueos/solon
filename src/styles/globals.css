@@ -1506,6 +1506,43 @@ select:focus-visible {
   text-decoration-style: solid;
 }
 
+/* Link comum `[texto](url)`: sublinhado contínuo, na cor do texto — o
+   accent fica para o wikilink, que navega dentro do projeto. Clique só
+   posiciona o cursor; Ctrl+clique abre fora do app. */
+.ProseMirror a[href] {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--text-muted);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: text;
+}
+
+/* Comentário HTML `<!-- nota -->`: nota para quem escreve, fora do fluxo
+   do texto. Discreto, não editável aqui (fica igual no arquivo). */
+.ProseMirror .solon-html-comment {
+  margin: 0.5em 0;
+  padding: 0.15em 0 0.15em 0.75em;
+  border-left: 2px dashed var(--border-strong);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.8em;
+  white-space: pre-wrap;
+  user-select: none;
+}
+.ProseMirror .solon-html-comment-inline {
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.8em;
+  border-bottom: 1px dashed var(--border-strong);
+  user-select: none;
+}
+.ProseMirror .solon-html-comment-inline.ProseMirror-selectednode,
+.ProseMirror .solon-html-comment.ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* Headings colapsáveis (CollapsibleHeadingsExtension). O estado de fold
    vive no plugin — aqui é só o visual. */
 .ProseMirror .solon-collapsed-hidden {
@@ -1954,6 +1991,33 @@ select:focus-visible {
   padding-left: 0.25rem;
 }
 .ProseMirror li::marker {
+  color: var(--text-muted);
+}
+
+/* Lista de tarefas `- [ ]`: a caixinha substitui o marcador. */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.25rem;
+}
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  padding-left: 0;
+}
+.ProseMirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  user-select: none;
+}
+.ProseMirror ul[data-type="taskList"] li > label input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
   color: var(--text-muted);
 }
 

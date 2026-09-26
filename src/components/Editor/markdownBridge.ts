@@ -1,4 +1,4 @@
-import { marked } from "marked";
+import { marked, type Tokens } from "marked";
 import TurndownService from "turndown";
 // `turndown-plugin-gfm` não publica tipos; a shim fica em `src/types/shims.d.ts`.
 import { gfm, tables, strikethrough } from "turndown-plugin-gfm";
@@ -129,6 +129,105 @@ marked.setOptions({
   pedantic: false,
 });
 
+/** Comentário HTML sozinho num bloco: `<!-- nota -->`. */
+const BLOCK_COMMENT_RE = /^\s*<!--([\s\S]*?)-->\s*$/;
+
+/**
+ * O texto do comentário viaja codificado no atributo: o DOMPurify corta
+ * espaço das pontas de todo atributo (e "<!-- nota -->" voltaria como
+ * "<!--nota-->") e descarta atributo com "-->" dentro.
+ */
+export function encodeCommentText(text: string): string {
+  return encodeURIComponent(text);
+}
+
+export function decodeCommentText(encoded: string | null): string {
+  if (!encoded) return "";
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    return encoded;
+  }
+}
+
+type ListToken = Tokens.List;
+type ListItemToken = Tokens.ListItem;
+
+/** Primeiro token de texto do item, onde entra o marcador `[ ]`. */
+function prependToItemText(item: ListItemToken, prefix: string): void {
+  const first = item.tokens[0] as (Tokens.Text | Tokens.Paragraph | undefined);
+  if (first && (first.type === "text" || first.type === "paragraph")) {
+    first.text = prefix + first.text;
+    const inner = first.tokens?.[0];
+    if (inner && inner.type === "text") {
+      (inner as Tokens.Text).text = prefix + (inner as Tokens.Text).text;
+    }
+    return;
+  }
+  item.tokens.unshift({ type: "text", raw: prefix, text: prefix } as Tokens.Text);
+}
+
+// Renderizadores no formato que o schema do editor entende. Devolver
+// `false` cai no renderizador padrão do marked.
+marked.use({
+  renderer: {
+    // Lista de tarefas vira o `taskList` do TipTap. Lista mista (tarefa e
+    // item comum juntos) não tem nó no editor: o marcador fica como texto
+    // "[ ] " e volta igual ao salvar.
+    list(token: ListToken) {
+      const tasks = token.items.filter((item) => item.task).length;
+      if (tasks === 0) return false;
+      if (token.ordered || tasks !== token.items.length) {
+        for (const item of token.items) {
+          if (!item.task) continue;
+          item.task = false;
+          prependToItemText(item, item.checked ? "[x] " : "[ ] ");
+        }
+        return false;
+      }
+      const body = token.items
+        .map((item) => {
+          const [first, ...rest] = item.tokens;
+          const lead =
+            first && (first.type === "text" || first.type === "paragraph")
+              ? `<p>${this.parser.parseInline((first as Tokens.Text).tokens ?? [first])}</p>`
+              : this.parser.parse(first ? [first] : []);
+          const nested = rest.length ? this.parser.parse(rest) : "";
+          return `<li data-type="taskItem" data-checked="${item.checked ? "true" : "false"}">${lead}${nested}</li>\n`;
+        })
+        .join("");
+      return `<ul data-type="taskList">\n${body}</ul>\n`;
+    },
+    // Alinhamento de coluna (`:-:`, `--:`) vira alinhamento do parágrafo
+    // da célula, que é o que o editor guarda.
+    tablecell(token: Tokens.TableCell) {
+      if (token.align !== "center" && token.align !== "right") return false;
+      const type = token.header ? "th" : "td";
+      const content = this.parser.parseInline(token.tokens);
+      return `<${type}><p style="text-align: ${token.align}">${content}</p></${type}>\n`;
+    },
+    // Comentário vira nó do editor em vez de sumir: bloco quando está
+    // numa linha própria, inline quando está no meio do texto.
+    html(token: Tokens.HTML | Tokens.Tag) {
+      const match = token.text.match(BLOCK_COMMENT_RE);
+      if (!match) return false;
+      const text = encodeCommentText(match[1]);
+      return "block" in token && token.block
+        ? `<div data-solon-comment="${text}"></div>\n`
+        : `<span data-solon-comment="${text}"></span>`;
+    },
+    // Imagem sozinha no parágrafo é bloco no editor; embrulhada em <p> o
+    // editor a tirava do parágrafo e deixava um parágrafo vazio no lugar.
+    paragraph(token: Tokens.Paragraph) {
+      const meaningful = token.tokens.filter(
+        (t) => !(t.type === "text" && !t.raw.trim()),
+      );
+      if (meaningful.length !== 1 || meaningful[0].type !== "image") return false;
+      return `${this.parser.parseInline(meaningful)}\n`;
+    },
+  },
+});
+
 const turndown = new TurndownService({
   headingStyle: "atx",
   bulletListMarker: "-",
@@ -180,16 +279,59 @@ turndown.escape = function (string: string): string {
   // próprio editor gera. Runs antigos de barras antes de `*` eram a causa
   // do bug visual `\\\\\*` ao trocar de arquivo.
   const escaped = TurndownEscape.call(this, string);
-  return repairEscapedInlineMarks(escaped);
+  return unescapeInertBrackets(repairEscapedInlineMarks(escaped));
 };
+
+/**
+ * O turndown escapa todo colchete, e "[risos]" ia para o arquivo como
+ * "\[risos\]" — e a nota de rodapé "[^1]" como "\[^1\]". Só precisa de
+ * escape o colchete que formaria link: seguido de "(" ou "[", ou uma
+ * definição "[x]: ...". A exceção é "[^n]:", que é definição de rodapé e
+ * não vira link.
+ */
+function unescapeInertBrackets(markdown: string): string {
+  return markdown
+    .replace(/\\\[(\^[^\]\\\n]+)\\\]:/g, "[$1]:")
+    .replace(/\\\[([^\]\\\n]*)\\\](?![(\[:])/g, "[$1]");
+}
 
 // Plugins GFM: tabelas + strike + checkboxes
 turndown.use([gfm, tables, strikethrough]);
+
+/** Item de lista ao qual o parágrafo pertence (direto ou dentro do
+ *  `<div>` do item de tarefa), ou null. */
+function owningListItem(node: HTMLElement): HTMLElement | null {
+  const parent = node.parentNode as HTMLElement | null;
+  if (!parent) return null;
+  if (parent.nodeName === "LI") return parent;
+  const grand = parent.parentNode as HTMLElement | null;
+  if (parent.nodeName === "DIV" && grand?.nodeName === "LI") return grand;
+  return null;
+}
+
+function paragraphCount(container: HTMLElement): number {
+  let count = 0;
+  for (const child of Array.from(container.childNodes)) {
+    if (child.nodeName === "P") count += 1;
+    if (child.nodeName === "DIV") count += paragraphCount(child as HTMLElement);
+  }
+  return count;
+}
 
 turndown.addRule("paragraphStrip", {
   filter: "p",
   replacement: (content, node) => {
     const el = node as HTMLElement;
+    const parentName = el.parentNode?.nodeName;
+    // Célula de tabela: tudo numa linha só, senão a tabela quebra.
+    if (parentName === "TH" || parentName === "TD") {
+      return content.replace(/\n+/g, " ").trim() + (el.nextElementSibling ? "<br>" : "");
+    }
+    // Item com um parágrafo só fica compacto ("- item"), como no
+    // arquivo original; com mais de um, os parágrafos se separam.
+    const item = owningListItem(el);
+    if (item && paragraphCount(item) === 1) return content;
+
     const indented = el.getAttribute("data-indent") === "true";
     const prefix = indented ? EM_SPACE : "";
     // TextAlign: emite HTML literal quando ha alinhamento custom.
@@ -198,6 +340,87 @@ turndown.addRule("paragraphStrip", {
       return `\n\n<p style="text-align: ${align}">${prefix}${content}</p>\n\n`;
     }
     return `\n\n${prefix}${content}\n\n`;
+  },
+});
+
+/** Marcador + recuo das linhas seguintes, no padrão CommonMark. */
+function listItemMarkdown(content: string, marker: string, node: HTMLElement): string {
+  const indent = " ".repeat(marker.length);
+  const body = content
+    .replace(/^\n+/, "")
+    .replace(/\n+$/, "\n")
+    .replace(/\n(?!$)/g, `\n${indent}`);
+  const tail = node.nextSibling && !/\n$/.test(body) ? "\n" : "";
+  return marker + body + tail;
+}
+
+// Item de lista compacto: "- item" e "1. item" em vez do "-   item" com
+// linha em branco entre itens que o turndown produz por padrão. Respeita
+// o número inicial da lista ("5. quinto").
+turndown.addRule("listItemCompact", {
+  filter: (node) =>
+    node.nodeName === "LI" && (node as HTMLElement).getAttribute("data-type") !== "taskItem",
+  replacement: (content, node) => {
+    const el = node as HTMLElement;
+    const parent = el.parentNode as HTMLElement;
+    let marker = "- ";
+    if (parent.nodeName === "OL") {
+      const start = Number(parent.getAttribute("start") ?? "1") || 1;
+      const index = Array.prototype.indexOf.call(parent.children, el);
+      marker = `${start + index}. `;
+    }
+    return listItemMarkdown(content, marker, el);
+  },
+});
+
+turndown.addRule("taskItem", {
+  filter: (node) =>
+    node.nodeName === "LI" && (node as HTMLElement).getAttribute("data-type") === "taskItem",
+  replacement: (content, node) => {
+    const el = node as HTMLElement;
+    const checked = el.getAttribute("data-checked") === "true";
+    return listItemMarkdown(content, checked ? "- [x] " : "- [ ] ", el);
+  },
+});
+
+// A caixinha visível do item de tarefa: o estado já vai no marcador.
+turndown.addRule("taskItemCheckbox", {
+  filter: (node) =>
+    node.nodeName === "LABEL" &&
+    (node.parentNode as HTMLElement | null)?.getAttribute?.("data-type") === "taskItem",
+  replacement: () => "",
+});
+
+// O plugin GFM escreve tachado com um til só (`~x~`). É válido, mas muda
+// o arquivo de quem escreveu `~~x~~`, que é a forma comum.
+turndown.addRule("strikeDouble", {
+  filter: (node) => ["DEL", "S", "STRIKE"].includes(node.nodeName),
+  replacement: (content) => `~~${content}~~`,
+});
+
+turndown.addRule("underline", {
+  filter: "u",
+  replacement: (content) => `<u>${content}</u>`,
+});
+
+// `<https://site>` volta como autolink em vez de `[https://site](https://site)`.
+turndown.addRule("autolink", {
+  filter: (node) => {
+    if (node.nodeName !== "A") return false;
+    const el = node as HTMLElement;
+    const href = el.getAttribute("href");
+    return !!href && !el.getAttribute("title") && el.textContent === href;
+  },
+  replacement: (_, node) => `<${(node as HTMLElement).getAttribute("href")}>`,
+});
+
+turndown.addRule("htmlComment", {
+  filter: (node) =>
+    (node.nodeName === "DIV" || node.nodeName === "SPAN") &&
+    (node as HTMLElement).hasAttribute("data-solon-comment"),
+  replacement: (_, node) => {
+    const text = decodeCommentText((node as HTMLElement).getAttribute("data-solon-comment"));
+    return node.nodeName === "DIV" ? `\n\n<!--${text}-->\n\n` : `<!--${text}-->`;
   },
 });
 
@@ -291,6 +514,11 @@ export const ALLOWED_TAGS = [
   // colorido seria stripado no save/load roundtrip.
   "mark",
   "img",
+  "u",
+  // Comentário HTML (`HtmlCommentNode`) viaja como <div>/<span>
+  // data-solon-comment.
+  "div",
+  "span",
   // <a> pra wikilinks (mark `[[name]]`). Roundtrip emite back pra
   // `[[name]]`; durante a edição o WikilinkExtension reconhece o
   // <a.wikilink>.
@@ -332,6 +560,15 @@ export const ALLOWED_ATTR = [
   "alt",
   "title",
   "role",
+  // Link comum. O DOMPurify já barra protocolos perigosos (javascript:,
+  // data: em href); http(s), mailto e caminhos relativos passam.
+  "href",
+  // Lista numerada que não começa em 1.
+  "start",
+  // Lista de tarefas e comentário HTML.
+  "data-type",
+  "data-checked",
+  "data-solon-comment",
 ];
 
 function sanitizeEditorHtml(html: string): string {
@@ -345,8 +582,9 @@ function sanitizeEditorHtml(html: string): string {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     // `style` saiu do FORBID porque virou whitelist (suporta text-align
-    // e highlight color). Mantemos os outros vetores classicos de XSS.
-    FORBID_ATTR: ["srcdoc", "href", "onerror", "onload"],
+    // e highlight color); `href` saiu quando o editor ganhou link comum.
+    // Mantemos os outros vetores classicos de XSS.
+    FORBID_ATTR: ["srcdoc", "onerror", "onload"],
   });
 }
 
@@ -462,7 +700,27 @@ export function markdownToHtml(md: string): string {
     new RegExp(`<p([^>]*)>${EM_SPACE}`, "g"),
     '<p data-indent="true"$1>',
   );
-  return normalizeNestedMarks(sanitizeEditorHtml(withIndent));
+  // Parágrafo vazio guardado como `<p><br></p>`: com o nó de quebra de
+  // linha no editor, o <br> viraria uma quebra dentro do parágrafo (duas
+  // linhas de altura). Vazio de verdade é `<p></p>`.
+  const withEmptyParagraphs = withIndent.split(EMPTY_PARAGRAPH_HTML).join("<p></p>");
+  return normalizeNestedMarks(sanitizeEditorHtml(withEmptyParagraphs));
+}
+
+/**
+ * Ajustes no HTML do editor antes do turndown:
+ * - `<colgroup>` das tabelas do editor impedia o plugin GFM de reconhecer
+ *   a linha de cabeçalho, e a tabela ia para o arquivo como HTML cru;
+ * - alinhamento centralizado/à direita do parágrafo da célula de
+ *   cabeçalho vira `align` da coluna (`:-:`, `--:`).
+ */
+function prepareEditorHtml(html: string): string {
+  return html
+    .replace(/<colgroup>[\s\S]*?<\/colgroup>/g, "")
+    .replace(
+      /<th([^>]*)>(\s*<p[^>]*style="[^"]*text-align:\s*(center|right)[^"]*")/g,
+      '<th$1 align="$3">$2',
+    );
 }
 
 export function htmlToMarkdown(html: string): string {
@@ -471,7 +729,7 @@ export function htmlToMarkdown(html: string): string {
   // padrão porque ele considera EM SPACE como whitespace e come o
   // marker de indent do primeiro paragrafo.
   const markdown = turndown
-    .turndown(protectEditorSpaces(html))
+    .turndown(protectEditorSpaces(prepareEditorHtml(html)))
     .replace(/^[\n ]+/, "")
     .replace(/[\n ]+$/, "\n");
   return repairEscapedInlineMarks(markdown);

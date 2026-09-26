@@ -336,7 +336,10 @@ describe("editor markdown bridge", () => {
   it("preserves empty paragraphs used as visual spacing", () => {
     const md = htmlToMarkdown("<p>Um</p><p></p><p>Dois</p>");
     assert.match(md, /Um\n\n<p><br><\/p>\n\nDois/);
-    assert.match(markdownToHtml(md), /<p>Um<\/p>\n<p><br><\/p>\n+<p>Dois<\/p>/);
+    // Para o editor o vazio vai como `<p></p>`: com o nó de quebra de
+    // linha no schema, `<p><br></p>` viraria um parágrafo com uma quebra
+    // dentro (duas linhas de altura). No arquivo continua `<p><br></p>`.
+    assert.match(markdownToHtml(md), /<p>Um<\/p>\n<p><\/p>\n+<p>Dois<\/p>/);
   });
 
   it("preserves empty paragraphs represented with br", () => {
