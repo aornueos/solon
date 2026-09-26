@@ -1,15 +1,10 @@
-import {
-  forwardRef,
-  useEffect,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { Columns2, ExternalLink, GripVertical, PanelRight, X } from "lucide-react";
-import { useAppStore, type TabInsertPlacement } from "../../store/useAppStore";
+import { useAppStore, type OpenTab } from "../../store/useAppStore";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { flushEditor } from "../../lib/editorRef";
-import { readDraggedTab, TAB_DND_MIME } from "../../lib/tabs";
+import { startDrag } from "../../lib/drag";
+import { resolveTabDrop, TAB_SPLIT_HINT_EVENT, type TabDropTarget } from "../../lib/tabDrop";
 import { openTabInNewWindow } from "../../lib/windows";
 import clsx from "clsx";
 
@@ -49,6 +44,7 @@ export function TabBar() {
   const activeTabRef = useRef<HTMLDivElement | null>(null);
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+  const suppressClickRef = useRef(false);
   useEffect(() => {
     const el = activeTabRef.current;
     if (!el) return;
@@ -75,75 +71,6 @@ export function TabBar() {
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
-
-  const beginPointerReorder = (
-    event: ReactPointerEvent<HTMLElement>,
-    sourcePath: string,
-  ) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-
-    const pointerId = event.pointerId;
-    const originalCursor = document.body.style.cursor;
-    const originalUserSelect = document.body.style.userSelect;
-
-    document.body.style.cursor = "grabbing";
-    document.body.style.userSelect = "none";
-    setDraggingPath(sourcePath);
-    setDropTargetPath(null);
-
-    const cleanup = () => {
-      document.body.style.cursor = originalCursor;
-      document.body.style.userSelect = originalUserSelect;
-      setDraggingPath(null);
-      setDropTargetPath(null);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("pointercancel", onPointerUp);
-    };
-
-    const reorderAt = (clientX: number, clientY: number) => {
-      const container = containerRef.current;
-      if (container) {
-        const rect = container.getBoundingClientRect();
-        if (clientX < rect.left + 28) container.scrollLeft -= 14;
-        if (clientX > rect.right - 28) container.scrollLeft += 14;
-      }
-
-      const target = document
-        .elementsFromPoint(clientX, clientY)
-        .map((el) => (el as HTMLElement).closest?.("[data-tab-path]"))
-        .find((el): el is HTMLElement => !!el);
-      const targetPath = target?.dataset.tabPath;
-      if (!targetPath || targetPath === sourcePath) {
-        setDropTargetPath(null);
-        return;
-      }
-
-      const rect = target.getBoundingClientRect();
-      const placement: TabInsertPlacement =
-        clientX > rect.left + rect.width / 2 ? "after" : "before";
-      setDropTargetPath(targetPath);
-      reorderTab(sourcePath, targetPath, placement);
-    };
-
-    function onPointerMove(moveEvent: PointerEvent) {
-      if (moveEvent.pointerId !== pointerId) return;
-      moveEvent.preventDefault();
-      reorderAt(moveEvent.clientX, moveEvent.clientY);
-    }
-
-    function onPointerUp(upEvent: PointerEvent) {
-      if (upEvent.pointerId !== pointerId) return;
-      upEvent.preventDefault();
-      cleanup();
-    }
-
-    window.addEventListener("pointermove", onPointerMove, { passive: false });
-    window.addEventListener("pointerup", onPointerUp);
-    window.addEventListener("pointercancel", onPointerUp);
-  };
 
   if (tabs.length === 0) return null;
 
@@ -188,6 +115,124 @@ export function TabBar() {
         .getState()
         .pushToast("error", `Não foi possível abrir nova janela: ${String(err)}`);
     }
+  };
+
+  // Arraste por mouse da aba inteira (mousedown → mousemove → mouseup),
+  // como no explorador. O drag-and-drop nativo do HTML5 falha no webview do
+  // Tauri no Windows, e a aba só se movia pela alça. Na barra, reordena ao
+  // vivo; na metade direita da área principal, abre como painel de
+  // referência; solta fora da janela, vira uma janela própria.
+  const startTabDrag = (e: React.MouseEvent<HTMLElement>, tab: OpenTab) => {
+    if (e.button !== 0) return;
+
+    const originX = e.clientX;
+    const originY = e.clientY;
+    let dragging = false;
+    let ghost: HTMLDivElement | null = null;
+
+    const probeAt = (x: number, y: number): TabDropTarget => {
+      const elements = document.elementsFromPoint(x, y);
+      const tabEl = elements
+        .map((el) => (el as HTMLElement).closest?.<HTMLElement>("[data-tab-path]"))
+        .find((el): el is HTMLElement => !!el);
+      const zoneEl = elements
+        .map((el) => (el as HTMLElement).closest?.<HTMLElement>("[data-tab-split-zone]"))
+        .find((el): el is HTMLElement => !!el);
+      const tabRect = tabEl?.getBoundingClientRect();
+      const zoneRect = zoneEl?.getBoundingClientRect();
+      return resolveTabDrop({
+        x,
+        y,
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        sourcePath: tab.path,
+        tab:
+          tabEl && tabRect
+            ? { path: tabEl.dataset.tabPath ?? "", left: tabRect.left, width: tabRect.width }
+            : null,
+        overTabBar: elements.some((el) => containerRef.current?.contains(el)),
+        splitZone: zoneRect ? { left: zoneRect.left, width: zoneRect.width } : null,
+      });
+    };
+
+    const showSplitHint = (active: boolean) => {
+      window.dispatchEvent(new CustomEvent(TAB_SPLIT_HINT_EVENT, { detail: { active } }));
+    };
+
+    const finish = () => {
+      document.documentElement.classList.remove("solon-dragging");
+      ghost?.remove();
+      ghost = null;
+      showSplitHint(false);
+      setDraggingPath(null);
+      setDropTargetPath(null);
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+    };
+
+    startDrag({
+      onMove: (ev) => {
+        if (!dragging && Math.hypot(ev.clientX - originX, ev.clientY - originY) < 5) return;
+        if (!dragging) {
+          dragging = true;
+          suppressClickRef.current = true;
+          setDraggingPath(tab.path);
+          document.documentElement.classList.add("solon-dragging");
+        }
+        ev.preventDefault();
+
+        const container = containerRef.current;
+        const barRect = container?.getBoundingClientRect();
+        const inBar =
+          !!barRect &&
+          ev.clientY >= barRect.top &&
+          ev.clientY <= barRect.bottom &&
+          ev.clientX >= barRect.left &&
+          ev.clientX <= barRect.right;
+        if (container && barRect && inBar) {
+          if (ev.clientX < barRect.left + 28) container.scrollLeft -= 14;
+          if (ev.clientX > barRect.right - 28) container.scrollLeft += 14;
+        }
+
+        // Na barra a própria aba anda sob o cursor; fora dela, uma
+        // etiqueta com o nome acompanha o arraste.
+        if (!inBar && !ghost) {
+          ghost = document.createElement("div");
+          ghost.className = "solon-drag-ghost";
+          ghost.textContent = stripExtension(tab.name);
+          document.body.appendChild(ghost);
+        } else if (inBar && ghost) {
+          ghost.remove();
+          ghost = null;
+        }
+        if (ghost) {
+          ghost.style.transform = `translate(${ev.clientX + 12}px, ${ev.clientY + 10}px)`;
+        }
+
+        const target = probeAt(ev.clientX, ev.clientY);
+        showSplitHint(target?.kind === "split");
+        if (target?.kind === "reorder") {
+          setDropTargetPath(target.path);
+          reorderTab(tab.path, target.path, target.placement);
+        } else {
+          setDropTargetPath(null);
+        }
+      },
+      onEnd: (ev) => {
+        if (!dragging) return;
+        ev.preventDefault();
+        const target = probeAt(ev.clientX, ev.clientY);
+        finish();
+        if (target?.kind === "split") {
+          setSplitPane({ kind: "reference", path: tab.path, name: tab.name });
+        } else if (target?.kind === "detach") {
+          void detachToNewWindow(tab.path, tab.name);
+        }
+      },
+      onCancel: () => {
+        if (dragging) finish();
+      },
+    });
   };
 
   const onTabContextMenu = (e: React.MouseEvent, path: string, name: string) => {
@@ -248,22 +293,20 @@ export function TabBar() {
             isActive={isActive}
             isDirty={isDirty}
             path={tab.path}
-            onActivate={() => onActivate(tab.path, tab.name)}
+            onActivate={() => {
+              // O mouseup de um arraste que termina na própria aba vira
+              // clique; não é para ativar.
+              if (suppressClickRef.current) {
+                suppressClickRef.current = false;
+                return;
+              }
+              onActivate(tab.path, tab.name);
+            }}
             onClose={() => onClose(tab.path)}
-            onReorder={(sourcePath, placement) =>
-              reorderTab(sourcePath, tab.path, placement)
-            }
-            onDetach={() => void detachToNewWindow(tab.path, tab.name)}
             onContextMenu={(e) => onTabContextMenu(e, tab.path, tab.name)}
             dragging={draggingPath === tab.path}
             dropTarget={dropTargetPath === tab.path && draggingPath !== tab.path}
-            onPointerReorderStart={(e) => beginPointerReorder(e, tab.path)}
-            onDragStartPath={() => setDraggingPath(tab.path)}
-            onDragTarget={() => setDropTargetPath(tab.path)}
-            onDragDone={() => {
-              setDraggingPath(null);
-              setDropTargetPath(null);
-            }}
+            onDragStart={(e) => startTabDrag(e, tab)}
           />
         );
       })}
@@ -279,15 +322,10 @@ interface TabProps {
   isDirty: boolean;
   onActivate: () => void;
   onClose: () => void;
-  onReorder: (targetPath: string, placement?: TabInsertPlacement) => void;
-  onDetach: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
   dragging: boolean;
   dropTarget: boolean;
-  onPointerReorderStart: (e: ReactPointerEvent<HTMLElement>) => void;
-  onDragStartPath: () => void;
-  onDragTarget: () => void;
-  onDragDone: () => void;
+  onDragStart: (e: React.MouseEvent<HTMLElement>) => void;
 }
 
 const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
@@ -299,15 +337,10 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
   isDirty,
   onActivate,
   onClose,
-  onReorder,
-  onDetach,
   onContextMenu,
   dragging,
   dropTarget,
-  onPointerReorderStart,
-  onDragStartPath,
-  onDragTarget,
-  onDragDone,
+  onDragStart,
 },
   ref,
 ) {
@@ -317,66 +350,6 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
       data-tab-path={path}
       role="tab"
       aria-selected={isActive}
-      draggable
-      onDragStart={(e) => {
-        onDragStartPath();
-        e.dataTransfer.effectAllowed = "move";
-        const payload = JSON.stringify({ path, name: fullName });
-        e.dataTransfer.setData(TAB_DND_MIME, payload);
-        // Fallback `text/plain` — alguns webviews (incluindo o Tauri
-        // em certas builds) tem restricoes no MIME type custom durante
-        // dragover; ter o text/plain garante que `types.includes` pelo
-        // menos detecta um. O readDraggedTab tenta primeiro o MIME
-        // custom e depois fallback pro plain.
-        try {
-          e.dataTransfer.setData("text/plain", payload);
-        } catch {
-          /* alguns ambientes não permitem setData duplicado */
-        }
-      }}
-      onDragOver={(e) => {
-        // Aceita drag se tem o nosso MIME OU se ha text/plain (fallback
-        // do Tauri webview). preventDefault EH OBRIGATORIO pra que onDrop
-        // dispare — esquecer disso bloqueia silenciosamente o drag.
-        const types = e.dataTransfer.types;
-        if (!types.includes(TAB_DND_MIME) && !types.includes("text/plain")) {
-          return;
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        e.dataTransfer.dropEffect = "move";
-        onDragTarget();
-      }}
-      onDrop={(e) => {
-        const tab = readDraggedTab(e.dataTransfer);
-        if (!tab || tab.path === path) {
-          onDragDone();
-          return;
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        const rect = e.currentTarget.getBoundingClientRect();
-        const placement: TabInsertPlacement =
-          e.clientX > rect.left + rect.width / 2 ? "after" : "before";
-        onReorder(tab.path, placement);
-        onDragDone();
-      }}
-      onDragEnd={(e) => {
-        // Detach só se o drag terminou GENUINAMENTE fora da janela —
-        // dropEffect = "none" quando o drop foi cancelado ou em lugar
-        // inválido; "move" quando o reorder aconteceu (então não
-        // detach). Coordenadas (0,0) ou negativas as vezes aparecem em
-        // cancelamentos no Tauri webview e disparariam detach falso.
-        const droppedSomewhere = e.dataTransfer.dropEffect === "move";
-        const outsideWindow =
-          e.clientX > 0 &&
-          e.clientY > 0 &&
-          (e.clientX > window.innerWidth || e.clientY > window.innerHeight);
-        if (!droppedSomewhere && outsideWindow) {
-          onDetach();
-        }
-        onDragDone();
-      }}
       onContextMenu={onContextMenu}
       onMouseDown={(e) => {
         // Middle-click (button=1) fecha a aba. Tratamos no mouseDown pra
@@ -387,7 +360,9 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
           e.preventDefault();
           e.stopPropagation();
           onClose();
+          return;
         }
+        onDragStart(e);
       }}
       onClick={(e) => {
         // Botao ✕ tem stopPropagation próprio, então chegar aqui é click
@@ -428,9 +403,6 @@ const Tab = forwardRef<HTMLDivElement, TabProps>(function Tab(
     >
       <button
         type="button"
-        draggable={false}
-        onPointerDown={onPointerReorderStart}
-        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         className="flex-shrink-0 rounded-sm opacity-50 transition-opacity group-hover:opacity-85"
         style={{

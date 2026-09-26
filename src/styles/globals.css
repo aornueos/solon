@@ -2168,12 +2168,15 @@ select:focus-visible {
   background-color: var(--bg-app);
 }
 
-/* Enquanto arrasta uma nota ou pasta no explorador, forca o cursor
-   "grabbing" em TUDO — senao o `cursor` proprio das linhas (folders =
-   default) revertia a maozinha pra seta ao passar por cima do alvo. Sobre
-   o canvas vira "copy": soltar ali cria um card, a nota fica onde está. */
+/* Enquanto arrasta uma nota ou pasta no explorador (ou uma aba, ou uma
+   seção do Índice), forca o cursor "grabbing" em TUDO — senao o `cursor`
+   proprio das linhas (folders = default) revertia a maozinha pra seta ao
+   passar por cima do alvo. Sobre o canvas vira "copy": soltar ali cria um
+   card, a nota fica onde está. */
 html.solon-tree-dragging,
-html.solon-tree-dragging * {
+html.solon-tree-dragging *,
+html.solon-dragging,
+html.solon-dragging * {
   cursor: grabbing !important;
 }
 html.solon-tree-dragging.solon-tree-drop-canvas,
@@ -2182,7 +2185,8 @@ html.solon-tree-dragging.solon-tree-drop-canvas * {
 }
 
 /* Etiqueta com o nome do item que acompanha o cursor no arraste do
-   explorador — o arraste por mouse não tem a imagem fantasma do HTML5. */
+   explorador e das abas — o arraste por mouse não tem a imagem fantasma
+   do HTML5. */
 .solon-drag-ghost {
   position: fixed;
   top: 0;

@@ -22,7 +22,7 @@ import { ContextMenuProvider } from "./ContextMenuProvider";
 import { ReferencePane } from "./ReferencePane";
 import { Scratchpad } from "./Scratchpad";
 import { startDrag } from "../../lib/drag";
-import { readDraggedTab, TAB_DND_MIME } from "../../lib/tabs";
+import { TAB_SPLIT_HINT_EVENT } from "../../lib/tabDrop";
 import { X } from "lucide-react";
 
 const Editor = lazy(() =>
@@ -51,7 +51,6 @@ export function AppLayout() {
   const toggleReadingMode = useAppStore((s) => s.toggleReadingMode);
   const activeView = useAppStore((s) => s.activeView);
   const splitPane = useAppStore((s) => s.splitPane);
-  const setSplitPane = useAppStore((s) => s.setSplitPane);
   const floatingInspector = useAppStore((s) => s.floatingInspector);
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
   const setOutlineWidth = useAppStore((s) => s.setOutlineWidth);
@@ -152,29 +151,15 @@ export function AppLayout() {
   const renderCurrentView = () =>
     inHome ? <HomePage /> : inCanvas ? <CanvasView /> : <Editor />;
 
-  const onMainDragOver = (e: React.DragEvent) => {
-    if (!e.dataTransfer.types.includes(TAB_DND_MIME)) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const inRightHalf = e.clientX > rect.left + rect.width * 0.55;
-    if (!inRightHalf) {
-      setTabDropHint(false);
-      return;
-    }
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    setTabDropHint(true);
-  };
-
-  const onMainDrop = (e: React.DragEvent) => {
-    const tab = readDraggedTab(e.dataTransfer);
-    if (!tab) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const inRightHalf = e.clientX > rect.left + rect.width * 0.55;
-    setTabDropHint(false);
-    if (!inRightHalf) return;
-    e.preventDefault();
-    setSplitPane({ kind: "reference", path: tab.path, name: tab.name });
-  };
+  // Aviso do arraste de aba (TabBar): soltar na metade direita abre a nota
+  // como painel de referência.
+  useEffect(() => {
+    const onHint = (e: Event) => {
+      setTabDropHint(!!(e as CustomEvent<{ active: boolean }>).detail?.active);
+    };
+    window.addEventListener(TAB_SPLIT_HINT_EVENT, onHint);
+    return () => window.removeEventListener(TAB_SPLIT_HINT_EVENT, onHint);
+  }, []);
 
   const onSidebarMouseDown = useCallback(() => {
     document.body.style.cursor = "col-resize";
@@ -268,9 +253,7 @@ export function AppLayout() {
         <div
           className="flex-1 min-w-0 overflow-hidden flex flex-col"
           style={{ background: "var(--bg-app)" }}
-          onDragOver={onMainDragOver}
-          onDragLeave={() => setTabDropHint(false)}
-          onDrop={onMainDrop}
+          data-tab-split-zone
         >
           {/* TabBar aparece fora da home — na landing não faz sentido,
               e ela já tem chrome próprio. Em focus mode permanece: o

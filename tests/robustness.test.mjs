@@ -13,6 +13,7 @@ import {
   rawParentPath,
   resolveSidebarDrop,
 } from "../src/lib/sidebarDrop.ts";
+import { resolveTabDrop } from "../src/lib/tabDrop.ts";
 import {
   collectExpandedRelPaths,
   expandedAbsolutePaths,
@@ -171,6 +172,46 @@ describe("sidebar folder drops", () => {
       ),
       false,
     );
+  });
+});
+
+describe("abas — destino do arraste", () => {
+  const viewport = { width: 1200, height: 800 };
+  const base = { viewport, sourcePath: "/p/a.md" };
+  const outra = { path: "/p/b.md", left: 200, width: 120 };
+
+  it("sobre outra aba reordena, antes ou depois conforme a metade", () => {
+    assert.deepEqual(resolveTabDrop({ ...base, x: 210, y: 10, tab: outra }), {
+      kind: "reorder",
+      path: "/p/b.md",
+      placement: "before",
+    });
+    assert.deepEqual(resolveTabDrop({ ...base, x: 300, y: 10, tab: outra }), {
+      kind: "reorder",
+      path: "/p/b.md",
+      placement: "after",
+    });
+  });
+
+  it("sobre a própria aba ou no vazio da barra não faz nada", () => {
+    const propria = { path: "/p/a.md", left: 60, width: 120 };
+    assert.equal(resolveTabDrop({ ...base, x: 100, y: 10, tab: propria }), null);
+    assert.equal(
+      resolveTabDrop({ ...base, x: 1000, y: 10, overTabBar: true, splitZone: { left: 0, width: 1200 } }),
+      null,
+    );
+  });
+
+  it("metade direita da área principal abre o painel; a esquerda não", () => {
+    const splitZone = { left: 200, width: 1000 };
+    assert.deepEqual(resolveTabDrop({ ...base, x: 900, y: 400, splitZone }), { kind: "split" });
+    assert.equal(resolveTabDrop({ ...base, x: 600, y: 400, splitZone }), null);
+  });
+
+  it("solta fora da janela, por qualquer lado, vira janela própria", () => {
+    for (const [x, y] of [[-5, 300], [1300, 300], [600, -3], [600, 900]]) {
+      assert.deepEqual(resolveTabDrop({ ...base, x, y }), { kind: "detach" });
+    }
   });
 });
 

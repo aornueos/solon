@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAppStore, HeadingItem } from "../../store/useAppStore";
 import { getCurrentEditor } from "../../lib/editorRef";
+import { startDrag } from "../../lib/drag";
 import clsx from "clsx";
 
 /**
@@ -10,10 +11,11 @@ import clsx from "clsx";
  *  - contagem de palavras da secao (heading inclusivo, ate o proximo
  *    heading do doc)
  *
- * Drag-and-drop reordena secoes inteiras: arrastar um heading move o
- * heading + todo o conteudo abaixo dele (ate o proximo heading) pra uma
- * nova posição no doc. Drop indicator (linha amber) aparece em cima do
- * row alvo enquanto o user arrasta.
+ * Arrastar reordena secoes inteiras: arrastar um heading move o heading
+ * + todo o conteudo abaixo dele (ate o proximo heading) pra uma nova
+ * posição no doc. Drop indicator (linha amber) aparece em cima do row
+ * alvo enquanto o user arrasta. O arraste é por mouse, como no explorador:
+ * o drag-and-drop do HTML5 falha no webview do Tauri no Windows.
  *
  * Implementado via DOM transactions do TipTap — ProseMirror gerencia
  * mapping automático entre delete + insert pra que as posições não se
@@ -25,6 +27,87 @@ export function Outline() {
 
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropIdx, setDropIdx] = useState<number | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const suppressClickRef = useRef(false);
+
+  const startSectionDrag = (e: React.MouseEvent, heading: HeadingItem) => {
+    if (e.button !== 0) return;
+    const originX = e.clientX;
+    const originY = e.clientY;
+    let dragging = false;
+    let target: number | null = null;
+    let lastX = originX;
+    let lastY = originY;
+    let autoScrollFrame = 0;
+
+    const rowAt = (x: number, y: number): number | null => {
+      const row = document
+        .elementsFromPoint(x, y)
+        .map((el) => (el as HTMLElement).closest?.<HTMLElement>("[data-outline-index]"))
+        .find((el): el is HTMLElement => !!el);
+      return row ? Number(row.dataset.outlineIndex) : null;
+    };
+
+    // Índice longo: encostar na borda de cima ou de baixo rola a lista.
+    const autoScroll = () => {
+      autoScrollFrame = 0;
+      const list = listRef.current;
+      if (!dragging || !list) return;
+      const rect = list.getBoundingClientRect();
+      if (lastX < rect.left || lastX > rect.right) return;
+      const zone = 28;
+      let dy = 0;
+      if (lastY < rect.top + zone) dy = -Math.min(12, Math.ceil((rect.top + zone - lastY) / 3));
+      else if (lastY > rect.bottom - zone) dy = Math.min(12, Math.ceil((lastY - rect.bottom + zone) / 3));
+      if (dy === 0) return;
+      const before = list.scrollTop;
+      list.scrollTop += dy;
+      if (list.scrollTop === before) return;
+      target = rowAt(lastX, lastY);
+      setDropIdx(target);
+      autoScrollFrame = requestAnimationFrame(autoScroll);
+    };
+
+    const finish = () => {
+      if (autoScrollFrame) cancelAnimationFrame(autoScrollFrame);
+      autoScrollFrame = 0;
+      document.documentElement.classList.remove("solon-dragging");
+      setDragId(null);
+      setDropIdx(null);
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+    };
+
+    startDrag({
+      onMove: (ev) => {
+        if (!dragging && Math.hypot(ev.clientX - originX, ev.clientY - originY) < 5) return;
+        if (!dragging) {
+          dragging = true;
+          suppressClickRef.current = true;
+          setDragId(heading.pos);
+          document.documentElement.classList.add("solon-dragging");
+        }
+        ev.preventDefault();
+        lastX = ev.clientX;
+        lastY = ev.clientY;
+        target = rowAt(ev.clientX, ev.clientY);
+        setDropIdx(target);
+        if (!autoScrollFrame) autoScrollFrame = requestAnimationFrame(autoScroll);
+      },
+      onEnd: (ev) => {
+        if (!dragging) return;
+        ev.preventDefault();
+        const idx = rowAt(ev.clientX, ev.clientY) ?? target;
+        finish();
+        const dest = idx === null ? undefined : headings[idx];
+        if (dest && dest.pos !== heading.pos) void reorderSection(heading.pos, dest.pos);
+      },
+      onCancel: () => {
+        if (dragging) finish();
+      },
+    });
+  };
 
   return (
     <div
@@ -40,7 +123,7 @@ export function Outline() {
       </div>
 
       {/* Lista de headings */}
-      <div className="flex-1 overflow-y-auto py-2">
+      <div ref={listRef} className="flex-1 overflow-y-auto py-2">
         {headings.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 px-4 text-center">
             <span style={{ color: "var(--border-strong)", fontSize: 22 }} aria-hidden>
@@ -68,23 +151,18 @@ export function Outline() {
                 idx={idx}
                 isDragSource={dragId === heading.pos}
                 isDropTarget={dropIdx === idx}
-                onDragStart={() => setDragId(heading.pos)}
-                onDragOver={() => setDropIdx(idx)}
-                onDragLeave={() => {
-                  // Limpa só se o leave era pra ESTE idx — events de
-                  // children podem disparar leave/over alternados.
-                  setDropIdx((curr) => (curr === idx ? null : curr));
-                }}
-                onDrop={() => {
-                  if (dragId !== null && dragId !== heading.pos) {
-                    void reorderSection(dragId, heading.pos);
+                onMouseDown={(e) => startSectionDrag(e, heading)}
+                onJump={() => {
+                  // O mouseup de um arraste vira clique; não é para pular.
+                  if (suppressClickRef.current) {
+                    suppressClickRef.current = false;
+                    return;
                   }
-                  setDragId(null);
-                  setDropIdx(null);
-                }}
-                onDragEnd={() => {
-                  setDragId(null);
-                  setDropIdx(null);
+                  document.dispatchEvent(
+                    new CustomEvent("solon:scroll-to", {
+                      detail: { pos: heading.pos, text: heading.text, level: heading.level },
+                    }),
+                  );
                 }}
               />
             ))}
@@ -122,48 +200,23 @@ const COLOR: Record<number, string> = {
 
 function HeadingRow({
   heading,
+  idx,
   isDragSource,
   isDropTarget,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
+  onMouseDown,
+  onJump,
 }: {
   heading: HeadingItem;
   idx: number;
   isDragSource: boolean;
   isDropTarget: boolean;
-  onDragStart: () => void;
-  onDragOver: () => void;
-  onDragLeave: () => void;
-  onDrop: () => void;
-  onDragEnd: () => void;
+  onMouseDown: (e: React.MouseEvent) => void;
+  onJump: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
 
   return (
-    <div
-      className="relative"
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        // Dado simbolico — a referência real esta no state do Outline.
-        e.dataTransfer.setData("text/plain", String(heading.pos));
-        onDragStart();
-      }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        onDragOver();
-      }}
-      onDragLeave={onDragLeave}
-      onDrop={(e) => {
-        e.preventDefault();
-        onDrop();
-      }}
-      onDragEnd={onDragEnd}
-    >
+    <div className="relative" data-outline-index={idx} onMouseDown={onMouseDown}>
       {/* Drop indicator: linha amber em cima do alvo. */}
       {isDropTarget && !isDragSource && (
         <div
@@ -194,13 +247,7 @@ function HeadingRow({
         }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        onClick={() => {
-          document.dispatchEvent(
-            new CustomEvent("solon:scroll-to", {
-              detail: { pos: heading.pos, text: heading.text, level: heading.level },
-            }),
-          );
-        }}
+        onClick={onJump}
       >
         <span className="truncate flex-1 leading-relaxed">{heading.text || "(sem título)"}</span>
         {heading.wordCount > 0 && (
