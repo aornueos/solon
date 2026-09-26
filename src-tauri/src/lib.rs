@@ -1,3 +1,4 @@
+mod spell_engine;
 mod spellcheck;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -17,9 +18,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Spellcheck nativo. Tres tentativas em JS falharam (V8
         // explodia com "Too many properties to enumerate" ao processar
-        // o dict pt-BR). Backend Rust nao tem esse limite, lookup
-        // contra HashSet e' O(1), e Levenshtein nativo lista 312k
-        // candidatos em ~5-15ms.
+        // o dict pt-BR). O motor fica em `spell_engine`; os comandos
+        // pesados rodam fora da thread da janela (ver `spellcheck`).
         .invoke_handler(tauri::generate_handler![
             spellcheck::spell_size,
             spellcheck::spell_check,
