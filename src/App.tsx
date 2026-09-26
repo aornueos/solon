@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AppLayout } from "./components/Layout/AppLayout";
 import { useAppStore, isUntitledPath } from "./store/useAppStore";
 import { useFileSystem } from "./hooks/useFileSystem";
@@ -11,6 +11,7 @@ import { flushEditor } from "./lib/editorRef";
 import { isProjectNotePath } from "./lib/pathSecurity";
 import {
   isTauriRuntime,
+  onFileOpenRequest,
   requestedFileFromUrl,
   setAppFullscreen,
   takeStartupFile,
@@ -91,8 +92,9 @@ export default function App() {
   // arquivo (duplo clique num .md), ele manda: dentro do último projeto,
   // a sessão é restaurada e o arquivo abre por cima; fora dele, a pasta do
   // arquivo vira o projeto e a sessão anterior fica para depois.
+  const bootRef = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
-    void (async () => {
+    bootRef.current = (async () => {
       const startupFile = await takeStartupFile();
       const lastRoot = localStorage.getItem("solon:rootFolder");
       if (startupFile && !isProjectNotePath(lastRoot, startupFile)) {
@@ -111,6 +113,49 @@ export default function App() {
       setActiveView(requested.view);
     })();
   }, [openFile, openFileFromDisk, restoreLastFolder, setActiveView]);
+
+  // macOS: arquivo pedido pelo Finder com o app já aberto (ou chegando logo
+  // depois do arranque). Espera o arranque terminar para não disputar a
+  // pasta aberta com a restauração da sessão.
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+    void onFileOpenRequest((path) => {
+      void bootRef.current.then(() => openFileFromDisk(path));
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [openFileFromDisk]);
+
+  // Arquivo do sistema solto fora do editor: sem o Tauri tratando o
+  // arrastar (desligado para o HTML5 funcionar no Windows), o webview
+  // abriria o arquivo no lugar do app. Só o texto do editor aceita
+  // arquivo (imagem); no resto, o cursor mostra que ali não solta.
+  useEffect(() => {
+    const carriesFiles = (event: DragEvent) =>
+      !!event.dataTransfer && Array.from(event.dataTransfer.types).includes("Files");
+    const onDragOver = (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.(".ProseMirror")) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
+    };
+    const onDrop = (event: DragEvent) => {
+      if (carriesFiles(event)) event.preventDefault();
+    };
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, []);
 
   // Update check no boot, com defer pra não concorrer com bootstrap (lendo
   // pasta, montando editor, etc). 5s e suficiente pra app sentir snappy.

@@ -32,6 +32,20 @@ pub fn run() {
             spellcheck::spell_remove,
             startup::take_startup_file,
         ])
-        .run(tauri::generate_context!())
-        .expect("Erro ao inicializar o Solon");
+        .build(tauri::generate_context!())
+        .expect("Erro ao inicializar o Solon")
+        .run(|_app, _event| {
+            // macOS não passa o arquivo por argumento: "Abrir com", o duplo
+            // clique num .md e soltar no ícone do Dock chegam aqui, com o
+            // app abrindo ou já aberto. A janela busca o caminho quando
+            // carrega (`take_startup_file`) ou quando recebe o aviso.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = _event {
+                let paths = urls.into_iter().filter_map(|url| url.to_file_path().ok());
+                if startup::remember_opened(paths) {
+                    use tauri::Emitter;
+                    let _ = _app.emit(startup::OPEN_FILE_EVENT, ());
+                }
+            }
+        });
 }

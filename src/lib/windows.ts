@@ -39,6 +39,36 @@ export async function takeStartupFile(): Promise<string | null> {
   }
 }
 
+/** Aviso do backend: há arquivo pedido pelo sistema (ver `startup.rs`). */
+const OPEN_FILE_EVENT = "solon://open-file";
+
+/**
+ * macOS entrega "Abrir com" e o duplo clique num `.md` como evento, também
+ * com o app já aberto; o backend guarda o caminho e avisa. Chama `open`
+ * com cada arquivo pedido. Janela destacada não escuta.
+ *
+ * Depois de começar a escutar, confere uma vez se já havia arquivo
+ * guardado: um pedido que chegou entre o arranque e este ponto teria o
+ * aviso perdido.
+ */
+export async function onFileOpenRequest(
+  open: (path: string) => void,
+): Promise<() => void> {
+  if (!isTauriRuntime()) return () => {};
+  if (new URLSearchParams(window.location.search).get("solonWindow") === "1") return () => {};
+  try {
+    const { listen } = await import("@tauri-apps/api/event");
+    const unlisten = await listen(OPEN_FILE_EVENT, () => {
+      void takeStartupFile().then((path) => path && open(path));
+    });
+    const pending = await takeStartupFile();
+    if (pending) open(pending);
+    return unlisten;
+  } catch {
+    return () => {};
+  }
+}
+
 export async function openTabInNewWindow(
   tab: OpenTab,
   view: "editor" | "canvas" = "editor",
@@ -68,6 +98,9 @@ export async function openTabInNewWindow(
     decorations: false,
     resizable: true,
     center: true,
+    // Como a janela principal: sem isso o Windows não entrega ao app o
+    // arrastar-e-soltar do HTML5 (imagem do Explorer, mover texto).
+    dragDropEnabled: false,
   });
 
   await new Promise<void>((resolve, reject) => {
