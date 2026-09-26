@@ -8,9 +8,10 @@
  *  - typo-js (JS): mesmo problema do nspell
  *  - Web Worker custom (Set + Levenshtein em JS): funcionava, mas user
  *    não via sugestoes confiaveis; foco é desktop
- *  - **ATUAL**: Rust backend via Tauri invoke. HashSet + Levenshtein
- *    em rust nativo. Sem limite V8, sem WASM, sem worker. Funciona
- *    sempre.
+ *  - **ATUAL**: Rust backend via Tauri invoke (`spell_engine.rs`):
+ *    distância de edição ponderada para erros comuns do português,
+ *    percorrendo o dicionário ordenado por prefixo. Sem limite V8, sem
+ *    WASM, sem worker.
  *
  * Trade: roda só em Tauri (no `npm run dev` puro browser, é no-op).
  * Decisao explicita do user — foco é desktop.
@@ -166,11 +167,9 @@ export async function checkWords(words: string[]): Promise<Map<string, boolean>>
 }
 
 /**
- * Pede sugestoes ao backend. Retorna array de até 8 candidatos
- * ordenados por edit distance (asc) + alfabetico (tiebreaker).
- *
- * Backend faz a iteracao em ~5-15ms — não precisamos de cache
- * extra aqui.
+ * Pede sugestoes ao backend: no máximo 4, da mais provável para a menos,
+ * e só as que ficam perto da melhor (uma correção óbvia vem sozinha).
+ * O cálculo roda fora da thread da janela e leva dezenas de ms.
  */
 export async function suggest(word: string): Promise<string[]> {
   if (!isTauriRuntime()) return [];
