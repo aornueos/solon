@@ -25,6 +25,8 @@ const GROUPS: ShortcutGroup[] = [
   {
     title: "Abas",
     items: [
+      { keys: "Ctrl + O", label: "Abrir arquivo" },
+      { keys: "Ctrl + Shift + O", label: "Abrir pasta" },
       { keys: "Ctrl + T", label: "Nova nota vazia" },
       { keys: "Ctrl + Shift + N", label: "Scratchpad efêmero" },
       { keys: "Ctrl + W", label: "Fechar aba ativa" },

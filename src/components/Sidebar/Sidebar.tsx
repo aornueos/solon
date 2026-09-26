@@ -53,7 +53,7 @@ export function Sidebar() {
   const openCommandPalette = useAppStore((s) => s.openCommandPalette);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const tagBtnRef = useRef<HTMLButtonElement | null>(null);
-  const { openFolder, openFile, refresh, createFile, createFolder, renameNode, deleteNode, reorderItem, moveItem, duplicateFile } =
+  const { openFolder, openFileFromDisk, openFile, refresh, createFile, createFolder, renameNode, deleteNode, reorderItem, moveItem, duplicateFile } =
     useFileSystem();
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   /**
@@ -318,6 +318,9 @@ export function Sidebar() {
             </p>
             <button onClick={openFolder} className="solon-btn solon-btn--primary">
               Abrir pasta
+            </button>
+            <button onClick={() => openFileFromDisk()} className="solon-text-action">
+              ou um arquivo avulso
             </button>
           </div>
         ) : activeTagFilter ? (

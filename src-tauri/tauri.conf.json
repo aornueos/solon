@@ -47,7 +47,18 @@
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
       }
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "md"
+        ],
+        "name": "Markdown",
+        "description": "Nota em Markdown",
+        "role": "Editor",
+        "mimeType": "text/markdown"
+      }
+    ]
   },
   "plugins": {
     "updater": {

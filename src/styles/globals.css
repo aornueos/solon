@@ -1177,6 +1177,25 @@
   border-color: var(--text-primary);
 }
 
+/* Ação secundária em texto, ao lado de um botão principal ("Abrir pasta"
+   / "ou abra um arquivo avulso"). */
+.solon-text-action {
+  background: transparent;
+  border: 0;
+  padding: 0.2rem 0.3rem;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.solon-text-action:hover {
+  color: var(--text-primary);
+  text-decoration-color: currentColor;
+}
+
 /* ─────────────────────────────────────────
    Dialogs e overlays — Quiet Editorial
    Cantos suaves, hairlines, sombra macia. Cada dialog so' troca classes.

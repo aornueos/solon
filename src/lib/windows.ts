@@ -24,6 +24,21 @@ export function requestedFileFromUrl():
   };
 }
 
+/**
+ * Arquivo com que o sistema abriu o Solon ("Abrir com", duplo clique num
+ * `.md`). O backend entrega uma vez só; janela destacada não pede.
+ */
+export async function takeStartupFile(): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+  if (new URLSearchParams(window.location.search).get("solonWindow") === "1") return null;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return (await invoke<string | null>("take_startup_file")) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function openTabInNewWindow(
   tab: OpenTab,
   view: "editor" | "canvas" = "editor",

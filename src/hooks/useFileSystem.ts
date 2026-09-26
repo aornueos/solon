@@ -121,65 +121,6 @@ export function useFileSystem() {
   const setActiveFile = useAppStore((s) => s.setActiveFile);
   const setSidebarOrder = useAppStore((s) => s.setSidebarOrder);
 
-  const openFolder = useCallback(async () => {
-    if (isTauriRuntime()) {
-      try {
-        const { open } = await import("@tauri-apps/plugin-dialog");
-        const selected = await open({ directory: true, multiple: false });
-        if (selected && typeof selected === "string") {
-          // Troca de projeto: invalida o cache de URLs de imagem (blob:)
-          // do projeto anterior. Sem isso, blob URLs apontando pra
-          // arquivos de outro projeto vazam memória até o app fechar
-          // E (pior) podem colidir se dois projetos tiverem nomes de
-          // asset iguais.
-          clearImageUrlCache();
-          setRootFolder(selected);
-          // Lido antes de qualquer await: a partir daqui a raiz já é a
-          // nova, e a árvore na tela ainda é a do projeto anterior.
-          const expanded = rememberedExpandedFolders(selected);
-          // Carrega a ordem manual ANTES do tree pra que o primeiro
-          // setFileTree já venha ordenado. Sem isso, user veria o
-          // sort alfabetico por 1 frame.
-          const order = await loadOrder(selected);
-          setSidebarOrder(order);
-          const tree = await buildFileTree(selected, expanded);
-          setFileTree(applyOrder(selected, tree, order));
-        }
-      } catch (err) {
-        console.error("Erro ao abrir pasta:", err);
-        useAppStore
-          .getState()
-          .pushToast("error", `Erro ao abrir pasta: ${describeError(err)}`);
-      }
-    } else {
-      // Mock para dev no browser
-      const mockTree: FileNode[] = [
-        {
-          name: "Meu Romance",
-          path: "/mock/romance",
-          type: "folder",
-          expanded: true,
-          children: [
-            {
-              name: "Parte I — O Início",
-              path: "/mock/romance/parte1",
-              type: "folder",
-              expanded: false,
-              children: [
-                { name: "Capítulo 01.md", path: "/mock/romance/parte1/cap01.md", type: "file" },
-                { name: "Capítulo 02.md", path: "/mock/romance/parte1/cap02.md", type: "file" },
-              ],
-            },
-            { name: "Notas de Personagens.md", path: "/mock/romance/personagens.md", type: "file" },
-            { name: "Worldbuilding.md", path: "/mock/romance/world.md", type: "file" },
-          ],
-        },
-      ];
-      setRootFolder("/mock/romance");
-      setFileTree(mockTree);
-    }
-  }, [setRootFolder, setFileTree, setSidebarOrder]);
-
   const openFile = useCallback(
     async (path: string, name: string, options: OpenFileOptions = {}) => {
       const tabMode = options.tab ?? "new";
@@ -302,6 +243,167 @@ export function useFileSystem() {
       }
     },
     []
+  );
+
+  /**
+   * Troca a pasta do projeto. Antes de trocar, grava a edição pendente da
+   * nota aberta — o salvamento exige que a nota esteja dentro da raiz, e
+   * depois da troca ela não está mais (a edição falhava ao salvar). Se a
+   * gravação falhar, não troca: melhor ficar no projeto do que perder
+   * texto.
+   */
+  const switchProject = useCallback(
+    async (newRoot: string): Promise<boolean> => {
+      flushEditor();
+      const before = useAppStore.getState();
+      const pending =
+        before.activeFilePath &&
+        !isUntitledPath(before.activeFilePath) &&
+        before.saveStatus !== "saved" &&
+        before.saveStatus !== "idle";
+      if (pending && before.activeFilePath) {
+        try {
+          await saveFile(
+            before.activeFilePath,
+            serializeDocument(before.sceneMeta, before.fileBody),
+          );
+          useAppStore.getState().setSaveStatus("saved");
+        } catch {
+          return false;
+        }
+      }
+
+      // Fecha o que não pertence ao projeto novo ANTES de trocar a raiz: o
+      // editor recarrega a nota quando a raiz muda, e recarregar a nota
+      // antiga sob a raiz nova a marcava como editada — o auto-save então
+      // tentava gravá-la fora do projeto e mostrava erro.
+      for (const tab of useAppStore.getState().openTabs) {
+        if (!isUntitledPath(tab.path) && !isProjectNotePath(newRoot, tab.path)) {
+          useAppStore.getState().closeTab(tab.path);
+        }
+      }
+      const active = useAppStore.getState().activeFilePath;
+      if (active && !isUntitledPath(active) && !isProjectNotePath(newRoot, active)) {
+        useAppStore.setState({
+          activeFilePath: null,
+          activeFileName: null,
+          fileBody: "",
+          sceneMeta: {},
+          headings: [],
+          wordCount: 0,
+          charCount: 0,
+          saveStatus: "idle",
+        });
+      }
+
+      // Troca de projeto: invalida o cache de URLs de imagem (blob:)
+      // do projeto anterior. Sem isso, blob URLs apontando pra
+      // arquivos de outro projeto vazam memória até o app fechar
+      // E (pior) podem colidir se dois projetos tiverem nomes de
+      // asset iguais.
+      clearImageUrlCache();
+      setRootFolder(newRoot);
+      // Lido antes de qualquer await: a partir daqui a raiz já é a
+      // nova, e a árvore na tela ainda é a do projeto anterior.
+      const expanded = rememberedExpandedFolders(newRoot);
+      // Carrega a ordem manual ANTES do tree pra que o primeiro
+      // setFileTree já venha ordenado. Sem isso, user veria o
+      // sort alfabetico por 1 frame.
+      const order = await loadOrder(newRoot);
+      setSidebarOrder(order);
+      const tree = await buildFileTree(newRoot, expanded);
+      setFileTree(applyOrder(newRoot, tree, order));
+      return true;
+    },
+    [saveFile, setRootFolder, setSidebarOrder, setFileTree],
+  );
+
+  const openFolder = useCallback(async () => {
+    if (isTauriRuntime()) {
+      try {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const selected = await open({ directory: true, multiple: false });
+        if (selected && typeof selected === "string") {
+          await switchProject(selected);
+        }
+      } catch (err) {
+        console.error("Erro ao abrir pasta:", err);
+        useAppStore
+          .getState()
+          .pushToast("error", `Erro ao abrir pasta: ${describeError(err)}`);
+      }
+    } else {
+      // Mock para dev no browser
+      const mockTree: FileNode[] = [
+        {
+          name: "Meu Romance",
+          path: "/mock/romance",
+          type: "folder",
+          expanded: true,
+          children: [
+            {
+              name: "Parte I — O Início",
+              path: "/mock/romance/parte1",
+              type: "folder",
+              expanded: false,
+              children: [
+                { name: "Capítulo 01.md", path: "/mock/romance/parte1/cap01.md", type: "file" },
+                { name: "Capítulo 02.md", path: "/mock/romance/parte1/cap02.md", type: "file" },
+              ],
+            },
+            { name: "Notas de Personagens.md", path: "/mock/romance/personagens.md", type: "file" },
+            { name: "Worldbuilding.md", path: "/mock/romance/world.md", type: "file" },
+          ],
+        },
+      ];
+      setRootFolder("/mock/romance");
+      setFileTree(mockTree);
+    }
+  }, [setRootFolder, setFileTree, switchProject]);
+
+  /**
+   * Abre um .md/.txt avulso — pelo diálogo ou pelo caminho que o sistema
+   * passou ("Abrir com", duplo clique). Como no Typora, a pasta do arquivo
+   * vira a pasta aberta na lateral: histórico local, recuperação de crash,
+   * imagens e wikilinks dependem de uma raiz e continuam valendo. Se o
+   * arquivo já está no projeto aberto, só abre.
+   */
+  const openFileFromDisk = useCallback(
+    async (path?: string) => {
+      if (!isTauriRuntime()) return;
+      try {
+        let target = path;
+        if (!target) {
+          const { open } = await import("@tauri-apps/plugin-dialog");
+          const selected = await open({
+            directory: false,
+            multiple: false,
+            filters: [{ name: "Notas", extensions: ["md", "txt"] }],
+          });
+          if (!selected || typeof selected !== "string") return;
+          target = selected;
+        }
+        if (!NOTE_FILE_RE.test(target)) {
+          useAppStore
+            .getState()
+            .pushToast("error", "O Solon abre notas .md e .txt.");
+          return;
+        }
+        const currentRoot = useAppStore.getState().rootFolder;
+        if (!isProjectNotePath(currentRoot, target)) {
+          const switched = await switchProject(parentOf(target));
+          if (!switched) return;
+        }
+        await openFile(target, baseName(target), { tab: "new" });
+        useAppStore.getState().setActiveView("editor");
+      } catch (err) {
+        console.error("Erro ao abrir arquivo:", err);
+        useAppStore
+          .getState()
+          .pushToast("error", `Erro ao abrir arquivo: ${describeError(err)}`);
+      }
+    },
+    [switchProject, openFile],
   );
 
   const refresh = useCallback(async () => {
@@ -984,6 +1086,7 @@ export function useFileSystem() {
 
   return {
     openFolder,
+    openFileFromDisk,
     openFile,
     saveFile,
     refresh,

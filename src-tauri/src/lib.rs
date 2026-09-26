@@ -1,8 +1,10 @@
 mod spell_engine;
 mod spellcheck;
+mod startup;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    startup::capture_from_args();
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -27,6 +29,7 @@ pub fn run() {
             spellcheck::spell_suggest,
             spellcheck::spell_add,
             spellcheck::spell_remove,
+            startup::take_startup_file,
         ])
         .run(tauri::generate_context!())
         .expect("Erro ao inicializar o Solon");

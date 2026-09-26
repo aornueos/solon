@@ -73,9 +73,12 @@ export function useAutoSave() {
           !isUntitledPath(prev.activeFilePath) &&
           (prev.saveStatus === "dirty" ||
             (timer !== null && prev.saveStatus !== "saved"));
+        // O timer pendente é do arquivo anterior: se ele tinha pendência,
+        // é gravado logo abaixo; se não, disparar depois só regravaria o
+        // arquivo novo sem mudança nenhuma.
+        if (timer) clearTimeout(timer);
+        timer = null;
         if (shouldFlushPrevious) {
-          if (timer) clearTimeout(timer);
-          timer = null;
           const content = serializeDocument(prev.sceneMeta, prev.fileBody);
           void saveFile(prev.activeFilePath!, content).catch(() => {
             // saveFile ja mostrou toast. Evita unhandled rejection neste

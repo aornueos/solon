@@ -8,10 +8,12 @@ import { useCanvasPersistence } from "./hooks/useCanvasPersistence";
 import { useSceneCardSync } from "./hooks/useSceneCardSync";
 import { checkForUpdate } from "./lib/updater";
 import { flushEditor } from "./lib/editorRef";
+import { isProjectNotePath } from "./lib/pathSecurity";
 import {
   isTauriRuntime,
   requestedFileFromUrl,
   setAppFullscreen,
+  takeStartupFile,
   toggleAppFullscreen,
 } from "./lib/windows";
 import { EDITOR_PAPERS } from "./store/useAppStore";
@@ -47,7 +49,8 @@ export default function App() {
   const toggleReadingMode = useAppStore((s) => s.toggleReadingMode);
   const appZoom = useAppStore((s) => s.appZoom);
   const setAppZoom = useAppStore((s) => s.setAppZoom);
-  const { restoreLastFolder, refresh, openFile, openFolder } = useFileSystem();
+  const { restoreLastFolder, refresh, openFile, openFolder, openFileFromDisk } =
+    useFileSystem();
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", "light");
@@ -84,16 +87,30 @@ export default function App() {
   useCanvasPersistence();
   useSceneCardSync();
 
-  // Restaura última pasta aberta
+  // Restaura última pasta aberta. Se o sistema abriu o Solon com um
+  // arquivo (duplo clique num .md), ele manda: dentro do último projeto,
+  // a sessão é restaurada e o arquivo abre por cima; fora dele, a pasta do
+  // arquivo vira o projeto e a sessão anterior fica para depois.
   useEffect(() => {
-    void restoreLastFolder().then(async () => {
+    void (async () => {
+      const startupFile = await takeStartupFile();
+      const lastRoot = localStorage.getItem("solon:rootFolder");
+      if (startupFile && !isProjectNotePath(lastRoot, startupFile)) {
+        await openFileFromDisk(startupFile);
+        return;
+      }
+      await restoreLastFolder();
+      if (startupFile) {
+        await openFileFromDisk(startupFile);
+        return;
+      }
       const requested = requestedFileFromUrl();
       if (!requested) return;
       useAppStore.setState({ openTabs: [] });
       await openFile(requested.path, requested.name, { tab: "new" });
       setActiveView(requested.view);
-    });
-  }, [openFile, restoreLastFolder, setActiveView]);
+    })();
+  }, [openFile, openFileFromDisk, restoreLastFolder, setActiveView]);
 
   // Update check no boot, com defer pra não concorrer com bootstrap (lendo
   // pasta, montando editor, etc). 5s e suficiente pra app sentir snappy.
@@ -189,9 +206,10 @@ export default function App() {
         openCommandPalette();
         return;
       }
-      if (native && ctrl && !e.shiftKey && key === "o") {
+      // Como em qualquer editor: Ctrl+O abre arquivo, Ctrl+Shift+O pasta.
+      if (native && ctrl && key === "o") {
         e.preventDefault();
-        void openFolder();
+        void (e.shiftKey ? openFolder() : openFileFromDisk());
         return;
       }
       if (native && ctrl && !e.shiftKey && key === "r") {
@@ -451,6 +469,7 @@ export default function App() {
     toggleReadingMode,
     openFile,
     openFolder,
+    openFileFromDisk,
     refresh,
     setAppZoom,
   ]);

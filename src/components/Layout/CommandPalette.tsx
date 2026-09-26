@@ -96,7 +96,8 @@ export function CommandPalette() {
   const setFileTree = useAppStore((s) => s.setFileTree);
   const setTool = useCanvasStore((s) => s.setTool);
   const addCard = useCanvasStore((s) => s.addCard);
-  const { openFile, openFolder, createUntitled, refresh } = useFileSystem();
+  const { openFile, openFolder, openFileFromDisk, createUntitled, refresh } =
+    useFileSystem();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -167,9 +168,16 @@ export function CommandPalette() {
         },
       },
       {
+        id: "open-file",
+        label: "Abrir arquivo",
+        hint: "Ctrl+O",
+        icon: <FileText size={15} />,
+        run: () => openFileFromDisk(),
+      },
+      {
         id: "open-folder",
         label: "Abrir pasta",
-        hint: "Trocar projeto",
+        hint: "Ctrl+Shift+O",
         icon: <FolderOpen size={15} />,
         run: openFolder,
       },
@@ -393,6 +401,7 @@ export function CommandPalette() {
       addCard,
       createUntitled,
       openFolder,
+      openFileFromDisk,
       openGlobalSearch,
       openLocalHistory,
       openWorkspaceHealth,

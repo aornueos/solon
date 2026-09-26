@@ -39,7 +39,7 @@ export function HomePage() {
   const openPrompt = useAppStore((s) => s.openPrompt);
   const pushToast = useAppStore((s) => s.pushToast);
   const recentFiles = useAppStore((s) => s.recentFiles);
-  const { openFolder, createFile, openFile } = useFileSystem();
+  const { openFolder, openFileFromDisk, createFile, openFile } = useFileSystem();
 
   const allFiles = useMemo(() => flattenFiles(fileTree), [fileTree]);
   const folderName = useMemo(() => {
@@ -159,7 +159,7 @@ export function HomePage() {
               )}
             </>
           ) : (
-            <EmptyHero onOpenFolder={openFolder} />
+            <EmptyHero onOpenFolder={openFolder} onOpenFile={() => openFileFromDisk()} />
           )}
         </div>
       </div>
@@ -339,7 +339,13 @@ function ProjectHero({
  * `ProjectHero` fica com a frase que explica o que uma pasta é aqui: é a
  * única coisa que o leitor precisa entender antes do único botão da tela.
  */
-function EmptyHero({ onOpenFolder }: { onOpenFolder: () => void }) {
+function EmptyHero({
+  onOpenFolder,
+  onOpenFile,
+}: {
+  onOpenFolder: () => void;
+  onOpenFile: () => void;
+}) {
   return (
     <>
       <h1
@@ -364,6 +370,9 @@ function EmptyHero({ onOpenFolder }: { onOpenFolder: () => void }) {
       <button onClick={onOpenFolder} className="solon-cta">
         <FolderOpen size={16} aria-hidden />
         <span>Abrir pasta</span>
+      </button>
+      <button onClick={onOpenFile} className="solon-text-action mt-4">
+        ou abra um arquivo avulso
       </button>
     </>
   );
