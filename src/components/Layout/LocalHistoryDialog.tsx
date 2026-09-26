@@ -59,6 +59,18 @@ export function LocalHistoryDialog() {
     };
   }, [selected]);
 
+  // Esc fecha, como nos outros diálogos.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, close]);
+
   if (!open) return null;
 
   const restore = async () => {
