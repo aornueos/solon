@@ -235,7 +235,9 @@ function formatCount(n: number): string {
  */
 async function reorderSection(sourcePos: number, targetPos: number) {
   const editor = getCurrentEditor();
-  if (!editor) return;
+  // No código-fonte as posições do Índice são linhas do Markdown, e o
+  // editor visual está escondido com o texto de antes.
+  if (!editor || useAppStore.getState().sourceMode) return;
   const state = editor.state;
   const headings = useAppStore.getState().headings;
   const source = headings.find((h) => h.pos === sourcePos);

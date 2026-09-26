@@ -13,7 +13,8 @@ import {
   EDITOR_TEXT_SIZES,
   useAppStore,
 } from "../../store/useAppStore";
-import { EditorToolbar } from "./EditorToolbar";
+import { EditorToolbar, SourceModeToolbar } from "./EditorToolbar";
+import { SourceEditor } from "./SourceEditor";
 import { markdownToHtml, htmlToMarkdown } from "./markdownBridge";
 import { setCurrentEditor, setEditorFlush } from "../../lib/editorRef";
 import { useFileSystem } from "../../hooks/useFileSystem";
@@ -157,6 +158,7 @@ export function Editor() {
   const readingMode = useAppStore((s) => s.readingMode);
   const typewriterMode = useAppStore((s) => s.typewriterMode);
   const spellcheckEnabled = useAppStore((s) => s.spellcheckEnabled);
+  const sourceMode = useAppStore((s) => s.sourceMode);
   const { openFile } = useFileSystem();
 
   const isLoadingRef = useRef(false);
@@ -286,6 +288,9 @@ export function Editor() {
     },
     onUpdate: ({ editor }) => {
       if (isLoadingRef.current) return;
+      // No modo código-fonte quem manda no texto é o campo de Markdown; o
+      // editor visual, escondido, tem o texto de antes e não pode gravar.
+      if (useAppStore.getState().sourceMode) return;
       // Coalesce todo o trabalho pesado num único debounce. Antes,
       // digitar uma frase de 30 letras disparava 30x:
       //   - extractHeadings (descend O(n) do doc inteiro)
@@ -303,7 +308,7 @@ export function Editor() {
       }
       updateTimerRef.current = window.setTimeout(() => {
         updateTimerRef.current = null;
-        if (isLoadingRef.current || !editor) return;
+        if (isLoadingRef.current || !editor || useAppStore.getState().sourceMode) return;
         extractHeadings(editor, setHeadings);
         const text = editor.getText();
         const words = text.trim() ? text.trim().split(/\s+/).length : 0;
@@ -324,7 +329,9 @@ export function Editor() {
       window.clearTimeout(updateTimerRef.current);
       updateTimerRef.current = null;
     }
-    if (isLoadingRef.current || !editor) return;
+    // Mesmo motivo do onUpdate: no código-fonte, um flush (Ctrl+S, troca de
+    // nota) gravaria o texto velho do editor escondido por cima do editado.
+    if (isLoadingRef.current || !editor || useAppStore.getState().sourceMode) return;
     extractHeadings(editor, setHeadings);
     const text = editor.getText();
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
@@ -361,6 +368,12 @@ export function Editor() {
 
   useEffect(() => {
     if (!editor) return;
+    // No código-fonte o editor visual fica parado. Esquecer o último
+    // arquivo carregado faz a volta recarregar o texto editado no campo.
+    if (sourceMode) {
+      lastLoadedPathRef.current = null;
+      return;
+    }
     if (!activeFilePath) {
       saveVisibleScroll();
       saveVisibleSelection();
@@ -428,7 +441,7 @@ export function Editor() {
       cancelled = true;
       if (raf != null) cancelAnimationFrame(raf);
     };
-  }, [activeFilePath, editor, rootFolder, setHeadings, setWordCount]);
+  }, [activeFilePath, editor, rootFolder, setHeadings, setWordCount, sourceMode]);
 
   // Mantemos o spellcheck nativo do WebView desligado. Ele costuma seguir
   // o idioma do sistema/Edge e marcar portugues correto como erro; o Solon
@@ -503,6 +516,7 @@ export function Editor() {
     if (!editor || !activeFilePath) return;
     const onFindShortcut = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "f") return;
+      if (useAppStore.getState().sourceMode) return;
       e.preventDefault();
       e.stopPropagation();
       setFindOpen(true);
@@ -689,7 +703,7 @@ export function Editor() {
   // Título dentro de seção dobrada fica escondido; a seção é desdobrada.
   useEffect(() => {
     const handler = (e: Event) => {
-      if (!editor) return;
+      if (!editor || useAppStore.getState().sourceMode) return;
       const detail = (e as CustomEvent).detail as OutlineJumpDetail | undefined;
       if (!detail || typeof detail.pos !== "number") return;
       const pos = resolveHeadingPos(editor.state.doc, detail);
@@ -841,7 +855,7 @@ export function Editor() {
   // qualquer linha da primeira metade jogava o cursor pro topo da
   // primeira página.
   const focusFromMargin = (e: React.MouseEvent) => {
-    if (!editor) return;
+    if (!editor || sourceMode) return;
     const target = e.target as HTMLElement;
     if (target.closest(".ProseMirror")) return;
 
@@ -920,7 +934,7 @@ export function Editor() {
 
   return (
     <div className="relative flex flex-col h-full">
-      {editor && (
+      {editor && !sourceMode && (
         <FindBar
           editor={editor}
           open={findOpen}
@@ -928,8 +942,9 @@ export function Editor() {
           onClose={() => setFindOpen(false)}
         />
       )}
-      {editor && <WikilinkAutocomplete editor={editor} />}
-      {editor && !focusMode && !readingMode && <EditorToolbar editor={editor} />}
+      {editor && !sourceMode && <WikilinkAutocomplete editor={editor} />}
+      {editor && !focusMode && !readingMode &&
+        (sourceMode ? <SourceModeToolbar /> : <EditorToolbar editor={editor} />)}
       <div
         ref={scrollRef}
         data-paper={editorPaper === "default" ? undefined : editorPaper}
@@ -948,7 +963,7 @@ export function Editor() {
           className={editorBodyClassName}
           style={editorBodyStyle}
         >
-          <EditorContent editor={editor} />
+          {sourceMode ? <SourceEditor /> : <EditorContent editor={editor} />}
         </div>
       </div>
     </div>

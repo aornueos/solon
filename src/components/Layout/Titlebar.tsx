@@ -476,7 +476,7 @@ export function Titlebar() {
             <IconBtn onClick={() => openExport()} title="Exportar (Ctrl+Shift+E)">
               <FileDown size={14} />
             </IconBtn>
-            <IconBtn onClick={openShortcuts} title="Atalhos (Ctrl+/)">
+            <IconBtn onClick={openShortcuts} title="Atalhos (F1)">
               <HelpCircle size={14} />
             </IconBtn>
             {available && (

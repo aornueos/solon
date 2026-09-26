@@ -19,6 +19,7 @@ import {
   Keyboard,
   Eye,
   Pin,
+  FileCode2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
@@ -43,6 +44,7 @@ export function EditorToolbar({ editor }: Props) {
   const [tableMenu, setTableMenu] = useState(false);
   const typewriterMode = useAppStore((s) => s.typewriterMode);
   const setTypewriterMode = useAppStore((s) => s.setTypewriterMode);
+  const toggleSourceMode = useAppStore((s) => s.toggleSourceMode);
   const editorTextSize = useAppStore((s) => s.editorTextSize);
   const setEditorTextSize = useAppStore((s) => s.setEditorTextSize);
   const toolbarMode = useAppStore((s) => s.editorToolbarMode);
@@ -246,6 +248,34 @@ export function EditorToolbar({ editor }: Props) {
           />
         )}
       </div>
+      <Divider />
+      <ToolBtn title="Código-fonte (Ctrl+/)" onClick={toggleSourceMode}>
+        <FileCode2 size={15} />
+      </ToolBtn>
+    </div>
+  );
+}
+
+/**
+ * Barra do modo código-fonte. A formatação da barra normal age no editor
+ * visual, que está escondido — aqui só cabe voltar.
+ */
+export function SourceModeToolbar() {
+  const toggleSourceMode = useAppStore((s) => s.toggleSourceMode);
+  return (
+    <div
+      className="solon-editor-toolbar flex items-center gap-2 px-4 py-1.5"
+      style={{
+        borderBottom: "1px solid var(--border-subtle)",
+        background: "var(--bg-panel-2)",
+      }}
+    >
+      <ToolBtn title="Voltar ao texto formatado (Ctrl+/)" active onClick={toggleSourceMode}>
+        <FileCode2 size={15} />
+      </ToolBtn>
+      <span className="text-[0.78rem]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-ui)" }}>
+        Editando o Markdown da nota
+      </span>
     </div>
   );
 }

@@ -69,7 +69,8 @@ What that means in practice:
 * **Local history viewer** opens from the Inspector.
 * **Command palette** with `Ctrl+K` searches every file and command.
 * **Global search** with `Ctrl+Shift+F` searches note content across the project with parallelized reads.
-* **Shortcuts cheatsheet** with `Ctrl+/` shows every keyboard shortcut.
+* **Shortcuts cheatsheet** with `F1` (or `Ctrl+?`) shows every keyboard shortcut.
+* **Source mode** with `Ctrl+/` edits the raw Markdown of the note.
 
 ### Resilience
 
@@ -123,6 +124,7 @@ Building from source works on both. A release matrix for multiple operating syst
 | Action                             | Shortcut                           |
 | :--------------------------------- | :--------------------------------- |
 | Command palette                    | `Ctrl+K`                           |
+| Open file or folder                | `Ctrl+O` / `Ctrl+Shift+O`          |
 | Global search                      | `Ctrl+Shift+F`                     |
 | Find in note                       | `Ctrl+F`                           |
 | Local history                      | `Ctrl+Alt+H`                       |
@@ -137,7 +139,8 @@ Building from source works on both. A release matrix for multiple operating syst
 | Fullscreen                         | `F11`                              |
 | Toggle theme                       | `Ctrl+Shift+L`                     |
 | Settings                           | `Ctrl+,`                           |
-| Cheatsheet                         | `Ctrl+/`                           |
+| Cheatsheet                         | `F1` / `Ctrl+?`                    |
+| Source mode (raw Markdown)         | `Ctrl+/`                           |
 | Export to PDF                      | `Ctrl+Shift+E`                     |
 | Reset special modes                | `Ctrl+Shift+Esc`                   |
 | Promote or demote heading          | `Tab` / `Shift+Tab`                |

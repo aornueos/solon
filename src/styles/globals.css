@@ -1537,6 +1537,28 @@ select:focus-visible {
   cursor: text;
 }
 
+/* Modo código-fonte: o Markdown cru na mesma folha do texto. Cresce com o
+   conteúdo (quem rola é a página) e usa a mesma cor e escala do editor. */
+.solon-source-editor {
+  display: block;
+  width: 100%;
+  min-height: 60vh;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--editor-paper-text, var(--text-primary));
+  caret-color: var(--accent);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: calc(0.95rem * var(--editor-text-scale, 1) * var(--editor-zoom, 1));
+  line-height: 1.65;
+  tab-size: 2;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* Comentário HTML `<!-- nota -->`: nota para quem escreve, fora do fluxo
    do texto. Discreto, não editável aqui (fica igual no arquivo). */
 .ProseMirror .solon-html-comment {

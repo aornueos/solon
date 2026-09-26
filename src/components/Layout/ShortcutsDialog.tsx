@@ -47,6 +47,7 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "Tab (heading)", label: "Demote heading" },
       { keys: "Shift + Tab (heading)", label: "Promote heading" },
       { keys: "Tab (parágrafo)", label: "Indentar primeira linha" },
+      { keys: "Ctrl + /", label: "Modo código-fonte (Markdown cru)" },
       { keys: "Ctrl + Shift + E", label: "Exportar para PDF" },
     ],
   },
@@ -63,7 +64,7 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "Ctrl + ,", label: "Preferências" },
       { keys: "Ctrl + Shift + L", label: "Alternar tema visual" },
       { keys: "Ctrl + + / - / 0", label: "Zoom do aplicativo" },
-      { keys: "Ctrl + /", label: "Esta janela de atalhos" },
+      { keys: "F1 / Ctrl + ?", label: "Esta janela de atalhos" },
     ],
   },
   {

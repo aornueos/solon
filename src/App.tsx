@@ -262,13 +262,21 @@ export default function App() {
       // early-return mata qualquer outro Ctrl+Alt+letra restante.
       // (`ctrl` já definido no topo deste handler.)
 
-      // Ctrl+/ e Ctrl+? — cheatsheet. Aceita altKey porque na layout
-      // pt-PT o usuário pressiona Ctrl+Alt+W pra produzir Ctrl+? (a
-      // tecla fisica W gera "?" via AltGr). Sem essa precedencia, o
-      // bailout abaixo bloqueava a cheatsheet.
-      if (ctrl && (e.key === "/" || e.key === "?")) {
+      // F1 e Ctrl+? — cheatsheet. Aceita altKey porque na layout pt-PT o
+      // usuário pressiona Ctrl+Alt+W pra produzir Ctrl+? (a tecla fisica
+      // W gera "?" via AltGr). Sem essa precedencia, o bailout abaixo
+      // bloqueava a cheatsheet.
+      if (e.key === "F1" || (ctrl && e.key === "?")) {
         e.preventDefault();
         openShortcuts();
+        return;
+      }
+      // Ctrl+/ — modo código-fonte, como no Typora. Só faz sentido com uma
+      // nota aberta no editor.
+      if (ctrl && e.key === "/") {
+        e.preventDefault();
+        const s = useAppStore.getState();
+        if (s.activeFilePath && s.activeView === "editor") s.toggleSourceMode();
         return;
       }
       // Ctrl+Alt+H / Ctrl+Alt+I — atalhos explicitos do app. Tem que
@@ -329,7 +337,7 @@ export default function App() {
         e.preventDefault();
         openSettings();
       }
-      // (Ctrl+/ e Ctrl+? são tratados acima — antes do bailout do
+      // (F1, Ctrl+? e Ctrl+/ são tratados acima — antes do bailout do
       // AltGr — pra que continuem funcionando em layouts onde "?" exige
       // AltGr+W.)
       // Ctrl+Shift+E abre o dialog de export (PDF/DOCX) — convencao

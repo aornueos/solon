@@ -168,6 +168,18 @@ export function CommandPalette() {
         },
       },
       {
+        id: "source-mode",
+        label: "Alternar modo código-fonte",
+        hint: "Ctrl+/",
+        icon: <FileText size={15} />,
+        run: () => {
+          const s = useAppStore.getState();
+          if (!s.activeFilePath) return;
+          setActiveView("editor");
+          s.toggleSourceMode();
+        },
+      },
+      {
         id: "open-file",
         label: "Abrir arquivo",
         hint: "Ctrl+O",
@@ -371,7 +383,7 @@ export function CommandPalette() {
       {
         id: "shortcuts",
         label: "Atalhos de teclado",
-        hint: "Ctrl+/",
+        hint: "F1",
         icon: <Info size={15} />,
         run: openShortcuts,
       },

@@ -3,6 +3,7 @@ import { SceneMeta } from "../types/scene";
 import type { CanvasTool } from "../types/canvas";
 import type { SidebarOrder } from "../lib/sidebarOrder";
 import { saveExpandedFolders } from "../lib/expandedFolders";
+import { flushEditor } from "../lib/editorRef";
 
 export interface FileNode {
   name: string;
@@ -311,7 +312,7 @@ interface AppState {
   showSettings: boolean;
   /** Paleta de comandos rapida (Ctrl+K). */
   showCommandPalette: boolean;
-  /** Cheatsheet de atalhos (Ctrl+/). */
+  /** Cheatsheet de atalhos (F1 ou Ctrl+?). */
   showShortcuts: boolean;
   /** Dialog de export (PDF/DOCX). */
   showExport: boolean;
@@ -364,6 +365,9 @@ interface AppState {
    *  de Ulysses/iA Writer pra concentracao. Padding virtual no topo
    *  e fundo permite centralizar mesmo em docs curtos. */
   typewriterMode: boolean;
+  /** Modo código-fonte: o Markdown cru num campo de texto, no lugar do
+   *  editor formatado. Só da sessão. */
+  sourceMode: boolean;
   editorToolbarMode: EditorToolbarMode;
   /** Lado em que o painel "Índice" (Outline) docka. "right" (default)
    *  fica junto do Inspector na coluna direita; "left" desce embaixo
@@ -497,6 +501,7 @@ interface AppState {
   setEditorFontFamily: (v: EditorFontFamily) => void;
   setEditorPaper: (v: EditorPaper) => void;
   setTypewriterMode: (v: boolean) => void;
+  toggleSourceMode: () => void;
   setEditorToolbarMode: (v: EditorToolbarMode) => void;
   setOutlineSide: (v: OutlineSide) => void;
   setFloatingOutlineRect: (rect: Partial<FloatingOutlineRect>) => void;
@@ -1126,7 +1131,7 @@ function loadBoolPref(key: string, fallback: boolean): boolean {
   }
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   activeFilePath: null,
   activeFileName: null,
   fileBody: "",
@@ -1196,6 +1201,7 @@ export const useAppStore = create<AppState>((set) => ({
   editorFontFamily: loadEditorFontFamily(),
   editorPaper: loadEditorPaper(),
   typewriterMode: loadBoolPref(TYPEWRITER_MODE_KEY, DEFAULT_TYPEWRITER_MODE),
+  sourceMode: false,
   editorToolbarMode: loadEditorToolbarMode(),
   outlineSide: loadOutlineSide(),
   floatingOutline: { x: 360, y: 120, width: 320, height: 420 },
@@ -2066,6 +2072,16 @@ export const useAppStore = create<AppState>((set) => ({
       /* ignora */
     }
     set({ restoreWorkspaceLayout: v, splitPane: v ? loadSplitPane() : { kind: "none" } });
+  },
+
+  toggleSourceMode: () => {
+    const entering = !get().sourceMode;
+    // Ao entrar, o texto do editor formatado precisa estar no `fileBody`
+    // antes de o campo de Markdown assumir. Ao sair NÃO pode haver flush:
+    // o editor escondido ainda tem o texto de antes, e o flush gravaria
+    // esse texto velho por cima do que foi editado no Markdown.
+    if (entering) flushEditor();
+    set({ sourceMode: entering });
   },
 
   setStartView: (v) => {
