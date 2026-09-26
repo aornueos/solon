@@ -15,6 +15,7 @@ import {
 } from "../src/lib/sidebarDrop.ts";
 import { resolveTabDrop } from "../src/lib/tabDrop.ts";
 import { htmlAsPlainText } from "../src/lib/exportText.ts";
+import { localImagePath } from "../src/lib/editorImages.ts";
 import {
   collectExpandedRelPaths,
   expandedAbsolutePaths,
@@ -173,6 +174,28 @@ describe("sidebar folder drops", () => {
       ),
       false,
     );
+  });
+});
+
+describe("imagem da nota — caminho no disco", () => {
+  it("relativo à pasta da nota, como Typora e Obsidian gravam", () => {
+    assert.equal(localImagePath("imagens/capa.png", "/proj/parte/cap.md"), "/proj/parte/imagens/capa.png");
+    assert.equal(localImagePath("./assets/a.jpg", "/proj/cap.md"), "/proj/assets/a.jpg");
+    assert.equal(localImagePath("../fotos/a%20b.webp", "/proj/parte/cap.md"), "/proj/fotos/a b.webp");
+    assert.equal(localImagePath("<minha foto.png>", "/proj/cap.md"), "/proj/minha foto.png");
+  });
+
+  it("Windows: mantém a barra invertida e a unidade", () => {
+    assert.equal(localImagePath("img/a.png", "C:\\Livro\\cap.md"), "C:\\Livro\\img\\a.png");
+    assert.equal(localImagePath("../../../a.png", "C:\\Livro\\cap.md"), "C:\\a.png");
+    assert.equal(localImagePath("file:///C:/Fotos/x.png", "C:\\Livro\\cap.md"), "C:/Fotos/x.png");
+  });
+
+  it("absoluto passa direto; web, data: e o que não é imagem ficam de fora", () => {
+    assert.equal(localImagePath("/home/ana/foto.jpg", "/proj/cap.md"), "/home/ana/foto.jpg");
+    assert.equal(localImagePath("https://site.com/a.png", "/proj/cap.md"), null);
+    assert.equal(localImagePath("data:image/png;base64,xx", "/proj/cap.md"), null);
+    assert.equal(localImagePath("notas/segredo.txt", "/proj/cap.md"), null);
   });
 });
 

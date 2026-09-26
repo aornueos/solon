@@ -1,4 +1,9 @@
-import { isSafeAssetSrc, resolveImageUrl, saveImageForCanvas } from "./canvasImages";
+import {
+  isSafeAssetSrc,
+  resolveImageUrl,
+  resolveLocalImageUrl,
+  saveImageForCanvas,
+} from "./canvasImages";
 
 const EDITOR_ASSET_PREFIX = ".solon/";
 
@@ -26,11 +31,66 @@ export async function saveImageForEditor(
   };
 }
 
+const LOCAL_IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif|ico)$/i;
+
+/**
+ * Caminho no disco de uma imagem que a nota referencia por conta própria:
+ * relativo à pasta da nota ("imagens/capa.png", "../fotos/a.jpg" — como o
+ * Typora e o Obsidian gravam), absoluto ou `file://`. `null` para
+ * endereço da web, `data:`, `blob:` e o que não é imagem.
+ */
+export function localImagePath(src: string, notePath: string): string | null {
+  let raw = src.trim().replace(/^<(.*)>$/, "$1");
+  if (!raw || /^(data|blob|https?|asset|tauri|mailto):/i.test(raw)) return null;
+  if (/^file:\/\//i.test(raw)) {
+    raw = safeDecode(raw.replace(/^file:\/\/(localhost)?/i, ""));
+    // file:///C:/pasta/x.png → C:/pasta/x.png
+    if (/^\/[A-Za-z]:[\\/]/.test(raw)) raw = raw.slice(1);
+  } else {
+    raw = safeDecode(raw);
+  }
+  if (!LOCAL_IMAGE_EXT.test(raw)) return null;
+  if (raw.startsWith("/") || raw.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(raw)) return raw;
+
+  const sep = notePath.includes("\\") && !notePath.includes("/") ? "\\" : "/";
+  const dir = notePath.replace(/[\\/][^\\/]*$/, "");
+  const parts = dir.split(/[\\/]/);
+  for (const piece of raw.split(/[\\/]/)) {
+    if (piece === "" || piece === ".") continue;
+    if (piece === "..") {
+      // Não sobe além da raiz do disco ("/" ou "C:").
+      if (parts.length > 1) parts.pop();
+      continue;
+    }
+    parts.push(piece);
+  }
+  return parts.join(sep);
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURI(value);
+  } catch {
+    return value;
+  }
+}
+
+/**
+ * Troca o `src` das imagens pelo endereço que o webview consegue mostrar.
+ * O caminho escrito na nota fica em `data-solon-src` e é ele que volta
+ * para o arquivo ao salvar.
+ *
+ * - `.solon/assets/...` (imagem colada no Solon): lida do projeto.
+ * - Caminho da própria nota (relativo à pasta dela, absoluto, `file://`):
+ *   lido do disco — sem isso, nota vinda do Typora/Obsidian mostrava a
+ *   imagem quebrada. Precisa de `notePath`.
+ */
 export async function resolveEditorImageHtml(
   html: string,
   rootFolder: string | null,
+  notePath?: string | null,
 ): Promise<string> {
-  if (!html || !rootFolder) return html;
+  if (!html) return html;
 
   // SHORT-CIRCUIT: docs sem `<img>` (caso majoritario — texto puro) NAO
   // passam pelo DOMParser/innerHTML round-trip. Esse round-trip pelo
@@ -48,12 +108,21 @@ export async function resolveEditorImageHtml(
     images.map(async (img) => {
       const original =
         img.getAttribute("data-solon-src") || img.getAttribute("src") || "";
-      const rel = storageRelFromMarkdown(original);
-      if (!rel) return;
-      const url = await resolveImageUrl(rootFolder, rel);
+      const rel = rootFolder ? storageRelFromMarkdown(original) : null;
+      if (rel && rootFolder) {
+        const url = await resolveImageUrl(rootFolder, rel);
+        if (url) {
+          img.setAttribute("src", url);
+          img.setAttribute("data-solon-src", `${EDITOR_ASSET_PREFIX}${rel}`);
+          return;
+        }
+      }
+      const full = notePath ? localImagePath(original, notePath) : null;
+      if (!full) return;
+      const url = await resolveLocalImageUrl(full);
       if (!url) return;
       img.setAttribute("src", url);
-      img.setAttribute("data-solon-src", `${EDITOR_ASSET_PREFIX}${rel}`);
+      img.setAttribute("data-solon-src", original);
     }),
   );
   return doc.body.innerHTML;

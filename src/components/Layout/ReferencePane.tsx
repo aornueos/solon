@@ -34,7 +34,7 @@ export function ReferencePane({
         const { readTextFile } = await import("@tauri-apps/plugin-fs");
         const raw = await readTextFile(path);
         const { body } = parseDocument(raw);
-        const rendered = await resolveEditorImageHtml(markdownToHtml(body), rootFolder);
+        const rendered = await resolveEditorImageHtml(markdownToHtml(body), rootFolder, path);
         if (!cancelled) {
           setHtml(rendered);
           setError(null);

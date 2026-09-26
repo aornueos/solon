@@ -422,7 +422,7 @@ export function Editor() {
     const body = useAppStore.getState().fileBody;
     const html = markdownToHtml(body);
 
-    void resolveEditorImageHtml(html, rootFolder).then((resolvedHtml) => {
+    void resolveEditorImageHtml(html, rootFolder, activeFilePath).then((resolvedHtml) => {
       if (cancelled || lastLoadedPathRef.current !== activeFilePath) return;
       editor.commands.setContent(resolvedHtml, false);
       extractHeadings(editor, setHeadings);

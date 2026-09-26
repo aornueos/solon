@@ -136,7 +136,32 @@ function mimeFromExt(src: string): string {
   if (lower.endsWith(".gif")) return "image/gif";
   if (lower.endsWith(".webp")) return "image/webp";
   if (lower.endsWith(".svg")) return "image/svg+xml";
+  if (lower.endsWith(".bmp")) return "image/bmp";
+  if (lower.endsWith(".avif")) return "image/avif";
+  if (lower.endsWith(".ico")) return "image/x-icon";
   return "application/octet-stream";
+}
+
+/**
+ * URL de exibição de uma imagem pelo caminho completo no disco: a que a
+ * nota referencia por conta própria ("imagens/capa.png", uma foto em
+ * outra pasta), fora de `.solon/assets`. Usa o mesmo cache das outras.
+ */
+export async function resolveLocalImageUrl(fullPath: string): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+  const key = cacheKey(null, `file:${fullPath}`);
+  const cached = urlCache.get(key);
+  if (cached) return cached;
+  try {
+    const { readFile, exists } = await import("@tauri-apps/plugin-fs");
+    if (!(await exists(fullPath))) return null;
+    const bytes = await readFile(fullPath);
+    const url = URL.createObjectURL(new Blob([bytes], { type: mimeFromExt(fullPath) }));
+    urlCache.set(key, url);
+    return url;
+  } catch {
+    return null;
+  }
 }
 
 /**
