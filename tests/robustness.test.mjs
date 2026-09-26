@@ -14,6 +14,7 @@ import {
   resolveSidebarDrop,
 } from "../src/lib/sidebarDrop.ts";
 import { resolveTabDrop } from "../src/lib/tabDrop.ts";
+import { htmlAsPlainText } from "../src/lib/exportText.ts";
 import {
   collectExpandedRelPaths,
   expandedAbsolutePaths,
@@ -172,6 +173,17 @@ describe("sidebar folder drops", () => {
       ),
       false,
     );
+  });
+});
+
+describe("exportação — HTML cru vira texto", () => {
+  it("imagem redimensionada (<img>) vira o marcador de imagem, não some", () => {
+    assert.equal(
+      htmlAsPlainText('<img src="a.png" alt="Capa &quot;nova&quot;" width="320">').trim(),
+      '[imagem: Capa "nova"]',
+    );
+    assert.equal(htmlAsPlainText('<img src="a.png" width="320">').trim(), "[imagem]");
+    assert.equal(htmlAsPlainText("<u>sublinhado</u>").trim(), "sublinhado");
   });
 });
 

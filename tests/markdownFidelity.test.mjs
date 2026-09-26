@@ -67,6 +67,13 @@ describe("fidelidade do Markdown — o que o arquivo tem, o arquivo mantém", ()
   same("tabela", "| a | b |\n| --- | --- |\n| 1 | 2 |");
   same("tabela com colunas alinhadas", "| a | b |\n| :-: | --: |\n| 1 | 2 |");
   same("imagem sozinha", "![capa](imagens/capa.png)");
+  same("imagem redimensionada", '<img src="imagens/capa.png" alt="capa" width="320">');
+  same("imagem redimensionada em porcentagem", '<img src="capa.png" alt="" width="50%">');
+  same(
+    "imagem redimensionada com título e caracteres especiais",
+    '<img src="a&amp;b.png" alt="x" title="Um &quot;título&quot;" width="200">',
+  );
+  same("imagem redimensionada entre parágrafos", 'Antes.\n\n<img src="c.png" alt="c" width="240">\n\nDepois.');
   same("código com linguagem", "```js\nconst a = 1;\n```");
   same("negrito e itálico", "Um **forte** e *leve*.");
   same("tachado", "~~riscado~~");
@@ -131,6 +138,23 @@ describe("fidelidade do Markdown — o que o arquivo tem, o arquivo mantém", ()
     }
     assert.equal(serialize.warm(editor.state.doc, editor.schema, 0), true);
     assert.equal(serialize(editor.state.doc, editor.schema), htmlToMarkdown(editor.getHTML()));
+  });
+
+  it("largura da imagem vira atributo do nó; tirar a largura volta ao ![]()", () => {
+    editor.commands.setContent(markdownToHtml('<img src="c.png" alt="c" width="240px">'), false);
+    const image = editor.state.doc.child(0);
+    assert.equal(image.type.name, "image");
+    assert.equal(image.attrs.width, "240");
+    editor.commands.command(({ tr }) => {
+      tr.setNodeMarkup(0, undefined, { ...image.attrs, width: null });
+      return true;
+    });
+    assert.equal(trimNewlines(htmlToMarkdown(editor.getHTML())), "![c](c.png)");
+  });
+
+  it("largura inválida é ignorada", () => {
+    editor.commands.setContent(markdownToHtml('<img src="c.png" alt="c" width="grande">'), false);
+    assert.equal(editor.state.doc.child(0).attrs.width, null);
   });
 
   it("link com javascript: perde o destino, não vira link clicável", () => {

@@ -2,6 +2,7 @@ import { marked } from "marked";
 import { parseDocument } from "./frontmatter";
 import type { FileNode } from "../store/useAppStore";
 import { isTauriRuntime } from "./runtime";
+import { htmlAsPlainText } from "./exportText";
 
 /**
  * Export DOCX em formato manuscrito Shunn ("Proper Manuscript Format",
@@ -112,9 +113,6 @@ function normalizeText(value: string): string {
   return value.replace(/ /g, " ").replace(/[ \t]+/g, " ");
 }
 
-function stripHtml(value: string): string {
-  return value.replace(/<[^>]*>/g, " ");
-}
 
 /** Segmentos inline {text,bold,italic} a partir dos tokens do marked. */
 function inlineSegments(
@@ -163,7 +161,7 @@ function inlineSegments(
         break;
       case "html":
         segments.push({
-          text: normalizeText(stripHtml(token.text ?? token.raw ?? "")),
+          text: normalizeText(htmlAsPlainText(token.text ?? token.raw ?? "")),
           ...style,
         });
         break;
@@ -400,7 +398,7 @@ async function buildAndSave(
           }
           break;
         case "html":
-          pushPara([{ text: normalizeText(stripHtml(token.text ?? token.raw ?? "")) }]);
+          pushPara([{ text: normalizeText(htmlAsPlainText(token.text ?? token.raw ?? "")) }]);
           break;
         default:
           if (token.text || token.raw) {

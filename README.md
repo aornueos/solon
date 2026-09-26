@@ -39,7 +39,7 @@ What that means in practice:
 * **Focus mode** collapses sidebar, outline, and inspector while keeping tabs and toolbar available.
 * **Real fullscreen** through `F11`, using the OS window API.
 * **Snippet expansion** turns `;trigger` into the matching replacement defined in `.solon/snippets.json`.
-* **Inline images** can be pasted or dropped into the editor. They are stored under `.solon/assets/` and referenced as Markdown.
+* **Inline images** can be pasted or dropped into the editor. They are stored under `.solon/assets/` and referenced as Markdown. Drag an image's side handle to resize it in the page (double-click the handle to go back to the original size); a resized image is saved as `<img src="…" width="320">`, which GitHub, Obsidian and Typora also render at that size.
 * **Find and replace** with regex, whole word, and preserve case options.
 
 ### Project and Files

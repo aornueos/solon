@@ -449,12 +449,25 @@ turndown.addRule("editorImage", {
     const el = node as HTMLElement;
     const src = el.getAttribute("data-solon-src") || el.getAttribute("src") || "";
     if (!src) return "";
-    const alt = (el.getAttribute("alt") || "").replace(/]/g, "\\]");
     const title = el.getAttribute("title");
+    // Imagem redimensionada: o `![]()` não guarda tamanho, então vai como
+    // HTML — que o GitHub, o Obsidian e o Typora também mostram no tamanho.
+    const width = el.getAttribute("width");
+    if (width) {
+      const attr = (name: string, value: string) => ` ${name}="${escapeHtmlAttr(value)}"`;
+      return `\n\n<img${attr("src", src)}${attr("alt", el.getAttribute("alt") || "")}${
+        title ? attr("title", title) : ""
+      }${attr("width", width)}>\n\n`;
+    }
+    const alt = (el.getAttribute("alt") || "").replace(/]/g, "\\]");
     const titlePart = title ? ` "${title.replace(/"/g, '\\"')}"` : "";
     return `\n\n![${alt}](${src}${titlePart})\n\n`;
   },
 });
+
+function escapeHtmlAttr(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
 
 // Wikilinks `[[name]]` — quando a mark "wikilink" do TipTap esta
 // presente, o HTML tem `<a class="wikilink">name</a>` (ou
@@ -561,6 +574,8 @@ export const ALLOWED_ATTR = [
   "src",
   "alt",
   "title",
+  // Largura da imagem redimensionada (`<img width="320">`).
+  "width",
   "role",
   // Link comum. O DOMPurify já barra protocolos perigosos (javascript:,
   // data: em href); http(s), mailto e caminhos relativos passam.

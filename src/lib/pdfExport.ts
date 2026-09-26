@@ -2,6 +2,7 @@ import { marked } from "marked";
 import { parseDocument } from "./frontmatter";
 import type { FileNode } from "../store/useAppStore";
 import { isTauriRuntime } from "./runtime";
+import { htmlAsPlainText } from "./exportText";
 
 type PdfDocument = import("jspdf").jsPDF;
 
@@ -269,7 +270,7 @@ class PdfRenderer {
         this.table(token);
         break;
       case "html":
-        this.paragraph([{ text: normalizeText(stripHtml(token.text ?? token.raw ?? "")) }]);
+        this.paragraph([{ text: normalizeText(htmlAsPlainText(token.text ?? token.raw ?? "")) }]);
         break;
       default:
         if (token.raw || token.text) {
@@ -463,7 +464,7 @@ class PdfRenderer {
           segments.push({ text: "\n", ...style });
           break;
         case "html":
-          segments.push({ text: normalizeText(stripHtml(token.text ?? token.raw ?? "")), ...style });
+          segments.push({ text: normalizeText(htmlAsPlainText(token.text ?? token.raw ?? "")), ...style });
           break;
         default:
           if (token.tokens) {
@@ -556,9 +557,6 @@ function normalizeText(value: string): string {
   return value.replace(/\u00a0/g, " ").replace(/[ \t]+/g, " ");
 }
 
-function stripHtml(value: string): string {
-  return value.replace(/<[^>]*>/g, " ");
-}
 
 export async function exportFileToPdf(
   filePath: string,

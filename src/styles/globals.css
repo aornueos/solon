@@ -2001,7 +2001,6 @@ select:focus-visible {
   display: block;
   max-width: min(100%, 720px);
   max-height: 520px;
-  width: auto;
   height: auto;
   margin: 1.25rem auto;
   border-radius: 6px;
@@ -2009,9 +2008,84 @@ select:focus-visible {
   box-shadow: var(--shadow-sm);
 }
 
-.ProseMirror img.solon-editor-image.ProseMirror-selectednode {
+/* Largura escolhida pelo usuário (`<img width>`): vale até a largura da
+   página, sem o teto de 720px e sem limite de altura — com largura fixa,
+   limitar a altura distorceria a proporção. */
+.ProseMirror img.solon-editor-image[width],
+.solon-reference-pane img[width] {
+  max-width: 100%;
+  max-height: none;
+}
+
+/* Moldura da imagem no editor: do tamanho da imagem, centralizada, com as
+   alças de redimensionar nas bordas. */
+.ProseMirror .solon-image-frame {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 1.25rem auto;
+}
+.ProseMirror .solon-image-frame > img.solon-editor-image {
+  margin: 0;
+}
+.ProseMirror .solon-image-frame.is-selected > img.solon-editor-image {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+.solon-image-handle {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 44px;
+  margin-top: -22px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: 2px solid var(--bg-app);
+  box-shadow: var(--shadow-sm);
+  cursor: ew-resize;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.solon-image-handle[data-side="left"] {
+  left: -5px;
+}
+.solon-image-handle[data-side="right"] {
+  right: -5px;
+}
+.solon-image-frame:hover .solon-image-handle,
+.solon-image-frame.is-selected .solon-image-handle,
+.solon-image-frame.is-resizing .solon-image-handle {
+  opacity: 1;
+}
+.ProseMirror[contenteditable="false"] .solon-image-handle {
+  display: none;
+}
+
+/* Largura em px enquanto arrasta. */
+.solon-image-size {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  opacity: 0;
+}
+.solon-image-frame.is-resizing .solon-image-size {
+  opacity: 1;
+}
+
+html.solon-resizing-image,
+html.solon-resizing-image * {
+  cursor: ew-resize !important;
+  user-select: none;
 }
 
 /* ── Listas — Tailwind preflight remove list-style, restauramos ── */
